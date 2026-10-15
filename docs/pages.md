@@ -29,3 +29,5 @@
 ## 验收
 
 PR Workflow 会：安装依赖 → `pnpm check` → `pnpm build:portal` → Playwright 截图首页和 HBM 播放页 → 上传截图 Artifact。任何 E2E 尚未在 Runner 实际执行前不能算通过。
+
+已确认首次 `configure-pages@v5` 创建 Pages 站点返回 `Resource not accessible by integration`。需由仓库管理员手动启用 Pages，一次即可；后续 `dev` 上的构建部署均由现有工作流负责。

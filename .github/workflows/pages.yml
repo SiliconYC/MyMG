@@ -32,6 +32,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
+      - name: Configure Pages (fail fast if not enabled)
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - name: Checkout dev
         uses: actions/checkout@v4
       - name: Enable pnpm
@@ -42,18 +46,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: pnpm
       - name: Install workspace dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install --frozen-lockfile
       - name: Unit tests and workspace validation
         run: pnpm check
       - name: Build Pages portal
         run: pnpm --filter @mymg/portal build
         env:
           MYMG_BASE_PATH: /MyMG/
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:
