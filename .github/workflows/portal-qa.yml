@@ -10,7 +10,7 @@ on:
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
       - 'package.json'
-      - 'tooling/qa-portal.mjs'
+      - 'apps/portal/qa-portal.mjs'
       - '.github/workflows/portal-qa.yml'
   workflow_dispatch:
 
@@ -58,5 +58,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mymg-portal-qa
-          path: |\n            output/qa-portal/\n            pnpm-lock.yaml
+          path: |
+            output/qa-portal/
+            pnpm-lock.yaml
           if-no-files-found: warn

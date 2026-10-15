@@ -54,3 +54,5 @@ pnpm check
 部署工作流 `.github/workflows/pages.yml` 只在 `dev` 中与门户有关的路径变化时运行，或者手动触发；并不为文档、Python 实验等每个提交都调用 Runner。PR 上的截图验收工作流 `.github/workflows/portal-qa.yml` 也只在 Web 文件变化时触发。
 
 初次部署可能需要在 GitHub `Settings → Pages → Build and deployment` 选择 **GitHub Actions**。私有仓库的 Pages 可用性取决于 GitHub 计划；即使仓库私有，通常访问者也可以公开访问已发布站点。勿将内部机密或授权受限素材引入静态网站。详情见 [门户说明](apps/portal/README.md)。
+
+**Pages 首次开通需要管理员一次性操作：** `Settings → Pages → Source → GitHub Actions`。首次 Runner 构建已成功，但 GitHub App 的 `GITHUB_TOKEN` 缺少创建 Pages 站点的权限（`Resource not accessible by integration`）。此操作不影响 `main` 的代码。
