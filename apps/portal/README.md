@@ -6,11 +6,11 @@
 
 ## 本地开发
 
-在仓库根目录运行 `corepack pnpm install` 和 `corepack pnpm --filter @mymg/portal dev`；默认 http://127.0.0.1:5173/ 。
+在仓库根目录运行 `corepack pnpm install` 和 `corepack pnpm --filter @mymg/portal dev`；默认 http://127.0.0.1:5173/MyMG/ 。
 
 ## 打包与部署
 
-`corepack pnpm --filter @mymg/portal build`，GitHub Actions 中使用 `MYMG_BASE_PATH=/MyMG/` 或 `GITHUB_ACTIONS=true` 自动设置静态资源前缀。
+`corepack pnpm --filter @mymg/portal build`，GitHub Actions 中使用 始终使用 `/MyMG/` 静态资源前缀。
 
 ## 新增作品
 
