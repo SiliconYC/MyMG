@@ -1,0 +1,10 @@
+{
+  "name": "mymg-workbench",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Motion graphics prototyping monorepo (not a production service)",
+  "workspaces": [
+    "animations/*",
+    "packages/*"
+  ]
+}

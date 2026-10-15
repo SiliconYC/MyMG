@@ -1,0 +1,31 @@
+# Generated media / intermediary outputs
+**/output/
+**/renders/
+**/frames/
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.avi
+*.wav
+*.aac
+*.mp3
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+build/
+coverage/
+
+# Editors and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
