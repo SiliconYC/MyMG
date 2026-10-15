@@ -24,7 +24,7 @@ try {
   assert.equal(new URL(page.url()).hash, '#/hbm');
   await page.locator('canvas').first().waitFor({timeout:30_000});
   await page.screenshot({path: resolve(out,'hbm-start.png'),fullPage:true});
-  await page.getByRole('button',{name:'后一帧'}).click();
+  await page.getByRole('button',{name:'前进一帧'}).click();
   await page.screenshot({path: resolve(out,'hbm-step.png'),fullPage:true});
   await page.reload({waitUntil:'networkidle'});
   await page.getByTestId('project-player-page').waitFor({timeout:20_000});

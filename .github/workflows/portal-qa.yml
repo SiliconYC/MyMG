@@ -58,5 +58,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mymg-portal-qa
-          path: output/qa-portal/
+          path: |\n            output/qa-portal/\n            pnpm-lock.yaml
           if-no-files-found: warn
