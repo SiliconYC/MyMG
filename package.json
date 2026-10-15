@@ -1,10 +1,21 @@
 {
-  "name": "mymg-workbench",
+  "name": "mymg",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
-  "description": "Motion graphics prototyping monorepo (not a production service)",
-  "workspaces": [
-    "animations/*",
-    "packages/*"
-  ]
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=22.16.0"
+  },
+  "type": "module",
+  "scripts": {
+    "studio": "pnpm --filter @mymg/studio studio",
+    "compositions": "pnpm --filter @mymg/studio compositions",
+    "render": "node tooling/render.mjs",
+    "still": "node tooling/still.mjs",
+    "check": "node tooling/check-workspace.mjs && pnpm test && pnpm -r --if-present typecheck",
+    "check:structure": "node tooling/check-workspace.mjs",
+    "test": "node --experimental-strip-types --test tooling/*.test.mjs",
+    "qa": "node tooling/check-video.mjs",
+    "frames": "node tooling/capture-frames.mjs"
+  }
 }
