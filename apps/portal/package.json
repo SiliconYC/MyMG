@@ -1,0 +1,32 @@
+{
+  "name": "@mymg/portal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit -p tsconfig.json && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "qa": "node qa-portal.mjs"
+  },
+  "dependencies": {
+    "@mymg/hbm": "workspace:*",
+    "@mymg/mg": "workspace:*",
+    "@remotion/player": "4.0.534",
+    "@remotion/three": "4.0.534",
+    "@react-three/fiber": "^9.3.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "remotion": "4.0.534",
+    "three": "^0.181.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.181.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.0",
+    "playwright": "^1.56.0"
+  }
+}

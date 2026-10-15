@@ -1,40 +1,56 @@
 # MyMG — 动态图形实验工作台
 
-用于批量实验 MG（Motion Graphics）的程序化动画、三维科普、运镜、排版、音画同步以及质量检查。**这是技术原型仓库，不对外提供商用级服务**；优先沉淀源码、实验经验，不提交渲染产物。
+本仓库用于批量实验 Motion Graphics（MG）的**程序化动画、三维讲解、镜头语言、排版、音画同步与自动化质量检查**，不是对外提供商业视频服务的产品。只沉淀源码、工具和有价值的工程经验，不提交生成视频。
 
-## 架构
+## 技术路线
 
-- **Web 主线**：React + TypeScript + Remotion + Three.js / React Three Fiber。
-- **apps/studio/**：唯一的 Remotion 工作室，统一注册、预览和渲染所有作品。
-- **packages/mg/**：唯一的共享组件包（正交摄影机、确定性缓动、文字安全区）。
-- **animations/**：每个 MG 一个项目目录；现有 HBM Python 代码完整保留。
-- **animations/hbm/web/**：仅用于验证新基础设施，不是 Mustard-04。
-- **tooling/**：本地截帧、视频元数据检查、工作区与时间曲线测试。
+- **主线：** React + TypeScript + Remotion + Three.js / React Three Fiber。
+- **单一工作室：** `apps/studio` 注册和预览所有作品。
+- **公共能力：** `packages/mg` 提供统一摄影机、逐帧缓动和可读文字层。
+- **独立原型：** `animations/<主题>/` 自己管理场景和素材，不重复搭建工作室。
+- **旧项目兼容：** HBM 原有 Python 代码仍保留在 `animations/hbm/src/`。`animations/hbm/web/` 只提供基础设施验收场景，不等同于下一版 HBM 正片。
 
-## 安装与运行
+## 运行
 
-需要 Node.js 22.16+、pnpm 10+；需要渲染时安装 FFmpeg。所有 Web 项目只在仓库根目录安装一次依赖。
+需要 Node.js 22.16+、pnpm 10+。安装一次即可为所有项目复用依赖：
 
-    corepack enable
-    pnpm install
-    pnpm studio
+```bash
+corepack enable
+pnpm install
+pnpm studio
+```
 
-在 Studio 中可选择 SystemCheck（二维）或 HBMInfrastructureCheck（三维）。
+在 Studio 中预览 `SystemCheck`（二维）和 `HBMInfrastructureCheck`（三维）。
 
-    pnpm compositions
-    pnpm render HBMInfrastructureCheck output/hbm-check.mp4
-    pnpm frames HBMInfrastructureCheck 0,30,60,120,149
-    pnpm qa output/hbm-check.mp4 5 30
-    pnpm check
+```bash
+pnpm render HBMInfrastructureCheck output/hbm-check.mp4
+pnpm frames HBMInfrastructureCheck 0,30,60,120,149
+pnpm qa output/hbm-check.mp4 5 30
+pnpm check
+```
 
-注：由于初次搭建环境无法联网访问 npm，尚不能实际安装依赖及完成 Studio 视频渲染的端到端验证。首次成功安装时应生成并提交根目录 pnpm-lock.yaml；不得手工伪造锁文件。现已通过不依赖 npm 的结构测试、缓动测试与 TypeScript 语法检查。
+详细运行流程、验收原则参见 [架构](docs/architecture.md) 与 [检查清单](docs/quality.md)。字体需在运行机器上安装合规授权的字体；**不随仓库分发字体文件**。
 
-详细原则参见 docs/architecture.md 与 docs/quality.md。字体由运行环境依法安装，仓库不分发字体文件。
+## 版本与分支
 
-## 分支与交付约定
+- `main` 保持稳定，不经明确指令禁止合并。
+- `dev` 为日常集成分支。
+- 每次改动必须从 `dev` 新开临时分支，验证后以 PR 合并回 `dev`。
+- 每个实验允许独立实现特殊效果；经过多个项目验证后才抽取公共组件。
+- 自动化渲染与测试默认**在本地或 OpenAI 沙盒运行**，不默认使用 GitHub Actions Runner。
 
-1. **dev**：日常集成分支。修改前先从 dev 派生临时分支，完成并检查后创建 PR 合并 dev。
-2. **main**：未经用户明确指令，**禁止合并或提交**。
-3. 不默认使用 GitHub Actions Runner，验证优先本地或允许的沙盒。
-4. 重要工程经验逐步从实例中提炼为公共能力，不为了抽象而抽象。
-5. 音乐、影片和逐帧结果默认不入 Git；素材许可需单独确认。
+**依赖锁文件：** `pnpm-lock.yaml` 应由首次联网的 `pnpm install` 生成后提交。请不要手工编写或使用未经验证的锁文件。
+
+## GitHub Pages 项目门户
+
+- **入口：** `https://siliconyc.github.io/MyMG/`（需首次成功启用 Pages 才能访问）。
+- **作品链接：** `https://siliconyc.github.io/MyMG/#/hbm`。
+- **门户代码：** `apps/portal/`，所有可播放作品统一在 `apps/portal/src/catalog.ts` 登记。
+- **Web 样片：** 当前只有 HBM 三维基础设施演示，**不是**旧 Python Mustard-03 成片；后续每个 MG 都可逐步移植为浏览器作品。
+- **体验：** 作品页支持播放、暂停、时间轴拖动、单帧前后退和移动端浏览；不需要先导出 MP4。
+
+本地开发：在仓库根目录执行 `corepack pnpm install`、`corepack pnpm portal`。静态站点建置：`corepack pnpm build:portal`。仓库不托管生成的视频文件。
+
+部署工作流 `.github/workflows/pages.yml` 只在 `dev` 中与门户有关的路径变化时运行，或者手动触发；并不为文档、Python 实验等每个提交都调用 Runner。PR 上的截图验收工作流 `.github/workflows/portal-qa.yml` 也只在 Web 文件变化时触发。
+
+初次部署可能需要在 GitHub `Settings → Pages → Build and deployment` 选择 **GitHub Actions**。私有仓库的 Pages 可用性取决于 GitHub 计划；即使仓库私有，通常访问者也可以公开访问已发布站点。勿将内部机密或授权受限素材引入静态网站。详情见 [门户说明](apps/portal/README.md)。

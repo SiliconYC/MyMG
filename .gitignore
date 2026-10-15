@@ -1,4 +1,4 @@
-# Generated media and temporary render output
+# Source-only repo: no render files, audio samples or intermediate media
 **/output/
 **/renders/
 **/frames/
@@ -11,7 +11,7 @@
 *.aac
 *.mp3
 
-# pnpm / Node
+# Node / pnpm
 node_modules/
 .pnpm-store/
 .cache/
@@ -19,15 +19,20 @@ dist/
 build/
 coverage/
 
-# Retain Python legacy MG sources without generated Python artifacts
+# Python legacy prototypes
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 .pytest_cache/
 
-# Local editor state
+# Editors and operating systems
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# Browser QA and cached builds
+playwright-report/
+test-results/
+.pnpm-store/
