@@ -6,7 +6,6 @@
   "engines": {
     "node": ">=22.16.0"
   },
-  "type": "module",
   "scripts": {
     "studio": "pnpm --filter @mymg/studio studio",
     "compositions": "pnpm --filter @mymg/studio compositions",
@@ -16,6 +15,10 @@
     "check:structure": "node tooling/check-workspace.mjs",
     "test": "node --experimental-strip-types --test tooling/*.test.mjs",
     "qa": "node tooling/check-video.mjs",
-    "frames": "node tooling/capture-frames.mjs"
-  }
+    "frames": "node tooling/capture-frames.mjs",
+    "portal": "pnpm --filter @mymg/portal dev",
+    "build:portal": "pnpm --filter @mymg/portal build",
+    "qa:portal": "pnpm --filter @mymg/portal qa"
+  },
+  "type": "module"
 }
