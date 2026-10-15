@@ -1,4 +1,4 @@
-# Generated media / intermediary outputs
+# Generated media and temporary render output
 **/output/
 **/renders/
 **/frames/
@@ -11,20 +11,22 @@
 *.aac
 *.mp3
 
-# Python
+# pnpm / Node
+node_modules/
+.pnpm-store/
+.cache/
+dist/
+build/
+coverage/
+
+# Retain Python legacy MG sources without generated Python artifacts
 __pycache__/
 *.py[cod]
 .venv/
 venv/
 .pytest_cache/
 
-# Node
-node_modules/
-dist/
-build/
-coverage/
-
-# Editors and OS
+# Local editor state
 .DS_Store
 Thumbs.db
 .vscode/
