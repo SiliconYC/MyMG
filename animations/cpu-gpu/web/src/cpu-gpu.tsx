@@ -14,7 +14,7 @@ const INPUT='#c3c5c1';
 const OUTPUT='#418ca7';
 const CPU_BODY='#a98063';
 const GPU_BODY='#788b92';
-const CENTER:Record<Kind,number>={cpu:-8,gpu:8};
+const CENTER:Record<Kind,number>={cpu:-6.5,gpu:6.5};
 type Vec=[number,number,number];
 
 const Box:React.FC<{pos:Vec;size:Vec;color:string;metal?:number;
@@ -55,9 +55,9 @@ const Mechanism:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>{
   return <group position={[center,0,0]} scale={Math.max(.001,appear)}>
     {/* Three physically separate regions: source -> machine -> destination. */}
     <Box pos={[0,-.61,0]} size={[8.35,.26,7.12]} color="#c8c5be"/>
-    <Box pos={[-2.98,-.453,0]} size={[2.02,.075,6.5]} color="#b5b4af"/>
+    <Box pos={[-2.9,-.453,0]} size={[2.3,.075,6.5]} color="#b5b4af"/>
     <Box pos={[0,-.443,0]} size={[2.23,.075,6.5]} color="#bdbbb4"/>
-    <Box pos={[2.94,-.453,0]} size={[2.04,.075,6.5]} color="#b1c5c8"/>
+    <Box pos={[2.94,-.453,0]} size={[2.3,.075,6.5]} color="#b1c5c8"/>
     {kind==='cpu'
       ? Array.from({length:CPU_CORES},(_,i)=>(
           <group key={i}>
