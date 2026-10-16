@@ -54,6 +54,10 @@ try{
     side:el.getAttribute('data-contact-side'),
     leftGap:Number(el.getAttribute('data-entry-contact-distance')),
     rightGap:Number(el.getAttribute('data-exit-contact-distance')),
+    wheelPlane:Number(el.getAttribute('data-wheel-plane-z')),
+    palletPlane:Number(el.getAttribute('data-pallet-plane-z')),
+    shaftThroughBearing:Number(el.getAttribute('data-wheel-bearing-axial-overlap')),
+    radialRunningClearance:Number(el.getAttribute('data-wheel-bearing-running-clearance')),
   }));
   const checkShot=async(time,chapter,mode,filename)=>{
     await seek(Math.round(time*30));
@@ -68,6 +72,15 @@ try{
   assert.ok(front.current.z>12);
   const orbit=await checkShot(6.4,'rear','travel','clock-short-orbit.png');
   assert.ok(orbit.current.x>2);
+  const side=await checkShot(6.8,'rear','travel','clock-axial-side.png');
+  assert.ok(side.current.x>5,'side shot must expose axial wheel/pallet relation');
+  assert.equal(side.current.wheelPlane,side.current.palletPlane,
+    'wheel teeth and both pallets must occupy the same 3D working plane');
+  assert.ok(side.current.shaftThroughBearing>=.22-1e-5,
+    'rear axle must cross the full bearing width, not float in free space');
+  assert.ok(side.current.radialRunningClearance>.005 &&
+    side.current.radialRunningClearance<.03,
+    'support sleeve must have a small real radial running clearance');
   const rear=await checkShot(12,'rear','observe','clock-rear.png');
   assert.ok(rear.current.z< -6);
   assert.ok(!front.png.equals(rear.png));
