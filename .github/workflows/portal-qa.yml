@@ -30,6 +30,30 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Steam-only PRs must not waste Runner minutes on every unrelated MG.
+      # Mixed PRs or manual runs still execute the complete browser suite.
+      - name: Classify isolated steam-engine changes
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "steam_only=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -Ev '^(animations/steam-engine/|tooling/steam-engine\.test\.mjs$|apps/portal/qa-steam\.mjs$|\.github/workflows/portal-qa\.yml$)' >/dev/null; then
+            echo "steam_only=true" >> "$GITHUB_OUTPUT"
+            echo "Steam-only PR: full unit/type/build + focused steam WebGL Chromium QA"
+          else
+            echo "steam_only=false" >> "$GITHUB_OUTPUT"
+            echo "Mixed PR: full browser regression suite"
+          fi
       - uses: pnpm/action-setup@v4
         with:
           version: 10.20.0
@@ -46,6 +70,7 @@ jobs:
         env:
           MYMG_BASE_PATH: /MyMG/
       - name: Match Python typography fonts before browser screenshots
+        if: steps.scope.outputs.steam_only != 'true'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y fonts-noto-cjk fonts-inter
@@ -61,29 +86,35 @@ jobs:
           cat /tmp/mymg-vite-preview.log
           exit 1
       - name: Check native HBM WebGL 345 frames and nine screenshots
+        if: steps.scope.outputs.steam_only != 'true'
         run: pnpm --filter @mymg/portal qa
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
       - name: Verify new pendulum clock WebGL and synchronized second hand
+        if: steps.scope.outputs.steam_only != 'true'
         run: pnpm --filter @mymg/portal qa:clock
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal/clock
       - name: Verify CPU/GPU #22 native WebGL and four motion stages
+        if: steps.scope.outputs.steam_only != 'true'
         run: pnpm --filter @mymg/portal qa:cpu-gpu
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
       - name: Python reference visual comparison prerequisites
+        if: steps.scope.outputs.steam_only != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: pip
           cache-dependency-path: animations/hbm/requirements.txt
       - name: Install Python reference dependencies
+        if: steps.scope.outputs.steam_only != 'true'
         run: python -m pip install -r animations/hbm/requirements.txt
       - name: Compare actual Python geometry to native WebGL pixels
+        if: steps.scope.outputs.steam_only != 'true'
         run: python tooling/hbm-compare-reference.py "${{ github.workspace }}/output/qa-portal"
       - name: Verify live 3D steam engine cutaway and continuously moving piston
         run: pnpm --filter @mymg/portal exec node qa-steam.mjs
@@ -92,12 +123,14 @@ jobs:
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
 
       - name: Verify automatic cycling (#29), 3D orbit and native WebGL screenshots
+        if: steps.scope.outputs.steam_only != 'true'
         run: pnpm --filter @mymg/portal exec node qa-automatic-fire.mjs
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal/automatic-fire
 
       - name: Verify GPU-independent demo in Chromium
+        if: steps.scope.outputs.steam_only != 'true'
         run: pnpm --filter @mymg/portal qa:react
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/

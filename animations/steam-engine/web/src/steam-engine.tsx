@@ -10,6 +10,10 @@ import {
   BOILER_TO_VALVE,VALVE_TO_CYLINDER,CYLINDER_TO_EXHAUST,throttleLinkage,
 } from './steam-plumbing.ts';
 import {cameraPose} from './camera-path.ts';
+import {BELT_LENGTH,DRIVE_BELT_RADIUS,DRIVE_BELT_Z,DRIVE_CRANK_X,DRIVE_GOV_X,
+  DRIVE_SUPPORT_Y,BEVEL_APEX,BEVEL_INPUT_RADIUS,BEVEL_OUTPUT_RADIUS,
+  BEVEL_INPUT_LENGTH,BEVEL_OUTPUT_LENGTH,beltTravelAt
+} from './governor-drive-model.ts';
 import {flowOpacity, flowProgress, visibleArrowCount} from './steam-flow.ts';
 import {
   steamAtFrame, CYLINDER_LEFT, CYLINDER_RIGHT, CYLINDER_OUTER_RADIUS,
@@ -309,13 +313,15 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
   const linkage=throttleLinkage(g.sleeveY);
   const sleeveY=g.sleeveY+GOV_LIFT;
   return <group>
-    {/* Governor shaft passes down directly into the inline inlet valve;
-        no pedestal-mounted levers or horizontal control transmission. */}
-    <Rod from={[GOV_X,THROTTLE_Y+.10,GOV_Z]}
-      to={[GOV_X,GOV_PIVOT_Y+.12,GOV_Z]}
-      radius={.061} color="#bfcace"/>
-    {/* An actual rotating head and both balls turn on the same vertical axis. */}
+    {/* The vertical spindle itself is driven by the bevel gearbox below,
+        and rotates together with the head and balls. The nonrotating sleeve
+        continues to actuate the inline steam valve independently. */}
     <group position={[GOV_X,0,GOV_Z]} rotation={[0,g.spindlePhase,0]}>
+      <Rod from={[0,.03,0]} to={[0,GOV_PIVOT_Y+.12,0]}
+        radius={.060} color="#bfcace"/>
+      {/* Short shaft key makes the origin of torque visible without a HUD. */}
+      <Rod from={[.060,.43,0]} to={[.060,1.40,0]}
+        radius={.018} color="#d3b280"/>
       <mesh position={[0,GOV_PIVOT_Y,0]}>
         <cylinderGeometry args={[.18,.18,.20,24]}/>
         <meshStandardMaterial color="#e5be82" metalness={.84} roughness={.26}/>
@@ -398,26 +404,118 @@ const GovernorThrottle:React.FC<{s:SteamFrame}>=({s})=>{
   </group>;
 };
 
-/** Compact belt drive on the engine's own axle; small right-angle gearbox. */
-const GovernorDrive: React.FC<{s:SteamFrame}> = ({s}) => <group>
-  {[CRANK_X,GOV_X].map(x=>
-    <group key={x} position={[x,0,GOV_Z]} rotation={[0,0,s.theta]}>
-      <mesh>
-        <torusGeometry args={[.235,.061,14,40]}/>
-        <meshStandardMaterial color="#bb9c6d" metalness={.77} roughness={.30}/>
+/**
+ * A *closed* belt runs from the flywheel's crankshaft pulley to a supported
+ * horizontal layshaft. Two visible bevel gears turn that horizontal rotation
+ * 90° into the spindle directly under the flyballs. No free-floating cone.
+ */
+const DrivePulley:React.FC<{x:number;theta:number}>=({x,theta})=>
+  <group position={[x,0,DRIVE_BELT_Z]} rotation={[0,0,theta]}>
+    <mesh rotation={[Math.PI/2,0,0]} castShadow>
+      <cylinderGeometry args={[DRIVE_BELT_RADIUS,DRIVE_BELT_RADIUS,.13,40]}/>
+      <meshStandardMaterial color="#bf9a65" metalness={.8} roughness={.30}/>
+    </mesh>
+    {[-.083,.083].map(z=><mesh key={z} position={[0,0,z]}>
+      <torusGeometry args={[DRIVE_BELT_RADIUS,.035,10,40]}/>
+      <meshStandardMaterial color="#dfc398" metalness={.81} roughness={.26}/>
+    </mesh>)}
+    <Rod from={[-.20,0,.095]} to={[.20,0,.095]}
+      radius={.022} color="#f2d9a8"/>
+  </group>;
+
+const ClosedDriveBelt:React.FC<{theta:number}>=({theta})=>{
+  const path=useMemo(()=>{
+    const r=DRIVE_BELT_RADIUS,z=DRIVE_BELT_Z,k=.5522847498;
+    const l=DRIVE_GOV_X,h=DRIVE_CRANK_X;
+    const p=(x:number,y:number)=>new THREE.Vector3(x,y,z);
+    const curve=new THREE.CurvePath<THREE.Vector3>();
+    curve.add(new THREE.LineCurve3(p(h,r),p(l,r)));
+    curve.add(new THREE.CubicBezierCurve3(
+      p(l,r),p(l-k*r,r),p(l-r,k*r),p(l-r,0)));
+    curve.add(new THREE.CubicBezierCurve3(
+      p(l-r,0),p(l-r,-k*r),p(l-k*r,-r),p(l,-r)));
+    curve.add(new THREE.LineCurve3(p(l,-r),p(h,-r)));
+    curve.add(new THREE.CubicBezierCurve3(
+      p(h,-r),p(h+k*r,-r),p(h+r,-k*r),p(h+r,0)));
+    curve.add(new THREE.CubicBezierCurve3(
+      p(h+r,0),p(h+r,k*r),p(h+k*r,r),p(h,r)));
+    return curve;
+  },[]);
+  return <group>
+    <mesh castShadow>
+      <tubeGeometry args={[path,176,.029,8,true]}/>
+      <meshStandardMaterial color="#393e46" metalness={.10} roughness={.68}/>
+    </mesh>
+    {/* Four restrained witness marks make belt motion obvious. Each mark
+        advances at the exact crank pulley rim velocity r × crank angle. */}
+    {Array.from({length:4},(_,i)=>
+      <mesh key={i} position={path.getPointAt(beltTravelAt(theta,i,4)/BELT_LENGTH)}>
+        <sphereGeometry args={[.048,12,8]}/>
+        <meshStandardMaterial color="#deb881" metalness={.68} roughness={.34}/>
       </mesh>
-      <Rod from={[-.22,0,0]} to={[.22,0,0]}
-        radius={.032} color="#ddbb80"/>
-    </group>
-  )}
-  <Rod from={[GOV_X,.235,GOV_Z]} to={[CRANK_X,.235,GOV_Z]}
-    radius={.025} color="#555966" metallic={.20}/>
-  <Rod from={[GOV_X,-.235,GOV_Z]} to={[CRANK_X,-.235,GOV_Z]}
-    radius={.025} color="#555966" metallic={.20}/>
-  <mesh position={[GOV_X,0,GOV_Z]} rotation={[0,s.governor.spindlePhase,0]}>
-    <coneGeometry args={[.19,.26,24]}/>
-    <meshStandardMaterial color="#cfb488" metalness={.76} roughness={.29}/>
+    )}
+  </group>;
+};
+
+const GovernorDrive:React.FC<{s:SteamFrame}>=({s})=><group>
+  {/* The driver sits on the SAME flywheel axle; the driven pulley is
+      locked to the rear layshaft (both rotate at crankshaft phase). */}
+  <DrivePulley x={DRIVE_CRANK_X} theta={s.theta}/>
+  <DrivePulley x={DRIVE_GOV_X} theta={s.theta}/>
+  <ClosedDriveBelt theta={s.theta}/>
+  <Rod from={[GOV_X,0,DRIVE_BELT_Z-.18]}
+    to={[GOV_X,0,GOV_Z-.04]} radius={.060} color="#b8c5c8"/>
+  {/* One unobtrusive frame-mounted bearing carries the layshaft instead
+      of allowing the second wheel to hang in empty space. */}
+  <Rod from={[GOV_X,DRIVE_SUPPORT_Y,DRIVE_BELT_Z-.15]}
+    to={[GOV_X,-.08,DRIVE_BELT_Z-.15]}
+    radius={.065} color="#5b7080"/>
+  <mesh position={[GOV_X,0,DRIVE_BELT_Z-.15]}
+    rotation={[Math.PI/2,0,0]}>
+    <cylinderGeometry args={[.115,.115,.19,24]}/>
+    <meshStandardMaterial color="#8da0a9" metalness={.74} roughness={.32}/>
   </mesh>
+  {/* A perpendicular pair of pitch cones with the SAME geometric apex.
+      Input 22 teeth / output 10 teeth gives the 11:5 spindle ratio. */}
+  <group position={BEVEL_APEX} rotation={[0,0,s.theta]}>
+    <mesh position={[0,0,-BEVEL_INPUT_LENGTH]} rotation={[Math.PI/2,0,0]}>
+      <coneGeometry args={[BEVEL_INPUT_RADIUS,2*BEVEL_INPUT_LENGTH,44]}/>
+      <meshStandardMaterial color="#cb985d" metalness={.78} roughness={.28}/>
+    </mesh>
+    <mesh position={[0,0,-2*BEVEL_INPUT_LENGTH]}>
+      <torusGeometry args={[BEVEL_INPUT_RADIUS,.019,8,44]}/>
+      <meshStandardMaterial color="#ead2a1" metalness={.82} roughness={.26}/>
+    </mesh>
+    {Array.from({length:11},(_,i)=>{
+      const a=i*2*Math.PI/11;
+      return <mesh key={i} position={[
+        BEVEL_INPUT_RADIUS*Math.cos(a),BEVEL_INPUT_RADIUS*Math.sin(a),-2*BEVEL_INPUT_LENGTH
+      ]} rotation={[0,0,a]}>
+        <boxGeometry args={[.048,.033,.063]}/>
+        <meshStandardMaterial color="#e7bf83" metalness={.75} roughness={.32}/>
+      </mesh>;
+    })}
+  </group>
+  <group position={BEVEL_APEX} rotation={[0,s.governor.spindlePhase,0]}>
+    <mesh position={[0,BEVEL_OUTPUT_LENGTH,0]} rotation={[Math.PI,0,0]}>
+      <coneGeometry args={[BEVEL_OUTPUT_RADIUS,2*BEVEL_OUTPUT_LENGTH,28]}/>
+      <meshStandardMaterial color="#d7b47b" metalness={.81} roughness={.26}/>
+    </mesh>
+    <mesh position={[0,2*BEVEL_OUTPUT_LENGTH,0]} rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[BEVEL_OUTPUT_RADIUS,.021,8,32]}/>
+      <meshStandardMaterial color="#f1d19a" metalness={.82} roughness={.28}/>
+    </mesh>
+    {Array.from({length:10},(_,i)=>{
+      const a=i*2*Math.PI/10;
+      return <mesh key={i} position={[
+        BEVEL_OUTPUT_RADIUS*Math.cos(a),2*BEVEL_OUTPUT_LENGTH,
+        BEVEL_OUTPUT_RADIUS*Math.sin(a)
+      ]} rotation={[0,a,0]}>
+        <boxGeometry args={[.031,.06,.025]}/>
+        <meshStandardMaterial color="#edc68a" metalness={.80} roughness={.30}/>
+      </mesh>;
+    })}
+  </group>
 </group>;
 
 const Pedestals: React.FC = () => <group>
@@ -503,7 +601,7 @@ const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
  * Only one card and one guide line are visible at any moment.
  */
 const TEACHING_BEATS = [
-  {start:5.42,end:7.23,part:'belt',lines:['飞轮带动皮带','调速器跟着转动']},
+  {start:5.42,end:7.23,part:'belt',lines:['曲轴带动闭合皮带','伞齿轮驱动重锤转动']},
   {start:7.26,end:10.73,part:'balls',lines:['转速升高','两颗重锤向外张开']},
   {start:10.77,end:13.31,part:'sleeve',lines:['重锤张开，套筒上升','进汽阀门被直接带动']},
   {start:13.35,end:16.26,part:'valve',lines:['节流阀片升起，进汽减少','发动机开始减速']},
@@ -517,7 +615,7 @@ type TeachingPart = typeof TEACHING_BEATS[number]['part'];
  * The actual opening is apparent from the balls and their expanding orbit ring.
  */
 const anchoredPoint = (part:TeachingPart,_s:SteamFrame):V3 => {
-  if(part==='belt') return [GOV_X,-.28,GOV_Z];
+  if(part==='belt') return [(DRIVE_GOV_X+DRIVE_CRANK_X)/2,-.28,DRIVE_BELT_Z];
   if(part==='balls') return [GOV_X,GOV_PIVOT_Y-.28,GOV_Z];
   if(part==='sleeve') return [GOV_X,2.9-.28,GOV_Z];
   if(part==='valve') return [THROTTLE_X,THROTTLE_Y-.28,THROTTLE_Z];
@@ -576,6 +674,10 @@ export const SteamEngineScene: React.FC = () => {
     data-piston-x={s.pistonX.toFixed(4)}
     data-crank-angle={s.theta.toFixed(4)}
     data-governor-speed={s.governor.relativeSpeed.toFixed(4)}
+    data-drive-source-angle={s.theta.toFixed(4)}
+    data-drive-pulley-angle={s.theta.toFixed(4)}
+    data-drive-gear-angle={s.governor.spindlePhase.toFixed(4)}
+    data-drive-belt-travel={beltTravelAt(s.theta).toFixed(4)}
     data-governor-angle={s.governor.angle.toFixed(4)}
     data-governor-sleeve={s.governor.sleeveY.toFixed(4)}
     data-governor-throttle={s.governor.throttle.toFixed(4)}
