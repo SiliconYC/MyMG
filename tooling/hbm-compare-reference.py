@@ -28,6 +28,10 @@ def rgb(img:Image.Image)->np.ndarray:
 
 def normalized_screen(filename:pathlib.Path)->Image.Image:
     im=Image.open(filename).convert("RGB")
+    # Chromium can include one redundant bottom pixel if the composition's
+    # subpixel screen origin is rounded outwards. Cropping never rescales.
+    if im.size==(1280,721):
+        im=im.crop((0,0,1280,720))
     if im.size!=(1280,720):
         raise AssertionError(f"Canvas screenshot must be 1280x720 without CSS scale or borders, got {im.size} from {filename}")
     return im
