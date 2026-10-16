@@ -17,6 +17,15 @@ export const GENERIC_X=-26.5;
 export const CENTER:Record<Kind,number>={cpu:-8.4,gpu:8.4};
 export const CHIP_HALF=3.275;
 export const GRID_STEP=.63;
+
+// Perspective lens with extra margin for the foreshortened near chip edges.
+// 'zoom' remains a framing cue; actual perspective push-ins move in 3D.
+export const PERSPECTIVE_FOV=38;
+export const CAMERA_FRAME_HEIGHT=720;
+export const CAMERA_FRAMING_MARGIN=1.30;
+export const perspectiveDistance=(framingZoom:number)=>
+  CAMERA_FRAME_HEIGHT*CAMERA_FRAMING_MARGIN/
+  (2*framingZoom*Math.tan(PERSPECTIVE_FOV*Math.PI/360));
 export const INPUT_X=-6.9;
 export const OUTPUT_X=5.25;
 export const clamp=(n:number)=>Math.max(0,Math.min(1,n));
@@ -37,12 +46,14 @@ export const cameraAt=(frame:number)=>{
   const cpu=smooth((frame-60)/35);
   const gpu=smooth((frame-237)/29);
   const together=smooth((frame-332)/45);
+  const zoom=80-10*cpu
+    -7*smooth((frame-238)/12)+7*smooth((frame-250)/17)
+    -35*together;
   return {
     focusX:GENERIC_X+(CENTER.cpu-GENERIC_X)*cpu+
       (CENTER.gpu-CENTER.cpu)*gpu-CENTER.gpu*together,
-    zoom:80-10*cpu
-      -7*smooth((frame-238)/12)+7*smooth((frame-250)/17)
-      -35*together,
+    zoom,
+    distance:perspectiveDistance(zoom),
     yaw:.35+.13*smooth((frame-8)/45)
       -.75*smooth((frame-60)/35)
       +.31*smooth((frame-110)/116)

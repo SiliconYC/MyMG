@@ -1,5 +1,5 @@
 /** Chromium/SwiftShader acceptance: no transparent enclosing compute cube,
- * real shared task motions, accelerated orbital camera with yaw and pitch.
+ * real shared task motions, perspective dolly and fast yaw/pitch orbit.
  */
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -39,6 +39,8 @@ try{
   await scene.waitFor();
   assert.equal(await scene.getAttribute('data-renderer'),'react-threejs-webgl');
   assert.equal(await scene.getAttribute('data-chip-design'),'complete-silicon-top');
+  assert.equal(await scene.getAttribute('data-camera-projection'),'perspective');
+  assert.equal(Number(await scene.getAttribute('data-camera-fov')),38);
   assert.equal(await page.locator('video').count(),0);
   assert.equal(await scene.locator('img').count(),0);
   const canvas=scene.locator('canvas').first();
@@ -60,6 +62,8 @@ try{
     assert.equal(await scene.locator('span').count(),1);
     assert.ok(await number('data-camera-zoom')>=35);
     assert.ok(await number('data-camera-zoom')<=80);
+    assert.ok(await number('data-camera-distance')>10);
+    assert.ok(await number('data-camera-distance')<65);
     const png=await scene.screenshot({path:resolve(out,'cpu-gpu-orbit-'+frame+'.png')});
     assert.ok(png.byteLength>6000,'WebGL scene failed at frame '+frame);
     return png;
@@ -73,6 +77,7 @@ try{
   assert.doesNotMatch(introText,/CPU|GPU/);
   const exampleX=await number('data-example-location');
   assert.ok(Math.abs(exampleX-await number('data-cpu-location'))>9);
+  const introDistance=await number('data-camera-distance');
   const introMid=await image(30,'task',0,0,0,0);
   assert.ok(Buffer.compare(start,introMid)!==0,'neutral arithmetic operation must animate');
   assert.ok(await number('data-example-dyed')>.2,'cube must change color ABOVE exposed tile');
@@ -82,6 +87,8 @@ try{
 
   // The CPU and GPU each receive the identical 16 jobs, not the generic sample.
   await image(110,'cpu',0,0,4,0);
+  assert.ok(await number('data-camera-distance')>introDistance,
+    'perspective move must pull back when framing all CPU job pads');
   await image(133,'cpu',4,0,0,0);
   await image(167,'cpu',8,0,0,0);
   await image(235,'cpu',16,0,0,0);
@@ -103,6 +110,8 @@ try{
   await image(322,'gpu',16,16,0,0);
   await image(370,'compare',16,16,0,0);
   await image(419,'compare',16,16,0,0);
+  assert.ok(await number('data-camera-distance')>introDistance*1.8,
+    'final two-chip framing must come from a real 3D dolly, not orthographic zoom');
 
   for(const frame of [59,60,94,95,237,250,266,270,271,331,345,346,377]){
     await seek(frame);
@@ -130,7 +139,7 @@ try{
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:resolve(out,'cpu-gpu-cinematic-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU cinematic WebGL verified: exposed task core, shared movement, fast yaw/pitch orbit, mobile.');
+  console.log('CPU/GPU perspective WebGL verified: actual depth, 3D dolly, fast yaw/pitch orbit, mobile.');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}
