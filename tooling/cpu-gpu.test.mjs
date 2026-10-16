@@ -6,6 +6,7 @@ import {
   DURATION,FPS,TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,
   GENERIC_X,CENTER,CHIP_HALF,GRID_STEP,INPUT_X,
   stageAt,cameraAt,jobProgress,taskAt,taskPositions,
+  PERSPECTIVE_FOV,CAMERA_FRAMING_MARGIN,perspectiveDistance,
   completedCount,workingCount,corePosition,exampleAt,flowAt,
 } from '../animations/cpu-gpu/web/src/model.ts';
 
@@ -122,12 +123,71 @@ test('cinematic real-3D orbital camera with a fast, eased CPU→GPU transition',
     assert.ok(Math.abs(b.yaw-a.yaw)<.08,'camera yaw snapped at '+f);
     assert.ok(Math.abs(b.pitch-a.pitch)<.02,'camera elevation snapped at '+f);
     assert.ok(b.zoom>=35&&b.zoom<=80);
-    assert.ok(720/b.zoom>=9,'visible camera height must contain entire core');
+    assert.ok(720*CAMERA_FRAMING_MARGIN/b.zoom>=9,
+      'perspective center-plane framing must contain the core');
+    assert.ok(b.distance>10&&b.distance<65,'dolly must stay clear of geometry');
+    assert.ok(Math.abs(b.distance-perspectiveDistance(b.zoom))<1e-9);
+    assert.ok(Math.abs(b.distance-a.distance)<1.9,'perspective dolly snapped');
   }
   assert.ok(maxDx>.6,'camera move still too uniform/slow');
   assert.ok(maxDyaw>.02,'rotation does not visibly move');
   assert.ok(maxDpitch>.005,'pitch does not visibly move');
   assert.ok(1280/cameraAt(419).zoom>36);
+});
+
+
+/** Independent perspective projection, with the target on y=targetY, z=0.
+ * Normalized screen coordinates have visible bounds [-1,+1].
+ */
+const project=(point,c)=>{
+  const x=point[0]-c.focusX,y=point[1]-c.targetY,z=point[2];
+  const sinYaw=Math.sin(c.yaw),cosYaw=Math.cos(c.yaw);
+  const sinPitch=Math.sin(c.pitch),cosPitch=Math.cos(c.pitch);
+  const depth=c.distance-(x*cosPitch*sinYaw+y*sinPitch+z*cosPitch*cosYaw);
+  assert.ok(depth>1,'camera must not cross geometry');
+  const slope=Math.tan(PERSPECTIVE_FOV*Math.PI/360);
+  return {
+    x:(x*cosYaw-z*sinYaw)/(depth*slope*1280/720),
+    y:(-x*sinYaw*sinPitch+y*cosPitch-z*cosYaw*sinPitch)/(depth*slope),
+    depth,
+  };
+};
+
+test('perspective lens creates natural parallax and keeps hold shots fully framed',()=>{
+  assert.equal(PERSPECTIVE_FOV,38);
+  assert.ok(CAMERA_FRAMING_MARGIN>1.2);
+  const intro=cameraAt(0),cpu=cameraAt(110),gpu=cameraAt(280),wide=cameraAt(419);
+  assert.ok(intro.distance<cpu.distance&&cpu.distance<wide.distance);
+  assert.ok(Math.abs(cpu.distance-gpu.distance)<.1);
+  const near=project([CENTER.cpu,0,2],cpu);
+  const far=project([CENTER.cpu,0,-2],cpu);
+  assert.ok(near.depth<far.depth,'foreground really is closer');
+  assert.ok(far.depth/near.depth>1.15,'near/far scale difference must be visible');
+
+  // Cover die, both external job pads and their 4x4 task cubes.
+  // Insets are deliberately tighter than the full [-1,+1] frustum.
+  const shots=[
+    ...[0,30,60].map(f=>[f,[[-29.6,-23.4]]]),
+    ...[95,110,150,210,235,237].map(f=>[f,[[-16.6,.2]]]),
+    ...[266,280,293,322,332].map(f=>[f,[[.2,16.9]]]),
+    ...[377,419].map(f=>[f,[[-16.6,.2],[.2,16.9]]]),
+  ];
+  for(const [frame,ranges] of shots){
+    const c=cameraAt(frame);
+    for(const [left,right] of ranges){
+      for(const x of [left,right]){
+        for(const y of [-.75,.85]){
+          for(const z of [-3.4,3.4]){
+            const screen=project([x,y,z],c);
+            assert.ok(Math.abs(screen.x)<.93,
+              'perspective x clipping at frame '+frame+': '+screen.x);
+            assert.ok(Math.abs(screen.y)<.93,
+              'perspective y clipping at frame '+frame+': '+screen.y);
+          }
+        }
+      }
+    }
+  }
 });
 
 test('WebGL neutral cell is opaque and shares physical task motion with the cores',()=>{
@@ -144,6 +204,11 @@ test('WebGL neutral cell is opaque and shares physical task motion with the core
   assert.match(scene,/data-renderer="react-threejs-webgl"/);
   assert.match(scene,/data-camera-yaw/);
   assert.match(scene,/data-camera-pitch/);
+  assert.match(scene,/data-camera-projection="perspective"/);
+  assert.match(scene,/data-camera-fov/);
+  assert.match(scene,/data-camera-distance/);
+  assert.match(scene,/THREE\\.PerspectiveCamera/);
+  assert.doesNotMatch(scene,/<ThreeCanvas\\s+orthographic|THREE\\.OrthographicCamera/);
   assert.match(scene,/Math\.sin\(yaw\)/);
   assert.match(scene,/Math\.sin\(pitch\)/);
   assert.match(scene,/ThreeCanvas/);
