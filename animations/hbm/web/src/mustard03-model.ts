@@ -4,7 +4,14 @@
  * triangles are rasterised by Three.js/WebGL, not by the Python renderer. */
 export type Point3 = readonly [number,number,number];
 export type Point2 = readonly [number,number];
-export type Primitive = {points: Point2[]; world?: Point3[]; color: string; opacity: number};
+export type Primitive = {
+  points: Point2[];
+  world?: Point3[];
+  color: string;
+  opacity: number;
+  /** Procedural Gaussian shadow evaluated in the fragment shader, never a texture. */
+  shadow?: {corners: readonly [Point2,Point2,Point2,Point2]; radius: number};
+};
 type Cam = {s:number;tx:number;ty:number;ax:number;ay:number};
 type Draft = {cam:Cam; commands:Primitive[]};
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));
@@ -74,18 +81,24 @@ function dot(d:Draft,v:Point3,r:number,color:string,alpha=1){
   for(let k=0;k<12;k++){const a=2*Math.PI*k/12;pts.push([x+r*Math.cos(a),y+r*Math.sin(a)]);}
   plane(d,pts,color,alpha);
 }
-function shadow(d:Draft,x:number,y:number,sx:number,sy:number,z:number,alpha:number){
-  // Approximate Pillow GaussianBlur with 25 weighted shells; no stepped slabs.
-  const rings=25;
-  let norm=0;
-  const weights=Array.from({length:rings},(_,i)=>Math.exp(-.5*Math.pow(i/7.5,2)));
-  for(const w of weights)norm+=w;
-  for(let j=rings-1;j>=0;j--){
-    const e=j*(1.3/d.cam.s);
-    const strength=.32*alpha*weights[j]/norm;
-    polygon(d,[[x-sx/2-e,y-sy/2-e,z],[x+sx/2+e,y-sy/2-e,z],
-      [x+sx/2+e,y+sy/2+e,z],[x-sx/2-e,y+sy/2+e,z]],'#0f1b20',strength);
-  }
+function shadow(d:Draft,x:number,y:number,sx:number,sy:number,z:number,
+  alpha:number,radius:number){
+  if(alpha<=0.001)return;
+  // Python v3.shadow: four projected corners blurred by Pillow GaussianBlur.
+  // Render a slightly oversized box with a distance-field Gaussian convolution
+  // in the GPU fragment shader. No precomputed image, bitmap or video.
+  const corners=[
+    project(d.cam,[x-sx/2,y-sy/2,z]),
+    project(d.cam,[x+sx/2,y-sy/2,z]),
+    project(d.cam,[x+sx/2,y+sy/2,z]),
+    project(d.cam,[x-sx/2,y+sy/2,z])
+  ] as [Point2,Point2,Point2,Point2];
+  const x0=Math.min(...corners.map(p=>p[0]))-radius*3.4;
+  const x1=Math.max(...corners.map(p=>p[0]))+radius*3.4;
+  const y0=Math.min(...corners.map(p=>p[1]))-radius*3.4;
+  const y1=Math.max(...corners.map(p=>p[1]))+radius*3.4;
+  d.commands.push({points:[[x0,y0],[x1,y0],[x1,y1],[x0,y1]],
+    color:'#0f1b20',opacity:alpha,shadow:{corners,radius}});
 }
 function box(d:Draft,cx:number,cy:number,sx:number,sy:number,z:number,h:number,
   top:string,fx:string,fy:string,alpha=1,notch=0,edge=1){
@@ -124,7 +137,14 @@ function seams(d:Draft,x:number,y:number,z:number,alpha:number){
 }
 function unifiedStack(d:Draft,x:number,y:number,alpha=1,rise=0,shadowAlpha=1) {
   if(alpha<.002)return;
-  shadow(d,x,y,DIE_SX,DIE_SY,BASE_Z-.052,alpha*shadowAlpha*.7);
+  // v7.unified_stack uses a crisp projected contact quad, NOT a blurred
+  // v3.shadow; this distinguishes the final package from the opening hero.
+  polygon(d,[
+    [x-DIE_SX/2,y-DIE_SY/2,BASE_Z-.052],
+    [x+DIE_SX/2,y-DIE_SY/2,BASE_Z-.052],
+    [x+DIE_SX/2,y+DIE_SY/2,BASE_Z-.052],
+    [x-DIE_SX/2,y+DIE_SY/2,BASE_Z-.052]
+  ],'#1d383a',57/255*alpha*shadowAlpha*.72);
   box(d,x,y,DIE_SX+.08,DIE_SY+.07,BASE_Z+rise,BASE_H,
     '#C7A575','#8E6943','#AE8557',alpha);
   contacts(d,x,y,BASE_Z+rise,alpha);
@@ -140,7 +160,7 @@ function hero(d:Draft,t:number){
   const x=HBM_X,y=HBM_Y;
   // Python Mustard-03 accelerates collapse of TSV before the wide shot.
   const ot=t>7.57?t+.72*smooth((t-7.57)/.68):t;
-  shadow(d,x,y,DIE_SX+.15,DIE_SY+.12,BASE_Z-.04,.8);
+  shadow(d,x,y,DIE_SX+.15,DIE_SY+.12,BASE_Z-.04,76/255,16);
   const on=easeout((ot-1.55)/.32);
   if(on>0){
     const bz=BASE_Z-.25*(1-on);
@@ -189,9 +209,13 @@ function gpu(d:Draft,x:number,y:number,t:number,start:number){
   if(p<=0)return;
   const land=easeout(p),alpha=smooth(p/.46);
   const z=.15-.28*(1-land);
-  shadow(d,x,y,4.05,4.25,z-.05,.5*land*alpha);
-  // Python v6.gpu_new: three solid faces and an inset. No old v5 ticks.
+  // The v6 GPU has a crisp contact quad, not a Gaussian blur.
   const sx=4.05,sy=4.25,x0=x-sx/2,x1=x+sx/2,y0=y-sy/2,y1=y+sy/2,z1=z+.48;
+  polygon(d,[
+    [x0+.1,y0+.1,z-.05],[x1-.1,y0+.1,z-.05],
+    [x1-.1,y1-.1,z-.05],[x0+.1,y1-.1,z-.05]
+  ],'#18313e',(45/255)*land*alpha);
+  // Python v6.gpu_new: three solid faces and an inset.
   polygon(d,[[x1,y0,z],[x1,y1,z],[x1,y1,z1],[x1,y0,z1]],'#25374A',alpha);
   polygon(d,[[x0,y1,z],[x1,y1,z],[x1,y1,z1],[x0,y1,z1]],'#33485E',alpha);
   polygon(d,[[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]],'#43586D',alpha);
@@ -203,7 +227,7 @@ function gpu(d:Draft,x:number,y:number,t:number,start:number){
 function support(d:Draft,t:number){
   const alpha=smooth((t-9.23)/.70);
   if(alpha<=0)return;
-  shadow(d,-2.35,.63,12,11.3,-.48,.9*alpha);
+  shadow(d,-2.35,.63,12,11.3,-.48,(91/255)*alpha,23);
   box(d,-2.35,.63,12,11.3,-.42,.49,'#54696C','#253A41','#324952',alpha,0,2);
   // 24 fully routed GPU-to-HBM traces, with true endpoints beneath chip footprints.
   let k=0;
