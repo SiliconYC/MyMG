@@ -6,12 +6,13 @@ import {steamAtFrame,CRANK_X,CRANK_RADIUS,CONNECTING_ROD,
   '../animations/steam-engine/web/src/steam-model.ts';
 import {governorAtFrame,GOVERNOR_START_FRAME,loadReliefAt,NOMINAL_ANGLE} from
   '../animations/steam-engine/web/src/governor-model.ts';
-import {GOV_X,GOV_Z,THROTTLE_X,THROTTLE_Y,THROTTLE_Z,THROTTLE_LEFT,THROTTLE_RIGHT,
+import {GOV_X,GOV_Z,GOV_PIVOT_Y,GOV_LIFT,THROTTLE_X,THROTTLE_Y,THROTTLE_Z,THROTTLE_LEFT,THROTTLE_RIGHT,
   INLET_PORT,EXHAUST_PORT,BOILER_TO_VALVE,VALVE_TO_CYLINDER,
   CYLINDER_TO_EXHAUST,throttleLinkage} from
   '../animations/steam-engine/web/src/steam-plumbing.ts';
 import {pipeSections} from '../animations/steam-engine/web/src/pipe-path.ts';
 import {cameraPose} from '../animations/steam-engine/web/src/camera-path.ts';
+import {flowOpacity,flowProgress,visibleArrowCount} from '../animations/steam-engine/web/src/steam-flow.ts';
 
 test('20-second runtime and crank / piston / connecting rod stay linked',()=>{
   assert.equal(DURATION,600);
@@ -118,43 +119,81 @@ test('intake, outlet and exhaust pipes use continuous tangent-connected elbows',
   }
 });
 
-test('governor sleeve drives a rigid constant-length yoke and sliding gate',()=>{
-  let originalLength=null;
-  let originalElevation=null;
+test('flyball governor is raised directly over the brass throttle',()=>{
+  assert.equal(GOV_X,THROTTLE_X);
+  assert.equal(GOV_Z,THROTTLE_Z);
+  assert.ok(GOV_PIVOT_Y>THROTTLE_Y+1.8);
+  let stemLength=null;
   for(let frame=0;frame<600;frame++){
-    const {sleeveY}=governorAtFrame(frame);
-    const {collarPin,valvePin,gateBottom,gateTop,gateCenter}=throttleLinkage(sleeveY);
-    assert.equal(collarPin[1],sleeveY);
-    assert.equal(valvePin[1],sleeveY);
-    assert.equal(collarPin[0],GOV_X-.21);
-    assert.equal(collarPin[2],GOV_Z);
+    const g=governorAtFrame(frame);
+    const {collarPin,valvePin,gateBottom,gateTop,gateCenter}=throttleLinkage(g.sleeveY);
+    assert.deepEqual([collarPin[0],collarPin[2]],[THROTTLE_X,THROTTLE_Z]);
     assert.deepEqual([valvePin[0],valvePin[2]],[THROTTLE_X,THROTTLE_Z]);
-    const length=Math.hypot(...valvePin.map((x,i)=>x-collarPin[i]));
-    if(originalLength===null) originalLength=length;
-    if(originalElevation===null) originalElevation=gateCenter[1]-sleeveY;
-    assert.ok(Math.abs(length-originalLength)<1e-12,'linkage must NEVER stretch');
-    assert.ok(Math.abs(gateCenter[1]-sleeveY-originalElevation)<1e-12);
+    assert.equal(collarPin[1],g.sleeveY+GOV_LIFT);
     assert.ok(Math.abs(gateTop[1]-gateBottom[1]-.70)<1e-12);
+    assert.ok(Math.abs(gateCenter[1]-g.sleeveY-.52)<1e-12);
+    const d=Math.hypot(...collarPin.map((v,i)=>v-valvePin[i]));
+    if(stemLength===null)stemLength=d;
+    assert.ok(Math.abs(d-stemLength)<1e-12,'straight stem may never telescope');
+    const radial=.88*Math.sin(g.angle);
+    const ballHeight=GOV_PIVOT_Y-.88*Math.cos(g.angle);
+    assert.ok(Math.abs(Math.hypot(radial,ballHeight-(g.sleeveY+GOV_LIFT))-.88)<1e-9);
   }
   const normal=throttleLinkage(governorAtFrame(225).sleeveY);
-  const fast=throttleLinkage(governorAtFrame(360).sleeveY);
-  assert.ok(normal.gateTop[1]<THROTTLE_Y-.12,
-    'normal gate must retract clear of the steam inlet bore');
-  assert.ok(fast.gateBottom[1]<THROTTLE_Y-.12
-    && fast.gateTop[1]>THROTTLE_Y+.12,
-    'overspeed gate must visibly cover the entire intake bore');
-  assert.ok(fast.gateCenter[1]>normal.gateCenter[1]+.7);
-  assert.ok(governorAtFrame(360).throttle<governorAtFrame(225).throttle-.38);
+  const high=throttleLinkage(governorAtFrame(360).sleeveY);
+  assert.ok(normal.gateTop[1]<THROTTLE_Y-.02);
+  assert.ok(high.gateBottom[1]<THROTTLE_Y-.12
+    &&high.gateTop[1]>THROTTLE_Y+.12);
+  assert.ok(high.gateCenter[1]>normal.gateCenter[1]+.70);
 });
 
-test('throttle uses a straight stem through a housing, not a rotating disc on a wrong axle',()=>{
+test('one stem replaces the former long side mechanism',()=>{
   const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
-  assert.match(src,/from=\{link\.valvePin\} to=\{link\.gateTop\}/);
-  assert.match(src,/position=\{link\.gateCenter\}/);
   assert.match(src,/from=\{linkage\.collarPin\} to=\{linkage\.valvePin\}/);
-  assert.doesNotMatch(src,/governorValveAngle|valveLinkEnd|<ValveAssembly/);
+  assert.match(src,/position=\{link\.gateCenter\}/);
+  assert.doesNotMatch(src,/rockerAngle|valveLinkEnd|<ValveAssembly/);
+  assert.doesNotMatch(src,/from=\{link\.valvePin\} to=\{link\.gateTop\}/);
   assert.match(src,/new THREE\.CurvePath<THREE\.Vector3>/);
   assert.match(src,/new THREE\.QuadraticBezierCurve3/);
+});
+
+test('brass and blue flow tubes both fade only while the cylinder is cut',()=>{
+  for(let f=0;f<600;f++){
+    const cut=steamAtFrame(f).cut;
+    assert.ok(flowOpacity(cut)>=.31&&flowOpacity(cut)<=1);
+    assert.equal(visibleArrowCount(cut),cut>.025?4:0);
+    if(cut===0)assert.equal(flowOpacity(cut),1);
+    if(cut===1)assert.ok(Math.abs(flowOpacity(cut)-.31)<1e-9);
+  }
+  assert.equal(visibleArrowCount(steamAtFrame(90).cut),4);
+  assert.equal(visibleArrowCount(steamAtFrame(160).cut),0);
+  const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
+  for(const path of ['BOILER_TO_VALVE','VALVE_TO_CYLINDER','CYLINDER_TO_EXHAUST']){
+    assert.ok(src.includes('Pipe points={'+path+'}'));
+  }
+  assert.match(src,/curve\.getPointAt\(u\)/);
+  assert.match(src,/curve\.getTangentAt\(u\)/);
+  assert.match(src,/transparent=\{s\.cut>\.01\}/);
+  assert.match(src,/data-visible-flow-arrows/);
+});
+
+test('real 3D arrows traverse true pipe paths with deterministic rhythmic phases',()=>{
+  for(let id=0;id<3;id++){
+    const points=[BOILER_TO_VALVE,VALVE_TO_CYLINDER,CYLINDER_TO_EXHAUST][id];
+    const sections=pipeSections(points,.25);
+    assert.deepEqual(sections[0].start,points[0]);
+    assert.deepEqual(sections.at(-1).end,points.at(-1));
+    for(let f=0;f<600;f++){
+      const g=governorAtFrame(f),time=f/30;
+      for(let i=0;i<4;i++){
+        const phase=flowProgress(time,i,4,g.relativeSpeed,id);
+        assert.ok(phase>=0&&phase<1);
+        assert.equal(phase,flowProgress(time,i,4,g.relativeSpeed,id));
+      }
+    }
+  }
+  assert.notEqual(flowProgress(3,0,4,1,0),flowProgress(3.3,0,4,1,0));
+  assert.notEqual(flowProgress(3,0,4,1,0),flowProgress(3,0,4,1,2));
 });
 
 test('camera genuinely orbits in yaw AND pitch, rather than translating alone',()=>{
@@ -180,7 +219,7 @@ test('teaching callouts never chase spinning flyweights or flywheel spokes',()=>
     src.indexOf('const projectOnCanvas ='));
   assert.ok(anchors.length>200);
   assert.match(anchors,/part==='balls'\) return \[GOV_X,GOV_PIVOT_Y/);
-  assert.match(anchors,/part==='sleeve'\) return \[GOV_X,1\.30/);
+  assert.match(anchors,/part==='sleeve'\) return \[GOV_X,2\.9/);
   assert.doesNotMatch(anchors,/spindlePhase|Math\.sin|Math\.cos|\.governor\.angle/);
   assert.match(src,/Math\.max\(\.08,radial\)/,
     'a subtle visible orbit trace must expose changing flyball radius');
