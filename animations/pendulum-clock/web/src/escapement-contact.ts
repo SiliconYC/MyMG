@@ -22,12 +22,9 @@ export function palletOutline(side:Side):Point[]{
   const points:Point[]=[];
   for(let i=0;i<=n;i++) points.push(anchorPolar(LOCK_RADIUS,lerp(lo,hi,i/n)));
   const backRadius=LOCK_RADIUS+(side==='entry'?-PALLET_BAND:PALLET_BAND);
-  const lead=side==='entry'?lo:hi;
-  // Chamfer an arrival edge. Its forward tilt delivers a short impulse;
-  // the circular face, not the chamfer, provides the static wheel lock.
-  points.push(anchorPolar(backRadius,lead===lo?hi:lo));
+  // Follow the back of the same finite arc in reverse: no self-intersection.
+  // The two free ends are the short inclined impulse edges.
   for(let i=0;i<=n;i++)points.push(anchorPolar(backRadius,lerp(hi,lo,i/n)));
-  // Deduplicate the back point at the first end; THREE.Shape closes outline.
   return points;
 }
 /** Weld arm to the broad rear edge; never to a sharp tooth-catching nose. */
