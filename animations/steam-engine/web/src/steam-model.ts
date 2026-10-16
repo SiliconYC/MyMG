@@ -46,8 +46,8 @@ export function steamAtFrame(frame: number): SteamFrame {
   const velocity = -Math.sin(theta);
   return {
     time, theta, pistonX, crossheadX, pinX, pinY, cut, cutZ,
-    leftPressure: (0.28 + 0.64 * Math.max(0, velocity)) * governor.throttle / .58,
-    rightPressure: (0.28 + 0.64 * Math.max(0, -velocity)) * governor.throttle / .58,
+    leftPressure: clamp01((0.28 + 0.64 * Math.max(0, velocity)) * governor.throttle / .58),
+    rightPressure: clamp01((0.28 + 0.64 * Math.max(0, -velocity)) * governor.throttle / .58),
     motion: velocity >= 0 ? 'right' : 'left',
     governor,
   };
