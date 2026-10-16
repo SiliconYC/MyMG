@@ -170,7 +170,7 @@ try {
       dots:el.querySelectorAll('svg circle').length,
     }));
     assert.ok(dot.x>0 && dot.x<1280 && dot.y>0 && dot.y<720,
-      'Leader line endpoint must point at a visible 3D part');
+      'Leader endpoint out of frame: '+part+' '+JSON.stringify(dot));
     assert.equal(dot.paths,1);
     assert.equal(dot.dots,2);
     if(['balls','sleeve','valve'].includes(part)) await page.getByTestId('steam-engine-scene').screenshot({
