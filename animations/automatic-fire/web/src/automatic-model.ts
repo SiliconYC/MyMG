@@ -1,79 +1,102 @@
 /**
- * Conceptual automatic cycling illustration, NOT a functional firearm blueprint.
- * Dimensions and timing are arbitrary visual units. Every image is frame-derived.
+ * Storyboard in arbitrary modelling units: a visual explanation of a repeating
+ * cycle, NOT a blueprint or functional fire-control reconstruction.
+ *
+ * Every result is a pure function of the Remotion frame, including the camera.
  */
-export const FPS = 30;
-export const DURATION = 720;
-export const START = 165;
-export const CYCLE = 110;
-export const COUNT = 4;
-export const END = START + CYCLE * COUNT;
-export const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
-export const ease = (v: number): number => {
-  const x = clamp01(v);
-  return x * x * (3 - 2 * x);
+export const FPS=30;
+export const DURATION=720;
+export const START=198;
+export const CYCLE=96;
+export const COUNT=4;
+export const END=START+CYCLE*COUNT;
+
+export const clamp01=(x:number):number=>Math.max(0,Math.min(1,x));
+export const ease=(x:number):number=>{
+  const t=clamp01(x);
+  return t*t*(3-2*t);
 };
-export type Point = [number, number, number];
-export type CameraPose = {position: Point; target: Point};
-export type CycleFrame = {
-  phase: number; cycleIndex: number; trigger: number; shell: number;
-  recoil: number; ejection: number; feed: number; flash: number;
-  active: boolean;
+export type Point=[number,number,number];
+export type CameraPose={position:Point;target:Point;zoom:number};
+export type CycleFrame={
+  phase:number;
+  cycleIndex:number;
+  active:boolean;
+  trigger:number;
+  reveal:number;
+  shell:number;
+  recoil:number;
+  ejection:number;
+  feed:number;
+  flash:number;
+  roundLoaded:boolean;
 };
-const KEYFRAMES: ReadonlyArray<{f: number; position: Point; target: Point}> = [
-  {f:0,   position:[8.0,3.6,12.7], target:[0,0,0]},
-  {f:96,  position:[4.1,3.0,8.5],  target:[-.1,-.1,0]},
-  {f:190, position:[-.7,2.5,6.5], target:[-.5,-.1,0]},
-  {f:285, position:[2.8,2.6,6.1], target:[1.0,.1,0]},
-  {f:385, position:[-3.0,2.8,6.0],target:[-1.9,.1,0]},
-  {f:490, position:[-1.3,-.8,7.6],target:[-.2,-.8,0]},
-  {f:586, position:[2.6,1.9,7.5], target:[1,.0,0]},
-  {f:719, position:[8.0,3.6,12.7],target:[0,0,0]},
+
+/** Meaningful dolly + orbit + tracking, with real focal targets and zoom.
+ * A hero view gives way to receiver closeups; the camera restores the hero
+ * composition before looping to avoid a jarring jump.
+ */
+const SHOTS:ReadonlyArray<{frame:number;position:Point;target:Point;zoom:number}>=[
+  {frame:0,   position:[6.6,3.7,18.4], target:[.3,.05,0], zoom:77},
+  {frame:72,  position:[3.2,2.8,14.0], target:[.1,.25,0], zoom:89},
+  {frame:160, position:[2.9,2.35,8.5], target:[-.05,.68,.1],zoom:133},
+  {frame:248, position:[-.7,1.7,7.5],  target:[-.2,.70,.1],zoom:140},
+  {frame:342, position:[-2.6,2.8,7.3], target:[-.65,.77,.1],zoom:146},
+  {frame:439, position:[1.9,3.45,8.6], target:[.25,.78,.1],zoom:140},
+  {frame:535, position:[-.8,1.25,7.9], target:[-.1,.65,.1],zoom:151},
+  {frame:619, position:[3.7,2.75,12.0],target:[-.0,.36,0],zoom:99},
+  {frame:719, position:[6.6,3.7,18.4], target:[.3,.05,0],zoom:77},
 ];
-export function cameraAt(frame: number): CameraPose {
-  const f = Math.max(0, Math.min(DURATION - 1, frame));
-  for (let i=0; i<KEYFRAMES.length-1; i++) {
-    const a=KEYFRAMES[i], b=KEYFRAMES[i+1];
-    if (f<=b.f) {
-      const t=ease((f-a.f)/(b.f-a.f));
-      const mix=(p: Point,q:Point):Point=>[
-        p[0]+(q[0]-p[0])*t,
-        p[1]+(q[1]-p[1])*t,
-        p[2]+(q[2]-p[2])*t,
-      ];
-      return {position:mix(a.position,b.position), target:mix(a.target,b.target)};
+const lerp=(a:number,b:number,t:number):number=>a+(b-a)*t;
+const lerpPoint=(a:Point,b:Point,t:number):Point=>[
+  lerp(a[0],b[0],t),lerp(a[1],b[1],t),lerp(a[2],b[2],t),
+];
+export function cameraAt(frame:number):CameraPose{
+  const f=Math.max(0,Math.min(DURATION-1,frame));
+  for(let i=0;i<SHOTS.length-1;i++){
+    const a=SHOTS[i],b=SHOTS[i+1];
+    if(f<=b.frame){
+      const t=ease((f-a.frame)/(b.frame-a.frame));
+      return {position:lerpPoint(a.position,b.position,t),
+        target:lerpPoint(a.target,b.target,t),zoom:lerp(a.zoom,b.zoom,t)};
     }
   }
-  return {position:[...KEYFRAMES[0].position],target:[0,0,0]};
+  return {position:[...SHOTS[0].position],target:[...SHOTS[0].target],zoom:77};
 }
-export function cycleAt(frame: number): CycleFrame {
-  const f = Math.max(0, Math.min(DURATION-1, frame));
-  const active=f>=START && f<END;
-  const elapsed=Math.max(0,Math.min(END-START-.000001,f-START));
-  const index=active ? Math.floor(elapsed/CYCLE) : (f>=END?COUNT-1:0);
-  const phase=active ? (elapsed%CYCLE)/CYCLE : 0;
-  // A visible pulse followed by retreat, extraction and spring-driven return.
-  const backward=ease((phase-.10)/.32);
-  const forward=ease((phase-.57)/.32);
-  const recoil=active ? 1.62*backward*(1-forward) : 0;
-  const ejection=active && phase>.31 && phase<.67 ? (phase-.31)/.36 : -1;
-  const feed=active ? ease((phase-.57)/.35) : (f>=END?1:0);
-  const flash=active ? Math.sin(Math.PI*clamp01(phase/.11))**2 : 0;
-  const trigger=ease((f-100)/32)*(1-ease((f-638)/40));
-  const shell=1-.93*ease((f-84)/82)*(1-ease((f-640)/71));
-  return {phase,cycleIndex:index,trigger,shell,recoil,ejection,feed,flash,active};
+
+/** Color and motion encode the logical steps, not real mechanism dimensions. */
+export function cycleAt(frame:number):CycleFrame{
+  const f=Math.max(0,Math.min(DURATION-1,frame));
+  const active=f>=START&&f<END;
+  const index=active?Math.floor((f-START)/CYCLE):(f>=END?COUNT-1:0);
+  const phase=active?((f-START)%CYCLE)/CYCLE:0;
+  const backwards=ease((phase-.09)/.28);
+  const forwards=ease((phase-.53)/.32);
+  const recoil=active?1.38*backwards*(1-forwards):0;
+  const ejection=active&&phase>=.29&&phase<=.70?(phase-.29)/.41:-1;
+  const feed=active?ease((phase-.57)/.32):0;
+  const flash=active?Math.pow(Math.sin(Math.PI*clamp01(phase/.13)),2):0;
+  const trigger=ease((f-149)/29)*(1-ease((f-606)/37));
+  const reveal=ease((f-63)/102)*(1-ease((f-600)/91));
+  return {
+    phase,cycleIndex:index,active,trigger,reveal,
+    shell:1-.97*reveal,recoil,ejection,feed,flash,
+    roundLoaded:!active||phase<.10||phase>=.92,
+  };
 }
-/** Sparse captions: one short thought at a time, never a permanent HUD. */
-export function captionAt(frame: number): {text: string; opacity:number} {
-  const cues=[
-    {from:18,to:91,text:'連發的秘密'},
-    {from:112,to:162,text:'扳機持續按住'},
-    {from:190,to:252,text:'擊發後，槍機自行後退'},
-    {from:329,to:385,text:'彈簧推回，完成裝填'},
-    {from:494,to:554,text:'循環再次開始'},
-    {from:620,to:687,text:'無需再次扣動扳機'},
-  ];
-  const cue=cues.find(c=>frame>=c.from&&frame<c.to);
-  if (!cue)return {text:'',opacity:0};
-  return {text:cue.text,opacity:ease((frame-cue.from)/13)*(1-ease((frame-cue.to+14)/14))};
+
+const WORDS=[
+  {from:22,to:92,text:'為什麼能連發？'},
+  {from:140,to:192,text:'扳機一直按住'},
+  {from:214,to:284,text:'擊發後，槍機後退'},
+  {from:324,to:390,text:'彈簧復位，送入下一發'},
+  {from:468,to:536,text:'它又開始了'},
+  {from:618,to:690,text:'半自動：每發都要重新扣扳機'},
+] as const;
+
+export function captionAt(frame:number):{text:string;opacity:number}{
+  const cue=WORDS.find(x=>frame>=x.from&&frame<x.to);
+  if(!cue)return {text:'',opacity:0};
+  return {text:cue.text,opacity:ease((frame-cue.from)/15)*
+    (1-ease((frame-cue.to+17)/17))};
 }
