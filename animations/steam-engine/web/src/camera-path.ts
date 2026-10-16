@@ -14,8 +14,8 @@ export function cameraPose(t:number){
   const elevation=.255+.065*inspect+.105*governorView
     -.045*valveView-.015*recovery;
   const focus:CameraTriple=[
-    -1.3*inspect+2.90*governorView-.44*valveView+.12*recovery,
-    .06+.12*inspect+1.58*governorView+.16*valveView-.37*recovery,
+    -1.3*inspect+1.77*governorView-.12*valveView+.12*recovery,
+    .24+.12*inspect+2.35*governorView-.42*valveView-.35*recovery,
     -.22*governorView+.20*close,
   ];
   const distance=14.2-.9*inspect-.7*governorView-.15*close;
