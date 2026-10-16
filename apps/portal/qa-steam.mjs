@@ -97,6 +97,10 @@ try {
     throttle:Number(el.getAttribute('data-governor-throttle')),
     gate:Number(el.getAttribute('data-gate-y')),
     yoke:Number(el.getAttribute('data-yoke-length')),
+    driver:Number(el.getAttribute('data-drive-source-angle')),
+    driven:Number(el.getAttribute('data-drive-pulley-angle')),
+    gear:Number(el.getAttribute('data-drive-gear-angle')),
+    belt:Number(el.getAttribute('data-drive-belt-travel')),
     camera:Number(el.getAttribute('data-camera-shift')),
     zoom:Number(el.getAttribute('data-camera-zoom')),
   }));
@@ -112,6 +116,14 @@ try {
     'the initial pan must finish early');
   assert.ok(govFrames[225].zoom>185 && govFrames[225].zoom<195,
     'governor must stay substantially closer during teaching');
+  for(const f of [150,190,225,255,270,305,360,405,480,555]){
+    assert.equal(govFrames[f].driver,govFrames[f].driven,
+      'driven pulley must physically follow the flywheel pulley');
+    assert.ok(Math.abs(govFrames[f].gear-2.2*govFrames[f].driver)<.0002,
+      '90-degree gears must synchronize spindle and crank at 22:10 teeth');
+  }
+  assert.notEqual(govFrames[225].belt,govFrames[255].belt,
+    'belt witness marks must advance when flywheel turns');
   assert.ok(govFrames[305].speed>govFrames[225].speed+.52,
     'overspeed must be a large, obvious visual change');
   assert.ok(govFrames[305].angle>govFrames[225].angle+.42,
@@ -222,7 +234,7 @@ try {
   await page.screenshot({path:resolve(out,'steam-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
   await writeFile(resolve(out,'metrics.json'),JSON.stringify(samples,null,2));
-  console.log('PASS: raised governor directly above brass valve; real transparent 3D cutaway tubes with moving flow arrows.');
+  console.log('PASS: crankshaft -> moving closed belt -> supported layshaft -> bevel gears -> spinning regulator; valve and transparent flow unaffected.');
 } catch(e) {
   await writeFile(resolve(out,'failure.log'),(e.stack??String(e))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'failure.png'),fullPage:true});}catch{}
