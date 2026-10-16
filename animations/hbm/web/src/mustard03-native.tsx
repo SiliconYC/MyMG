@@ -6,7 +6,7 @@ import {buildScene, smooth, modelTime, cameraAt, type Primitive} from './mustard
 
 /** The Python original paints projected polygons with Pillow. Here the same
  * world-space XYZ shapes are triangulated every frame by TypeScript and drawn
- * by the live Three.js WebGL context. No `<video>`, frame PNG, or MP4 anywhere.
+ * by the live Three.js WebGL context. No prerecorded media inputs of any kind.
  * 1280x720 and 30 FPS / 345 frames are authored in the single project catalog. */
 const VERTEX_SHADER=`
 attribute vec4 tint;
