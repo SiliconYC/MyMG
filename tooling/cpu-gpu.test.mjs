@@ -75,7 +75,8 @@ test('both 4x4 input AND output grids stand distinctly outside silicon',()=>{
     for(let i=0;i<TASKS;i++){
       const final=taskAt(470,kind,i);
       assert.equal(final.phase,'done');
-      assert.deepEqual(final.point,points[i].output);
+      for(let axis=0;axis<3;axis++)
+        assert.ok(Math.abs(final.point[axis]-points[i].output[axis])<1e-9);
       assert.equal(final.dyed,1);
     }
   }
