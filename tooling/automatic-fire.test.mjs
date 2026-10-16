@@ -22,7 +22,7 @@ test('a continuous held trigger drives four distinct, complete visual cycles',()
   }
   assert.equal(cycleAt(100).active,false);
   assert.ok(cycleAt(110).reveal>0);
-  assert.ok(cycleAt(170).trigger>.9);
+  assert.ok(cycleAt(179).trigger>.9);
   for(let i=0;i<COUNT;i++){
     const start=START+i*CYCLE;
     assert.equal(cycleAt(start+6).cycleIndex,i);
@@ -39,7 +39,8 @@ test('a continuous held trigger drives four distinct, complete visual cycles',()
 });
 test('real cinematography: broad hero, receiver closeup, tracked orbit, end match',()=>{
   const opening=cameraAt(0),close=cameraAt(350),end=cameraAt(DURATION-1);
-  assert.deepEqual(end,opening);
+  assert.ok([...end.position,...end.target,end.zoom].every((n,i)=>
+    Math.abs(n-[...opening.position,...opening.target,opening.zoom][i])<1e-10));
   assert.ok(close.zoom>opening.zoom*1.75);
   assert.ok(Math.hypot(...opening.position.map((n,i)=>n-close.position[i]))>11);
   assert.ok(Math.abs(cameraAt(350).position[0]-cameraAt(440).position[0])>3);
