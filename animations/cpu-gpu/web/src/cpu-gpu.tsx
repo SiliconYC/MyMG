@@ -2,7 +2,6 @@ import React, {useLayoutEffect} from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
-import * as THREE from 'three';
 import {
   FPS, DURATION, CPU_CORES, GPU_LANES, OUTPUT_TILES,
   clamp, smooth, stageAt, uniformProgress, branchProgress,
@@ -91,7 +90,7 @@ const CpuCore:React.FC<{index:number;frame:number}>=({index,frame})=>{
     <Block pos={[0,.27,0]} size={[2.28,.22,2]} color="#5c4c3f" emissive="#8e582a" glow={.23}/>
     <Block pos={[0,.57,0]} size={[1.83,.46,1.69]} color={on?'#c8893e':'#66543f'} emissive={color} glow={glow}/>
     <Block pos={[0,.823,0]} size={[1.59,.035,1.44]} color={color} emissive={color}
-      glow={on?2.2:1.1} opacity={on?.76:.5}/>
+      glow={on?2.2:1.1} opacity={on ? .76 : .5}/>
     {/* Independent out-of-order/control and close cache blocks per CPU core. */}
     {Array.from({length:5},(_,i)=><Block key={i}
       pos={[-.62+i*.31,.88,-.42]} size={[.16,.075,.35]}
@@ -123,7 +122,7 @@ const GpuLanes:React.FC<{frame:number}>=({frame})=>{
         <Block pos={[0,.09,0]} size={[.6,.23,.6]} color="#164051" metal={.78}/>
         <Block pos={[0,.275,0]} size={[.53,.20,.54]} color={top} emissive={c} glow={power} metal={.28}/>
         <Block pos={[0,.391,0]} size={[.32,.025,.34]} color={c} emissive={c}
-          glow={active?2.5:.16} opacity={active?.92:.5}/>
+          glow={active?2.5:.16} opacity={active ? .92 : .5}/>
         {active&&<mesh position={[0,.54+.13*pulse(frame,index),0]}>
           <octahedronGeometry args={[.078,0]}/>
           <meshBasicMaterial color={c}/>
