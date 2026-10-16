@@ -15,7 +15,8 @@ const OUTER_RADIUS=1.55;
 const ROOT_RADIUS=1.32;
 const FLANK_FROM=.43;
 const FLANK_TO=.69;
-const FLANK_T=.52;
+/** Shift working faces closer to the tooth shoulder: the opposing tip has clearance. */
+const FLANK_T=.40;
 const CONTACT_ANGLE=PENDULUM_AMPLITUDE*Math.cos(Math.PI*RELEASE_OFFSET);
 
 const polar=(r:number,a:number):Point=>[r*Math.sin(a),r*Math.cos(a)];
@@ -71,6 +72,28 @@ export function palletLocalTip(side:Side):Point {
   ];
   return rotate([target[0],target[1]-PIVOT_Y],angle);
 }
+/** Pallet profiles start at their contact nose (local origin). +Y is the
+ * wide, non-contact BASE which faces the anchor pivot. Unlike the earlier
+ * gear-radial rotation this angle makes the shoe point AWAY from its arm.
+ */
+export const PALLET_BASE_HEIGHT=.19;
+export function palletOrientation(side:Side):number {
+  const tip=palletLocalTip(side);
+  return Math.atan2(tip[0],-tip[1]);
+}
+export function palletLocalBase(side:Side):Point {
+  const tip=palletLocalTip(side);
+  const angle=palletOrientation(side);
+  return [
+    tip[0]-Math.sin(angle)*PALLET_BASE_HEIGHT,
+    tip[1]+Math.cos(angle)*PALLET_BASE_HEIGHT,
+  ];
+}
+export function palletWorldBase(side:Side,pendulumAngle:number):Point {
+  const base=rotate(palletLocalBase(side),-pendulumAngle);
+  return [base[0],base[1]+PIVOT_Y];
+}
+
 export function palletWorldTip(side:Side,pendulumAngle:number):Point {
   const swung=rotate(palletLocalTip(side),-pendulumAngle);
   return [swung[0],swung[1]+PIVOT_Y];
@@ -91,14 +114,9 @@ export function palletPose(side:Side,state:ClockState):PalletPose {
     ? (side===state.lock?start>.85:start<.15)
     : side===state.lock;
   const world=(p:Point):Point=>[p[0],p[1]+WHEEL_Y];
-  const mountingLocal=palletLocalTip(side);
-  const radial=REFERENCE[side].radial;
-  const mountingRotated=rotate([
-    mountingLocal[0]+radial[0]*.16,
-    mountingLocal[1]+radial[1]*.16,
-  ],-state.pendulumAngle);
+  const base=palletWorldBase(side,state.pendulumAngle);
   return {
-    side,tip,mounting:[mountingRotated[0],mountingRotated[1]+PIVOT_Y],
+    side,tip,mounting:base,
     nominalTooth:world(currentTooth.point),
     gap:contactDistance(side,state),
     toothIndex:currentTooth.toothIndex,
