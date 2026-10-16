@@ -1,56 +1,49 @@
-/** Pure timeline: one frame determines every active unit and output tile. */
+/**
+ * A single, quiet demonstration: four independent CPU cores versus an array of
+ * GPU arithmetic lanes. Every visible change is derived from the frame.
+ * Hardware counts and cadence are explanatory, NOT performance measurements.
+ */
 export const FPS = 30;
-export const DURATION = 630;
+export const DURATION = 450;
 export const CPU_CORES = 4;
-export const GPU_LANES = 80;
-export const OUTPUT_TILES = 40;
-export const clamp = (x: number) => Math.min(1, Math.max(0, x));
-export const smooth = (x: number) => {
-  const t = clamp(x);
+export const GPU_LANES = 64;
+export const clamp = (n: number) => Math.max(0, Math.min(1, n));
+export const smooth = (n: number) => {
+  const t = clamp(n);
   return t * t * (3 - 2 * t);
 };
-export const stageAt = (frame: number): 'reveal' | 'uniform' | 'branch' | 'compare' =>
-  frame < 88 ? 'reveal' : frame < 304 ? 'uniform' :
-  frame < 515 ? 'branch' : 'compare';
+export type Stage = 'cpu' | 'gpu' | 'compare';
 
-/** 80 independent data elements, one common instruction on the GPU. */
-export const uniformProgress = (frame: number) => ({
-  cpu: clamp((frame - 106) / 180),
-  gpu: clamp((frame - 106) / 44),
+export const stageAt = (frame: number): Stage =>
+  frame < 166 ? 'cpu' : frame < 320 ? 'gpu' : 'compare';
+
+/**
+ * The camera is the narrator: one focal point at a time, then one comparison.
+ * CPU -> GPU: frame 134..177; GPU -> both: frame 287..332.
+ */
+export const cameraAt = (frame: number) => ({
+  focusX: -5.4 + 10.8 * smooth((frame - 134) / 43)
+    - 5.4 * smooth((frame - 287) / 45),
+  zoom: 95 - 48 * smooth((frame - 287) / 45),
 });
-/** Branch-heavy / mixed tasks: CPU cores run separate control flows.
- * GPU executes divergent halves of each wave serially. This is qualitative,
- * not a measured benchmark or a universal speedup claim. */
-export const branchProgress = (frame: number) => ({
-  cpu: clamp((frame - 324) / 125),
-  gpu: clamp((frame - 324) / 185),
-});
-export const laneBranch = (index: number) => index % 2;
-export const laneActive = (frame: number, index: number) => {
-  const stage = stageAt(frame);
-  if (stage === 'reveal') return false;
-  if (stage === 'uniform') return frame >= 106 && frame < 190;
-  if (stage === 'branch') {
-    if (frame < 324) return false;
-    return Math.floor((frame - 324) / 22) % 2 === laneBranch(index);
-  }
-  return false;
+
+/** CPU: each large independent core takes its own turn. */
+export const cpuActivity = (frame: number, index: number) => {
+  const t = ((frame - 12) % 88 + 88) % 88;
+  const local = t - index * 22;
+  if (frame < 12 || local < 0 || local >= 22) return 0;
+  return smooth(local / 6) * (1 - smooth((local - 15) / 7));
 };
-export const cpuActive = (frame: number, index: number) => {
-  const stage = stageAt(frame);
-  if (stage === 'reveal' || stage === 'compare') return false;
-  if (stage === 'uniform') {
-    const progress = uniformProgress(frame).cpu;
-    return progress < 1 && (Math.floor((frame - 106) / 6) + index) % 4 !== 3;
-  }
-  return frame >= 324 && frame < 449;
+
+/** GPU: many lightweight execution lanes perform the same operation together. */
+export const gpuActivity = (frame: number) => {
+  if (frame < 169) return 0;
+  const cycle = ((frame - 169) % 44 + 44) % 44;
+  return smooth(cycle / 8) * (1 - smooth((cycle - 28) / 9));
 };
-export const tileDone = (frame: number, tile: number, kind: 'cpu' | 'gpu') => {
-  const s = stageAt(frame);
-  const progress = s === 'branch' || s === 'compare'
-    ? branchProgress(frame)[kind]
-    : uniformProgress(frame)[kind];
-  return tile < Math.floor(progress * OUTPUT_TILES + 0.001);
-};
-export const pulse = (frame: number, index: number) =>
-  (Math.sin(frame * 0.24 + index * 0.4) + 1) * 0.5;
+
+export const cpuActiveCount = (frame: number) =>
+  Array.from({length: CPU_CORES}, (_, i) => cpuActivity(frame, i))
+    .filter(n => n > .25).length;
+export const gpuActiveCount = (frame: number) =>
+  gpuActivity(frame) > .25 ? GPU_LANES : 0;

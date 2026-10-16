@@ -1,10 +1,13 @@
-# CPU / GPU · 平行架構 3D 動畫
+# CPU / GPU · 極簡 3D 運算架構
 
-- 入口：`https://siliconyc.github.io/MyMG/#/cpu-gpu`
-- 原生 React + Three.js WebGL，630 幀 / 30 FPS；播放器可暫停、拖曳和逐格。
-- 第一幕：四顆大型 CPU 核心與八十條 GPU 運算通道浮現。
-- 第二幕：相同指令處理大量獨立資料，GPU 通道一起處理，CPU 分批完成。
-- 第三幕：彼此不同的分支任務，CPU 各核心執行不同控制流，GPU 以交錯兩組示意分歧執行。
-- 第四幕：保留三維成果對比。
-- 教學模型，並非實體 CPU/GPU 的核心數、精確排程、規格或實測速度比。此處 GPU lane 表示示意性的運算單元，不等於完整獨立 CPU 核心。
-- 禁止用 MP4、影格圖片、影片紋理替代 Three.js 幾何。
+正式路由：`https://siliconyc.github.io/MyMG/#/cpu-gpu`
+
+15 秒、30 FPS、450 幀。純 React + Three.js 原生幾何，支援暫停、拖動及逐格研究。
+
+- 0–5.5 秒：**CPU**。鏡頭只看四個大型核心，依次活動。
+- 5.5–10.7 秒：**GPU**。鏡頭橫移到 64 個小運算單元；相同操作同步升降。
+- 10.7–15 秒：**並置**。鏡頭退後，同時看到數量與運作節奏的對比。
+
+不在畫面塞進文字說明、跑分百分比、粒子、網格與進度條。僅保留 CPU／GPU 名稱，採 HBM 類似的暖白背景和正交透視。核心數及動畫速度純粹是教學抽象，並非硬體真實比例；CPU/GPU 都不保證特定工作負載的效率。
+
+驗收：`pnpm check`、`pnpm build:portal` 以及 Chromium WebGL `pnpm --filter @mymg/portal qa:cpu-gpu`。
