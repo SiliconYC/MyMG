@@ -107,7 +107,7 @@ export const projects: readonly MgProject[] = [
     title: 'CPU 与 GPU：两种计算方式',
     titleEn: 'CPU / GPU · PARALLEL COMPUTE',
     category: '芯片 / 三维运算架构',
-    description: '直接从 CPU/GPU 的 16 项同质任务对比开始；后半段用方块、球体、四面体和圆柱展示分歧任务。两轮结果严格分离。',
+    description: '两轮 16 项任务：同质并行由 GPU 胜出；明确转场后，复杂分歧任务由 CPU 胜出。原生透视运镜。',
     status: 'React / Three.js 原生动画',
     component: CpuGpuScene,
     durationInFrames: 744,
@@ -121,7 +121,8 @@ export const projects: readonly MgProject[] = [
       '第二幕：CPU 四个独立核心可同时处理不同控制流；GPU 模拟同一线程组的 4 条分歧执行路径，其他通道暂时掩码等待，四组依次激活。',
       '形状仅代表分歧执行路径，不能推出 GPU 执行异形物件就慢，也不表示 CPU 对全部异质任务必然胜出。演示时序不是实测硬件性能。',
       '第一轮结果于第二轮开始前全部淡出，并从 Three.js 场景树卸载；不会与第二轮几何体重叠。',
-      '全长 24.8 秒，38° 透视运镜，全程仅一条简短字幕。',
+      '第一轮双芯片同屏结束时明确显示“GPU 胜出”；用斜向扫场和“第二轮 · 16 个混合任务”的动态标题切换工作负载；片尾显示“CPU 胜出”。每次只显示一个大标题。',
+      '全长 24.8 秒，38° 透视运镜。仅在轮次和胜负节点出现短暂的动效标题；仍为实时 WebGL 动画。',
     ],
   },
   {
