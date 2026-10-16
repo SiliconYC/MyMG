@@ -4,7 +4,7 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  TASKS, CPU_CORES, GPU_LANES, cameraAt, completedCount, workingCount,
+  TASKS, TASK_CUBE_SIZE, CPU_CORES, GPU_LANES, cameraAt, completedCount, workingCount,
   taskAt, sampleAt, stageAt, smooth, corePosition, lidOpening,
   type Kind,
 } from './model';
@@ -124,7 +124,7 @@ const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
   const state=taskAt(frame,kind,index);
   const progress=state.progress;
   const inside=smooth((progress-.27)/.13)*(1-smooth((progress-.60)/.12));
-  const size=.46*(1-.59*inside);
+  const size=TASK_CUBE_SIZE*(1-.59*inside);
   const pos:Vec=[
     CENTER[kind]+state.point[0],
     state.point[1]-.22*inside,
