@@ -71,6 +71,12 @@ jobs:
         run: python -m pip install -r animations/hbm/requirements.txt
       - name: Compare actual Python geometry to native WebGL pixels
         run: python tooling/hbm-compare-reference.py "${{ github.workspace }}/output/qa-portal"
+      - name: Verify live 3D steam engine cutaway and continuously moving piston
+        run: pnpm --filter @mymg/portal exec node qa-steam.mjs
+        env:
+          MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
+          MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
+
       - name: Verify GPU-independent demo in Chromium
         run: pnpm --filter @mymg/portal qa:react
         env:
