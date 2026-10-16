@@ -5,7 +5,7 @@ import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   steamAtFrame, CYLINDER_LEFT, CYLINDER_RIGHT, CYLINDER_OUTER_RADIUS,
-  CYLINDER_INNER_RADIUS, CRANK_X, CRANK_RADIUS, type SteamFrame,
+  CYLINDER_INNER_RADIUS, CRANK_X, CRANK_RADIUS, smoothstep, type SteamFrame,
 } from './steam-model';
 
 const R = CYLINDER_OUTER_RADIUS;
@@ -296,7 +296,6 @@ const Pedestals: React.FC = () => <group>
     <planeGeometry args={[13, 8]}/>
     <meshStandardMaterial color="#122333" roughness={.89}/>
   </mesh>
-  <gridHelper args={[13, 26, '#344755', '#213442']} position={[.2, -1.745, 0]}/>
 </group>;
 
 const World: React.FC<{s: SteamFrame}> = ({s}) => {
@@ -318,61 +317,26 @@ const World: React.FC<{s: SteamFrame}> = ({s}) => {
   </>;
 };
 
-const labelStyle: React.CSSProperties = {
-  fontSize: 16, fontWeight: 650, letterSpacing: 1, color: '#b9cbd6',
-  background: 'rgba(11,26,39,.82)', padding: '7px 12px',
-  border: '1px solid #526777', borderRadius: 4,
-};
-const overlayFont: React.CSSProperties = {
-  fontFamily: '"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif',
-};
-const Overlay: React.FC<{s: SteamFrame}> = ({s}) => {
-  const mode = s.cut < .02 ? '封闭机体' : s.cut > .98 ? '深入剖面' : '剖切平面推进';
-  return <div aria-hidden="true" style={{
-    ...overlayFont, position:'absolute', inset:0, pointerEvents:'none',
-    background:'linear-gradient(90deg, rgba(9,22,34,.72) 0%, transparent 40%)',
-    color:'#ecf4f7',
-  }}>
-    <div style={{position:'absolute',top:33,left:46,fontSize:15,color:'#edae76',
-      letterSpacing:3,fontWeight:800}}>MYMG / ENGINEERING SERIES — 001</div>
-    <div style={{position:'absolute',top:63,left:43,fontSize:47,fontWeight:850,
-      letterSpacing:2,textShadow:'0 3px 22px #05121c'}}>蒸汽机的心脏</div>
-    <div style={{position:'absolute',top:131,left:46,fontSize:17,
-      color:'#bed0d8'}}>双作用气缸 · 活塞 · 连杆曲轴 · 飞轮</div>
-    <div style={{position:'absolute',right:40,top:39,textAlign:'right'}}>
-      <div style={{fontSize:13,color:'#e7ac73',letterSpacing:2}}>3D SECTION VIEW</div>
-      <div style={{fontSize:25,fontWeight:780,marginTop:8}}>{mode}</div>
-      <div style={{fontSize:13,color:'#98b2c2',marginTop:4}}>真实裁切平面 / 连续机械运动</div>
-    </div>
-    <div style={{position:'absolute',left:52,bottom:145,display:'flex',gap:10}}>
-      <span style={{...labelStyle,color:'#ffc07d',borderColor:'#9a684a'}}>● 高压蒸汽</span>
-      <span style={{...labelStyle,color:'#83d3e4',borderColor:'#477c8a'}}>● 排汽 / 低压侧</span>
-    </div>
-    <div style={{position:'absolute',left:52,bottom:43,width:390}}>
-      <div style={{display:'flex',justifyContent:'space-between',fontSize:14,
-        color:'#c8d7dd',marginBottom:9}}><span>气缸剖切深度</span>
-        <span style={{color:'#ffd197',fontVariantNumeric:'tabular-nums'}}>
-          {Math.round(s.cut*100)}%</span></div>
-      <div style={{height:9,background:'#2f475a',borderRadius:8,overflow:'hidden'}}>
-        <div style={{height:'100%',width:(s.cut*100)+'%',background:'#eeaa66',
-          borderRadius:8}}/>
-      </div>
-      <div style={{fontSize:13,color:'#95aabb',marginTop:13}}>
-        {s.motion === 'right' ? '活塞向右：左腔进汽做功' : '活塞向左：右腔进汽做功'}
-      </div>
-    </div>
-    <div style={{position:'absolute',right:41,bottom:34,textAlign:'right',
-      fontSize:13,color:'#9cb6c6',letterSpacing:1}}>
-      <div>SLIDER–CRANK / LIVE WEBGL</div>
-      <div style={{fontSize:16,color:'#e7c39b',marginTop:7}}>
-        {(s.time).toFixed(1)}s　/　18.0s
-      </div>
-    </div>
-    <div style={{position:'absolute',right:44,bottom:149,fontSize:13,
-      color:'#b6c9d3',lineHeight:1.8,textAlign:'right'}}>
-      橙色管线：锅炉送入蒸汽<br/>蓝色管线：乏汽排出<br/>动力来自压差，并非在气缸内燃烧
-    </div>
-  </div>;
+/** Storytelling comes from the machine. A single brief title, never a dashboard. */
+const CHAPTERS = [
+  {start:.35, end:2.25, title:'蒸汽机'},
+  {start:3.0, end:5.25, title:'剖开气缸'},
+  {start:7.2, end:9.5, title:'蒸汽推动活塞'},
+  {start:12.55, end:14.85, title:'往复变成旋转'},
+] as const;
+
+const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
+  const seconds = frame / 30;
+  const chapter = CHAPTERS.find(c => seconds >= c.start && seconds < c.end);
+  if (!chapter) return null;
+  const opacity = smoothstep((seconds - chapter.start)/.34)
+    * (1 - smoothstep((seconds - chapter.end + .46)/.46));
+  return <div data-testid="steam-stage-caption" aria-hidden="true" style={{
+    position:'absolute', top:56, left:62, pointerEvents:'none',
+    opacity, fontFamily:'"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif',
+    fontSize:36, fontWeight:750, letterSpacing:1.2, color:'#f2eee8',
+    textShadow:'0 2px 19px rgba(8,21,33,.65)',
+  }}>{chapter.title}</div>;
 };
 
 export const SteamEngineScene: React.FC = () => {
@@ -391,6 +355,6 @@ export const SteamEngineScene: React.FC = () => {
       style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
       <World s={s}/>
     </ThreeCanvas>
-    <Overlay s={s}/>
+    <ChapterTitle frame={frame}/>
   </AbsoluteFill>;
 };

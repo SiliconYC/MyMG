@@ -62,6 +62,25 @@ try {
     'Flywheel MUST rotate while knife plane is held');
   assert.ok(samples[415].cut>0 && samples[415].cut<1);
   assert.equal(samples[500].cut,0);
+  // Less is more: only one fleeting chapter title, never persistent technical HUD.
+  const chapter=page.getByTestId('steam-stage-caption');
+  for(const [n,title] of [[30,'蒸汽机'],[110,'剖开气缸'],
+    [245,'蒸汽推动活塞'],[415,'往复变成旋转']]){
+    await seek(n);
+    assert.equal(await chapter.count(),1,'Only one unobtrusive chapter title is allowed');
+    assert.equal(await chapter.textContent(),title);
+  }
+  for(const n of [170,190,360,500]){
+    await seek(n);
+    assert.equal(await chapter.count(),0,'Model must be alone on screen between chapters');
+  }
+  await page.getByTestId('steam-engine-scene').evaluate(root=>{
+    const content=root.textContent||'';
+    for(const forbidden of ['MYMG / ENGINEERING','3D SECTION VIEW','高压蒸汽',
+      'SLIDER–CRANK','气缸剖切深度','18.0s']){
+      if(content.includes(forbidden))throw new Error('Redundant HUD text: '+forbidden);
+    }
+  });
   await seek(170);
   await page.getByTestId('play-toggle').click();
   await page.waitForFunction(()=>Number(document.querySelector('[data-testid="frame-readout"]')
