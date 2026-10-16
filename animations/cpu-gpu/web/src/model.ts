@@ -6,7 +6,7 @@
  * trajectory and camera position is a pure function of Remotion frame.
  */
 export const FPS = 30;
-export const DURATION = 600;
+export const DURATION = 480;
 export const TASKS = 16;
 export const TASK_CUBE_SIZE = .40;
 export const CPU_CORES = 4;
@@ -21,36 +21,40 @@ export const smooth = (n: number) => {
   return t*t*(3-2*t);
 };
 export const stageAt = (frame:number):Stage =>
-  frame < 80 ? 'task' : frame < 292 ? 'cpu' :
-  frame < 424 ? 'gpu' : 'compare';
+  frame < 80 ? 'task' : frame < 286 ? 'cpu' :
+  frame < 405 ? 'gpu' : 'compare';
 
+/**
+ * One continuous camera path. At frame zero the CPU and its queued jobs are
+ * already present; a single pan reaches the GPU, then zooms out to both chips.
+ * Both packages remain at fixed world coordinates through the whole film.
+ *
+ * 1280×720 / zoom 67 = 19.1×10.7 world units in single-chip view.
+ * Previous zoom 114 yielded just 6.3 world units vertically, clipping the
+ * 6.55-wide package and its raised metal lid.
+ */
 export const cameraAt = (frame:number) => {
-  const cpu = smooth((frame - 66) / 55);
-  const gpu = smooth((frame - 278) / 56);
-  const both = smooth((frame - 400) / 65);
+  const gpu=smooth((frame-263)/65);
+  const together=smooth((frame-387)/72);
   return {
-    focusX: -6.5 * cpu + 13 * gpu - 6.5 * both,
-    zoom: 114 - 28 * cpu - 36 * both,
-    angle: .11 * smooth((frame-104)/45) - .11 * both,
+    focusX:-6.5+13*gpu-6.5*together,
+    zoom:67-27*together,
+    angle:.07*smooth((frame-90)/65)-.07*together,
+    targetY:.15,
   };
 };
 
-/** Explicit reset for the final side-by-side replay. */
-export const jobStart = (frame:number,kind:Kind,index:number) => {
-  if(frame >= 424) return kind==='cpu'
-    ? 480 + Math.floor(index/CPU_CORES)*28 : 480;
-  if(kind==='cpu')return 126 + Math.floor(index/CPU_CORES)*38;
-  return 334;
-};
-export const jobDuration = (frame:number,kind:Kind) =>
-  frame>=424 ? (kind==='cpu'?28:36) : (kind==='cpu'?36:44);
+/** Completed work is NEVER reset by a caption or a camera change. */
+export const jobStart = (_frame:number,kind:Kind,index:number) =>
+  kind==='cpu' ? 118+Math.floor(index/CPU_CORES)*38 : 330;
 
-/** The entering/processing/leaving phases all have visually distinct motion. */
-export const jobProgress = (frame:number,kind:Kind,index:number) => {
-  // The other engine is held at its initial tasks until its own scene begins.
-  if(frame < 424 && ((kind==='cpu' && frame<80) || (kind==='gpu' && frame<292))) return 0;
-  return clamp((frame-jobStart(frame,kind,index))/jobDuration(frame,kind));
-};
+export const jobDuration = (_frame:number,kind:Kind) =>
+  kind==='cpu'?36:44;
+
+/** Work motion is monotone: waiting → entering → processing → leaving → done. */
+export const jobProgress = (frame:number,kind:Kind,index:number) =>
+  clamp((frame-jobStart(frame,kind,index))/jobDuration(frame,kind));
+
 export const taskPhase = (p:number):TaskPhase =>
   p<=0?'waiting':p<.34?'entering':p<.66?'processing':p<1?'leaving':'done';
 
@@ -81,7 +85,7 @@ export const taskPositions = (kind:Kind,index:number): {
 };
 /** A raised package cover briefly slides away, revealing the real die layout. */
 export const lidOpening = (frame:number,kind:Kind) =>
-  smooth((frame-(kind==='cpu'?99:303))/30);
+  smooth((frame-(kind==='cpu'?56:291))/42);
 
 const lerp = (a:number,b:number,k:number) => a+(b-a)*k;
 export const taskAt = (frame:number,kind:Kind,index:number) => {
@@ -111,12 +115,3 @@ export const workingCount = (frame:number,kind:Kind) =>
   Array.from({length:TASKS},(_,i)=>taskAt(frame,kind,i).phase)
     .filter(p=>p==='entering'||p==='processing'||p==='leaving').length;
 
-/** The introduction physically performs the same one-cube transformation. */
-export const sampleAt = (frame:number) => {
-  const p=clamp((frame-15)/46);
-  return {
-    x:-1.8 + 3.6*smooth(p),
-    y:.55+.43*Math.sin(Math.PI*p),
-    dyed:smooth((p-.29)/.43),
-  };
-};
