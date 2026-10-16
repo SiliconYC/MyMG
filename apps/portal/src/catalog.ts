@@ -69,7 +69,7 @@ export const projects: readonly MgProject[] = [
     title: '机械摆钟 · 擒纵机构',
     titleEn: 'ANCHOR ESCAPEMENT / REGULATOR CLOCK',
     category: '机械 / 节奏控制',
-    description: '一套完整 3D 机芯：镜头从表盘正面绕到擒纵结构背面，推近齿面，观察锁止、放行与秒针步进。',
+    description: '重点定格正面、背面及两块擒纵瓦的锁止与放行细节；视角间快速绕行，摆钟机架简化到必要轴承。',
     status: 'React / Three.js 原生动画',
     component: PendulumClockScene,
     durationInFrames: 1800,
@@ -79,7 +79,8 @@ export const projects: readonly MgProject[] = [
     notes: [
       '30 齿擒纵轮，钟摆每两秒完整往复一次；左右擒纵瓦交替锁止，轮子每秒只走 6°。',
       '秒针与擒纵轮共用同一角度，经过 60 次节拍恰好转一整圈；暂停、拖动与逐帧状态完全一致。',
-      '前侧表盘、背侧擒纵轮、锚形叉、钟摆与机架为同一套有厚度的 3D 几何。摄影机以真实空间轨迹旋转、推近、拉远，拒绝左右分屏和平面假 3D。',
+      '前后同一套 3D 机构：连续摆杆与擒纵轮、立体楔形擒纵瓦（锁止面、冲量面）、秒针；删除装饰性机架。',
+      '摄影机采用定点慢移观察与短促快速绕行，分别聚焦入端瓦、出端瓦及秒针；不再匀速绕圈。',
       '为便于观察，齿形、摆幅及释放动作均是教学示意；并非可直接加工的物理仿真机芯。',
     ],
   },
