@@ -1,285 +1,332 @@
-import React, {useMemo} from 'react';
+import React, {useLayoutEffect, useMemo} from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
+import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
-import {clockAtFrame, TEETH} from './clock-model';
+import {clockAtFrame, TEETH, type ClockState} from './clock-model';
+import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
+  contactDistance, type PalletPose} from './escapement-contact';
+import {cameraAtFrame, type Vec3} from './camera-path';
 
-type Position = [number, number, number];
-const pos = (x: number, y: number, z = 0): Position => [x - 640, 360 - y, z];
+/**
+ * ONE spatially coherent mechanism. The camera starts at the FRONT of the
+ * dial, passes the SIDE (revealing the z-axis gaps), inspects the REAR
+ * escapement, and returns to the front. Nothing is a 2D projected substitute.
+ *
+ * Layout, back -> front along z:
+ *   pendulum and steel chassis  z=-0.98
+ *   anchor and pallets         z=-0.34
+ *   escapement and steel axle  z=0
+ *   dial support / dial        z=1.65..2.15
+ *   red seconds hand           z=2.37
+ *
+ * Every moving part and every camera pose is computed only from frame.
+ * The model remains the same object throughout; there are no scene swaps.
+ */
 
-const GOLD = '#cc9e5a';
-const GOLD_LIGHT = '#f2d295';
-const STEEL = '#adc5c8';
-const INK = '#203540';
-const RED = '#db775e';
+const METAL = '#536367';
+const DARK = '#283c43';
+const BRASS = '#b78d4f';
+const GOLD = '#ddba78';
+const STEEL = '#a9b9b7';
+const PORCELAIN = '#f2eee3';
+const SECOND = '#bc604c';
 
-/** All the moving mechanism parts are real Three.js geometry, not SVG paths/video. */
-const Bar: React.FC<{
-  x1: number; y1: number; x2: number; y2: number;
-  width: number; depth?: number; color: string; z?: number;
-}> = ({x1,y1,x2,y2,width,depth=6,color,z=0}) => {
-  const dx=x2-x1,dy=y2-y1;
-  return <mesh position={[(x1+x2)/2,(y1+y2)/2,z]}
-    rotation={[0,0,Math.atan2(dy,dx)]}>
-    <boxGeometry args={[Math.hypot(dx,dy),width,depth]}/>
-    <meshStandardMaterial color={color} metalness={0.8} roughness={0.3}/>
+type AxleProps={position:Vec3;radius:number;depth:number;color:string};
+const Axle:React.FC<AxleProps>=({position,radius,depth,color})=>
+  <mesh position={[...position]} rotation={[Math.PI/2,0,0]} castShadow receiveShadow>
+    <cylinderGeometry args={[radius,radius,depth,40]}/>
+    <meshStandardMaterial color={color} metalness={.69} roughness={.28}/>
+  </mesh>;
+
+const Ring:React.FC<{position:Vec3;radius:number;tube:number;color:string}>=
+({position,radius,tube,color})=>
+  <mesh position={[...position]} castShadow>
+    <torusGeometry args={[radius,tube,12,96]}/>
+    <meshStandardMaterial color={color} metalness={.66} roughness={.32}/>
+  </mesh>;
+
+/** A true round metal rod placed between arbitrary 3D endpoints. */
+const Rod:React.FC<{a:Vec3;b:Vec3;radius:number;color:string}>=
+({a,b,radius,color})=>{
+  const from=new THREE.Vector3(...a),to=new THREE.Vector3(...b);
+  const axis=new THREE.Vector3().subVectors(to,from);
+  const mid=from.add(to).multiplyScalar(.5);
+  const quat=new THREE.Quaternion().setFromUnitVectors(
+    new THREE.Vector3(0,1,0),axis.clone().normalize());
+  return <mesh position={[mid.x,mid.y,mid.z]} quaternion={[quat.x,quat.y,quat.z,quat.w]}
+    castShadow receiveShadow>
+    <cylinderGeometry args={[radius,radius,axis.length(),12]}/>
+    <meshStandardMaterial color={color} metalness={.77} roughness={.28}/>
   </mesh>;
 };
-const ScreenBar: React.FC<{
-  x1: number; y1: number; x2: number; y2: number;
-  width: number; color: string; z?: number;
-}> = ({x1,y1,x2,y2,width,color,z=0}) =>
-  <Bar x1={x1-640} y1={360-y1} x2={x2-640} y2={360-y2}
-    width={width} color={color} z={z}/>;
 
-const Plate:React.FC<{x:number;y:number;r:number;depth?:number;color:string;z?:number}> =
-({x,y,r,depth=6,color,z=0})=>
-  <mesh position={pos(x,y,z)} rotation={[Math.PI/2,0,0]}>
-    <cylinderGeometry args={[r,r,depth,64]}/>
-    <meshStandardMaterial color={color} metalness={0.83} roughness={0.32}/>
-  </mesh>;
-
-const Ring:React.FC<{x:number;y:number;r:number;tube:number;color:string;z?:number}> =
-({x,y,r,tube,color,z=0})=>
-  <mesh position={pos(x,y,z)}>
-    <torusGeometry args={[r,tube,12,120]}/>
-    <meshStandardMaterial color={color} metalness={0.78} roughness={0.33}/>
-  </mesh>;
-
-/** 30 individually cut ratchet teeth on a brass annulus with a circular bore. */
-function makeEscapeWheel(): THREE.ExtrudeGeometry {
-  const shape = new THREE.Shape();
-  const pitch = 2*Math.PI/TEETH;
+/** Single, watertight bevelled 30-tooth wheel: depth is real geometry. */
+function makeEscapeWheel():THREE.ExtrudeGeometry {
+  const shape=new THREE.Shape();
+  const step=2*Math.PI/TEETH;
   for(let k=0;k<TEETH;k++){
-    const a = k*pitch;
-    for(const [offset,r] of [[0,91],[0.18,98],[0.27,113],[0.41,112],[0.68,95],[0.92,91]]){
-      const angle=a+offset*pitch;
-      const x=Math.sin(angle)*r, y=Math.cos(angle)*r;
-      if(k===0&&offset===0)shape.moveTo(x,y);else shape.lineTo(x,y);
+    const base=k*step;
+    for(const [s,r] of [[0,1.29],[.19,1.31],[.34,1.53],[.43,1.55],[.69,1.32],[.93,1.29]]){
+      const a=base+s*step;
+      const x=Math.sin(a)*r,y=Math.cos(a)*r;
+      if(k===0&&s===0)shape.moveTo(x,y);else shape.lineTo(x,y);
     }
   }
   shape.closePath();
-  const bore = new THREE.Path();
-  bore.absarc(0,0,59,0,2*Math.PI,true);
-  shape.holes.push(bore);
-  return new THREE.ExtrudeGeometry(shape,{
-    steps:1,depth:7,bevelEnabled:true,bevelThickness:1.2,
-    bevelSize:1,bevelSegments:2,curveSegments:20
+  const hole=new THREE.Path();
+  hole.absarc(0,0,.55,0,Math.PI*2,true);
+  shape.holes.push(hole);
+  const geo=new THREE.ExtrudeGeometry(shape,{
+    depth:.18,steps:1,bevelEnabled:true,bevelSize:.018,
+    bevelThickness:.012,bevelSegments:2,curveSegments:48,
   });
+  geo.translate(0,0,-.11);
+  return geo;
 }
 
-const EscapeWheel: React.FC<{angle:number}> = ({angle}) => {
-  const geometry=useMemo(makeEscapeWheel,[]);
-  return <group position={pos(419,365,2)} rotation={[0,0,-angle]}>
-    <mesh geometry={geometry}>
-      <meshStandardMaterial color={GOLD} metalness={0.92} roughness={0.23}
+const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
+  const geom=useMemo(makeEscapeWheel,[]);
+  useLayoutEffect(()=>()=>geom.dispose(),[geom]);
+  return <group position={[0,.6,0]} rotation={[0,0,-angle]}>
+    <mesh geometry={geom} castShadow receiveShadow>
+      <meshStandardMaterial color={BRASS} metalness={.78} roughness={.26}
         side={THREE.DoubleSide}/>
     </mesh>
-    {Array.from({length:6},(_,k)=>{
-      const a=k*Math.PI/3;
-      return <Bar key={k} x1={Math.sin(a)*26} y1={Math.cos(a)*26}
-        x2={Math.sin(a)*83} y2={Math.cos(a)*83}
-        width={11} depth={9} color={GOLD_LIGHT} z={4}/>;
+    {Array.from({length:6},(_,i)=>{
+      const a=i*Math.PI/3;
+      return <Rod key={i}
+        a={[.27*Math.sin(a),.27*Math.cos(a),.09]}
+        b={[1.28*Math.sin(a),1.28*Math.cos(a),.09]}
+        radius={.067} color={GOLD}/>;
     })}
-    <mesh position={[0,0,6]} rotation={[Math.PI/2,0,0]}>
-      <cylinderGeometry args={[31,31,9,48]}/>
-      <meshStandardMaterial color="#647e85" metalness={0.89} roughness={0.28}/>
-    </mesh>
-    <mesh position={[0,0,13]} rotation={[Math.PI/2,0,0]}>
-      <cylinderGeometry args={[9,9,4,32]}/>
-      <meshStandardMaterial color="#f1cc89" metalness={0.85} roughness={0.3}/>
-    </mesh>
-    <mesh position={[0,0,18]}>
-      <sphereGeometry args={[3,12,12]}/>
-      <meshStandardMaterial color="#fff5d5" emissive="#957046" emissiveIntensity={0.3}/>
-    </mesh>
+    <Axle position={[0,0,.13]} radius={.32} depth={.24} color={METAL}/>
+    <Axle position={[0,0,.29]} radius={.125} depth={.17} color={GOLD}/>
+    <Ring position={[0,0,.245]} radius={.36} tube={.027} color={GOLD}/>
   </group>;
 };
 
-const Pendulum:React.FC<{angle:number}> = ({angle}) =>
-  <group position={pos(419,195,-16)} rotation={[0,0,-angle]}>
-    <Bar x1={0} y1={-10} x2={0} y2={-389}
-      width={8} depth={9} color={STEEL}/>
-    <mesh position={[0,-387,0]} scale={[1,1.08,.42]}>
-      <sphereGeometry args={[45,64,36]}/>
-      <meshStandardMaterial color="#d2a35e" metalness={0.87} roughness={0.22}/>
-    </mesh>
-    <mesh position={[-13,-373,19]} scale={[1.5,2.9,.36]}>
-      <sphereGeometry args={[8,20,20]}/>
-      <meshStandardMaterial color="#fce6ae" metalness={0.4} roughness={0.25}/>
-    </mesh>
-  </group>;
+/** Small, outward-pointing escapement shoe. The contact NOSE is (0,0).
+ * Its wide BASE is at (0,.19), where the fork arm is welded; the former
+ * mesh attached the arm to the nose, creating a visibly impossible joint.
+ */
+function makeSlimPallet():THREE.ExtrudeGeometry {
+  const profile=new THREE.Shape();
+  profile.moveTo(0,0);             // ONLY tooth-catching nose, never fork attachment
+  profile.lineTo(.017,.027);       // locking land
+  profile.lineTo(.023,.080);       // sloping impulse face
+  profile.lineTo(.050,.19);        // broad mounting base
+  profile.lineTo(-.050,.19);
+  profile.lineTo(-.023,.075);
+  profile.lineTo(-.010,.023);
+  profile.closePath();
+  const geometry=new THREE.ExtrudeGeometry(profile,{
+    depth:.12,steps:1,bevelEnabled:true,
+    bevelSize:.004,bevelThickness:.006,bevelSegments:2,
+  });
+  geometry.translate(0,0,-.10);
+  return geometry;
+}
 
-const Anchor:React.FC<{angle:number;locked:'entry'|'exit';releasing:boolean}> =
-({angle,locked,releasing}) =>
-  <group position={pos(419,195,23)} rotation={[0,0,-angle]}>
-    {/* Upper V-bar alternately catches two teeth. */}
-    <Bar x1={0} y1={-2} x2={-90} y2={-91} width={15} depth={11} color={STEEL}/>
-    <Bar x1={0} y1={-2} x2={90} y2={-91} width={15} depth={11} color={STEEL}/>
-    {([-1,1] as const).map(side=>{
-      const selected=(side===-1&&locked==='entry')||(side===1&&locked==='exit');
-      return <group key={side} position={[side*89,-90,7]}
-        rotation={[0,0,side*.48]}>
-        <mesh>
-          <boxGeometry args={[17,34,11]}/>
-          <meshStandardMaterial color={selected?GOLD_LIGHT:'#b5c9cc'}
-            emissive={selected?(releasing?'#de764a':'#574024'):'#000000'}
-            emissiveIntensity={selected?0.27:0}
-            metalness={0.9} roughness={0.2}/>
-        </mesh>
-      </group>;
-    })}
-    <mesh position={[0,0,12]} rotation={[Math.PI/2,0,0]}>
-      <cylinderGeometry args={[17,17,10,48]}/>
-      <meshStandardMaterial color={GOLD_LIGHT} metalness={0.85} roughness={0.29}/>
+const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
+  const geometry=useMemo(makeSlimPallet,[]);
+  useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
+  return <group position={[...palletLocalTip(pose.side),-.06]}
+    rotation={[0,0,palletOrientation(pose.side)]}>
+    <mesh geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial color={pose.engaged?GOLD:STEEL}
+        metalness={.75} roughness={.24}
+        emissive={pose.engaged?'#8b6033':'#000000'}
+        emissiveIntensity={pose.engaged?0.12:0}/>
     </mesh>
-    <mesh position={[0,0,20]} rotation={[Math.PI/2,0,0]}>
-      <cylinderGeometry args={[6,6,5,32]}/>
-      <meshStandardMaterial color="#324950" metalness={0.8} roughness={0.36}/>
-    </mesh>
+    {/* The visible edge of the actual short locking face. */}
+    <Rod a={[0,0,-.118]} b={[.017,.027,-.118]}
+      radius={.008} color="#f3dbb0"/>
+    {/* The angled impulse face is much longer than the locking land. */}
+    <Rod a={[.017,.027,-.118]} b={[.023,.080,-.118]}
+      radius={.008} color={BRASS}/>
   </group>;
+};
 
-const Dial: React.FC<{secondAngle:number;minuteAngle:number}> =
-({secondAngle,minuteAngle})=>{
-  const cx=987,cy=348;
+/** An anchor is an EXTENSION of the pendulum's own rigid shaft.
+ * It has no independent rotation, time base, positional interpolation, or
+ * animated piston. Geometry here is in PIVOT-LOCAL coordinates; the only
+ * group rotation exists in EscapementPendulumAssembly below.
+ */
+const Anchor:React.FC<{state:ClockState}>=({state})=>{
+  const entry=palletPose('entry',state);
+  const exit=palletPose('exit',state);
   return <group>
-    <Plate x={cx} y={cy} r={197} depth={14} color="#9d8059" z={0}/>
-    <Plate x={cx} y={cy} r={187} depth={16} color={INK} z={9}/>
-    <Plate x={cx} y={cy} r={170} depth={1.8} color="#253e49" z={19}/>
-    <Ring x={cx} y={cy} r={181} tube={2.7} color={GOLD_LIGHT} z={23}/>
-    <Ring x={cx} y={cy} r={158} tube={0.9} color="#819398" z={22}/>
-    {Array.from({length:60},(_,index)=>{
-      const a=index*Math.PI/30;
-      const outer=174,inner=index%5===0?153:163;
-      return <ScreenBar key={index}
-        x1={cx+inner*Math.sin(a)} y1={cy- inner*Math.cos(a)}
-        x2={cx+outer*Math.sin(a)} y2={cy-outer*Math.cos(a)}
-        width={index%5===0?3:1.2} color={index%5===0?GOLD_LIGHT:'#849fa4'} z={24}/>;
-    })}
-    {/* The canonical hand shaft and escapement wheel share EXACTLY the same angle. */}
-    <group position={pos(cx,cy,34)} rotation={[0,0,-(5.33+minuteAngle/12)]}>
-      <Bar x1={0} y1={-18} x2={0} y2={87} width={11} depth={6} color={GOLD_LIGHT} z={0}/>
-    </group>
-    <group position={pos(cx,cy,38)} rotation={[0,0,-(Math.PI/3+minuteAngle)]}>
-      <Bar x1={0} y1={-23} x2={0} y2={133} width={6} depth={5} color="#e8e2cd" z={0}/>
-    </group>
-    <group position={pos(cx,cy,44)} rotation={[0,0,-secondAngle]}>
-      <Bar x1={0} y1={-29} x2={0} y2={147} width={2.9} depth={4} color={RED} z={0}/>
-      <mesh position={[0,148,2]} rotation={[0,0,Math.PI]}>
-        <coneGeometry args={[7,17,3]}/>
-        <meshStandardMaterial color={RED} metalness={0.4} roughness={0.3}/>
-      </mesh>
-      <mesh position={[0,-24,0]}>
-        <sphereGeometry args={[8,16,12]}/>
-        <meshStandardMaterial color={RED} metalness={0.75} roughness={0.24}/>
-      </mesh>
-    </group>
-    <Plate x={cx} y={cy} r={8} depth={6} color="#f4d49b" z={49}/>
+    {([entry,exit] as PalletPose[]).map(pose=>
+      <group key={pose.side}>
+        {/* Fork-to-pallet weld lives on the wide BASE, not the tooth tip. */}
+        <Rod a={[0,0,-.33]}
+          b={[...palletLocalBase(pose.side),-.13]}
+          radius={.036} color={STEEL}/>
+        <PalletTooth pose={pose}/>
+      </group>
+    )}
+    <Axle position={[0,0,-.34]} radius={.16} depth={.18} color={DARK}/>
+    <Axle position={[0,0,-.47]} radius={.078} depth={.11} color={GOLD}/>
   </group>;
 };
 
-const World:React.FC<{frame:number}>=({frame})=>{
-  const clock=clockAtFrame(frame);
-  return <ThreeCanvas width={1280} height={720} orthographic
-    camera={{position:[0,0,900],zoom:1,near:.1,far:1500}}
-    gl={{alpha:true,antialias:true,preserveDrawingBuffer:true}}
-    style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
-    <ambientLight intensity={1.65}/>
-    <directionalLight position={[-200,300,700]} intensity={2.0} color="#fff0d1"/>
-    <directionalLight position={[500,-200,300]} intensity={1.1} color="#96c8d0"/>
-    {/* Stationary mounting bearings, arc marks and housing. */}
-    <Ring x={419} y={365} r={128} tube={1.2} color="#5c7277" z={-22}/>
-    <Plate x={419} y={195} r={29} depth={6} color="#546f78" z={-19}/>
-    <Pendulum angle={clock.pendulumAngle}/>
-    <EscapeWheel angle={clock.wheelAngle}/>
-    <Anchor angle={clock.anchorAngle} locked={clock.lock} releasing={clock.releasing}/>
-    <Dial secondAngle={clock.secondHandAngle} minuteAngle={clock.minuteHandAngle}/>
+/** Highlight only the REAL rotating tooth flank, never fabricate a bridge. */
+const ContactHighlights:React.FC<{state:ClockState;showDetail:boolean}>=
+({state,showDetail})=>{
+  if(!showDetail)return null;
+  return <group>
+    {(['entry','exit'] as const).map(side=>{
+      const p=palletPose(side,state);
+      return p.engaged?<Rod key={side}
+        a={[p.flankStart[0],p.flankStart[1],-.155]}
+        b={[p.flankEnd[0],p.flankEnd[1],-.155]}
+        radius={.018} color="#fff0c4"/>:null;
+    })}
+  </group>;
+};
+
+/** One pendulum physically hangs from the same anchor pivot behind the wheel. */
+const Pendulum:React.FC=()=>
+  <group position={[0,0,-.91]}>
+    <Rod a={[0,-.12,0]} b={[0,-6.28,0]} radius={.044} color={STEEL}/>
+    <Axle position={[0,-5.98,-.015]} radius={.14} depth={.18} color={METAL}/>
+    <mesh position={[0,-6.28,0]} scale={[1,1.18,.33]} castShadow>
+      <sphereGeometry args={[.55,48,32]}/>
+      <meshStandardMaterial color={BRASS} metalness={.74} roughness={.22}/>
+    </mesh>
+    <mesh position={[-.16,-6.14,.18]} scale={[.5,1.8,.35]}>
+      <sphereGeometry args={[.22,24,20]}/>
+      <meshStandardMaterial color="#f4daa4" metalness={.58} roughness={.25}/>
+    </mesh>
+    <Axle position={[0,0,-.05]} radius={.17} depth={.20} color={METAL}/>
+  </group>;
+
+/** Only the two axis bearings remain. No decorative chassis, cage or rails. */
+const MinimalSupports:React.FC=()=> <group>
+  <Axle position={[0,2.56,-1.08]} radius={.22} depth={.20} color={METAL}/>
+  <Axle position={[0,.60,-.42]} radius={.23} depth={.22} color={METAL}/>
+</group>;
+
+/** Porcelain seconds dial is ON THE SAME COAXIAL SHAFT as the escape wheel. */
+const Dial:React.FC<{angle:number}>=({angle})=>{
+  const dialY=.60;
+  return <group position={[0,dialY,0]}>
+    {/* The shaft crosses the real 3D gap from the wheel to the clock face. */}
+    <Rod a={[0,0,.20]} b={[0,0,2.36]} radius={.073} color={BRASS}/>
+    <Axle position={[0,0,1.75]} radius={1.78} depth={.20} color={BRASS}/>
+    <Axle position={[0,0,1.88]} radius={1.68} depth={.09} color={PORCELAIN}/>
+    <Ring position={[0,0,2.04]} radius={1.735} tube={.041} color={GOLD}/>
+    <Ring position={[0,0,2.07]} radius={1.49} tube={.009} color="#b4a78e"/>
+    {Array.from({length:60},(_,k)=>{
+      const a=k*Math.PI/30, r0=k%5===0?1.32:1.40, r1=1.52;
+      return <Rod key={k} a={[r0*Math.sin(a),r0*Math.cos(a),2.10]}
+        b={[r1*Math.sin(a),r1*Math.cos(a),2.10]}
+        radius={k%5===0?.021:.009} color={k%5===0?DARK:'#988c73'}/>;
+    })}
+    {/* No second independent model or off-axis display. */}
+    <group position={[0,0,2.29]} rotation={[0,0,-angle]}>
+      <Rod a={[0,-.32,0]} b={[0,1.31,0]} radius={.026} color={SECOND}/>
+      <mesh position={[0,1.35,0]} rotation={[0,0,Math.PI]}>
+        <coneGeometry args={[.073,.20,4]}/>
+        <meshStandardMaterial color={SECOND} metalness={.47} roughness={.32}/>
+      </mesh>
+      <Axle position={[0,-.25,0]} radius={.073} depth={.08} color={SECOND}/>
+    </group>
+    <Axle position={[0,0,2.38]} radius={.09} depth={.12} color={BRASS}/>
+  </group>;
+};
+
+const CinematicCamera:React.FC<{frame:number}>=({frame})=>{
+  const {camera}=useThree();
+  const shot=cameraAtFrame(frame);
+  useLayoutEffect(()=>{
+    camera.position.set(...shot.position);
+    camera.lookAt(...shot.target);
+    if(camera instanceof THREE.PerspectiveCamera){
+      camera.fov=shot.fov;
+      camera.updateProjectionMatrix();
+    }
+    camera.updateMatrixWorld();
+  },[camera,frame,shot.position[0],shot.position[1],shot.position[2],
+    shot.target[0],shot.target[1],shot.target[2],shot.fov]);
+  return null;
+};
+
+const Movement:React.FC<{frame:number}>=({frame})=>{
+  const state=clockAtFrame(frame);
+  const shot=cameraAtFrame(frame);
+  return <ThreeCanvas width={1280} height={720}
+    camera={{position:[0,1.2,14.5],fov:35,near:.1,far:95}}
+    gl={{alpha:false,antialias:true,preserveDrawingBuffer:true}}
+    style={{position:'absolute',inset:0,width:1280,height:720}}>
+    <color attach="background" args={['#edece6']}/>
+    <ambientLight intensity={1.5}/>
+    <directionalLight position={[4,8,13]} intensity={2.6} color="#fff4de"/>
+    <directionalLight position={[-7,5,-9]} intensity={2.7} color="#e5f0f2"/>
+    <directionalLight position={[0,-5,8]} intensity={.8} color="#ffdda0"/>
+    <CinematicCamera frame={frame}/>
+    <group>
+      <MinimalSupports/>
+      <EscapeWheel angle={state.wheelAngle}/>
+      {/* ONE pivot, ONE angle: pendulum rod, pendulum bob and both pallets
+          form a single physically connected rotating Three.js assembly. */}
+      <group position={[0,2.56,0]} rotation={[0,0,-state.pendulumAngle]}>
+        <Rod a={[0,0,-.91]} b={[0,0,-.33]}
+          radius={.085} color={STEEL}/>
+        <Pendulum/>
+        <Anchor state={state}/>
+      </group>
+      <ContactHighlights state={state}
+        showDetail={shot.chapter==='contact'||shot.chapter==='rear'}/>
+      <Dial angle={state.secondHandAngle}/>
+    </group>
   </ThreeCanvas>;
 };
 
-const labelStyle:React.CSSProperties={
-  color:'#97afaf',fontSize:13,letterSpacing:2,fontFamily:'Arial, sans-serif',
-};
-const Pill:React.FC<{left:number;top:number;label:string;active?:boolean}>=
-({left,top,label,active})=><div style={{
-  position:'absolute',left,top,background:active?'#cd9e5b22':'#ffffff0b',
-  border:'1px solid '+(active?'#dbaf71':'#ffffff30'),
-  color:active?'#f5cd88':'#8fa6ab',
-  padding:'7px 11px',fontSize:12,letterSpacing:1,borderRadius:3,
-}}>{label}</div>;
+const CAPTIONS={
+  front:'秒针一步一走：先看看钟摆的节奏',
+  rear:'两块小擒纵瓦，分别接住轮齿的斜面',
+  contact:'轮齿被锁住 → 放行半齿 → 对侧重新锁住',
+  proof:'每一次放行，秒针恰好前进一步',
+} as const;
 
 export const PendulumClockScene:React.FC=()=>{
   const frame=useCurrentFrame();
-  const clock=clockAtFrame(frame);
-  const phase=clock.releasing?'释 放':'锁 止';
-  return <AbsoluteFill data-testid="pendulum-clock-scene" data-renderer="react-threejs-webgl"
-    data-beats={clock.beats} data-lock={clock.lock}
-    data-wheel-angle={clock.wheelAngle.toFixed(7)}
-    data-second-hand-angle={clock.secondHandAngle.toFixed(7)}
-    style={{
-      background:'radial-gradient(ellipse at 34% 48%,#243d49 0%,#102631 56%,#071721 100%)',
-      color:'#f0e4d0',overflow:'hidden',
-      fontFamily:'Inter,"Noto Sans SC","Microsoft YaHei",sans-serif',
-    }}>
-    {/* Graphic frame and subtle technical engraving. */}
-    <div style={{position:'absolute',inset:0,opacity:.11,backgroundImage:
-      'linear-gradient(#bdd2c5 1px,transparent 1px),linear-gradient(90deg,#bdd2c5 1px,transparent 1px)',
-      backgroundSize:'40px 40px'}}/>
-    <div style={{position:'absolute',left:46,top:45,fontSize:14,letterSpacing:5,
-      color:'#d5a864'}}>M Y M G　/　M E C H A N I S M S</div>
-    <div style={{position:'absolute',left:46,top:88,fontSize:37,fontWeight:750,
-      letterSpacing:2}}>机械摆钟的心跳</div>
-    <div style={{position:'absolute',left:48,top:145,...labelStyle}}>
-      ANCHOR ESCAPEMENT · 30 TOOTH · 60 BEATS / MINUTE
-    </div>
-    <div style={{position:'absolute',left:730,top:75,height:570,width:1,
-      background:'linear-gradient(transparent,#68818b,transparent)',opacity:.52}}/>
-    <World frame={frame}/>
-    {/* Dial numerals are DOM text; seconds hand and gear train remain Three meshes. */}
-    {[12,3,6,9].map((n,i)=>{
-      const a=i*Math.PI/2, cx=987+136*Math.sin(a),cy=348-136*Math.cos(a);
-      return <span key={n} style={{position:'absolute',left:cx-20,top:cy-13,
-        width:40,textAlign:'center',fontSize:23,fontFamily:'Georgia,serif',
-        color:'#ead8ac',pointerEvents:'none'}}>{n}</span>;
-    })}
-    <div style={{position:'absolute',top:291,left:897,width:180,textAlign:'center',
-      fontSize:12,letterSpacing:4,color:'#d4b179'}}>REGULATOR</div>
-    <div style={{position:'absolute',top:391,left:888,width:198,textAlign:'center',
-      fontSize:10,letterSpacing:2.2,color:'#9fb9bd'}}>PRECISION · CLOCKWORK</div>
-    <div style={{position:'absolute',left:777,top:100,...labelStyle,
-      color:'#b5c7c7'}}>秒针 · 每次解锁前进一格</div>
-    <div style={{position:'absolute',left:777,top:574,...labelStyle}}>
-      60 次半摆 = 60 秒 = 擒纵轮一整圈
-    </div>
-    <div style={{position:'absolute',left:55,top:329,...labelStyle}}>
-      30 齿擒纵轮
-    </div>
-    <div style={{position:'absolute',left:56,top:354,width:210,height:1,
-      background:'#be9858',opacity:.45}}/>
-    <div style={{position:'absolute',left:521,top:199,...labelStyle}}>擒纵叉</div>
-    <div style={{position:'absolute',left:540,top:225,width:77,height:1,
-      background:'#be9858',opacity:.5}}/>
-    <div style={{position:'absolute',left:520,top:554,...labelStyle}}>钟摆</div>
-    <Pill left={56} top={416} label={'入端擒纵瓦  /  '+
-      (clock.lock==='entry'?'● 咬合':'○ 放行')} active={clock.lock==='entry'}/>
-    <Pill left={56} top={461} label={'出端擒纵瓦  /  '+
-      (clock.lock==='exit'?'● 咬合':'○ 放行')} active={clock.lock==='exit'}/>
-    <div style={{position:'absolute',left:56,bottom:45,right:56,height:1,
-      background:'#7d9598',opacity:.45}}/>
-    <div style={{position:'absolute',left:58,bottom:15,...labelStyle,letterSpacing:1}}>
-      摆动 → 交替解锁 → 擒纵轮步进 → 秒针跳动
-    </div>
-    <div style={{position:'absolute',left:775,bottom:45,display:'flex',
-      alignItems:'baseline',gap:16}}>
-      <span style={{fontSize:58,fontWeight:700,color:'#f4c586',
-        fontVariantNumeric:'tabular-nums'}}>{String(Math.min(clock.beats,60)).padStart(2,'0')}</span>
-      <span style={{fontSize:15,color:'#a8bdbf'}}>节拍</span>
-      <span style={{fontSize:18,color:'#eac58d',marginLeft:32}}>{phase}</span>
-      <span style={{fontSize:13,color:'#b4c4c6'}}>{clock.lock==='entry'?'左瓦锁定':'右瓦锁定'}</span>
-    </div>
-    <div data-testid="clock-kinematic-readout" style={{position:'absolute',right:55,bottom:15,
-      ...labelStyle,letterSpacing:.6}}>
-      {clock.wheelAngle*180/Math.PI < 10?'0':''}{(clock.wheelAngle*180/Math.PI).toFixed(1)}° / 360°
-    </div>
+  const state=clockAtFrame(frame);
+  const shot=cameraAtFrame(frame);
+  const entry=palletPose('entry',state);
+  const exit=palletPose('exit',state);
+  return <AbsoluteFill
+    data-testid="pendulum-clock-scene" data-renderer="react-threejs-webgl"
+    data-beats={state.beats} data-lock={state.lock}
+    data-pendulum-angle={state.pendulumAngle.toFixed(7)}
+    data-anchor-angle={state.anchorAngle.toFixed(7)}
+    data-wheel-angle={state.wheelAngle.toFixed(7)}
+    data-second-hand-angle={state.secondHandAngle.toFixed(7)}
+    data-camera-x={shot.position[0].toFixed(4)}
+    data-camera-z={shot.position[2].toFixed(4)}
+    data-camera-distance={Math.hypot(
+      shot.position[0]-shot.target[0],
+      shot.position[1]-shot.target[1],
+      shot.position[2]-shot.target[2]).toFixed(4)}
+    data-camera-chapter={shot.chapter}
+    data-camera-mode={shot.mode}
+    data-contact-side={entry.engaged?'entry':exit.engaged?'exit':'free'}
+    data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
+    data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
+    style={{overflow:'hidden',background:'#edece6',color:'#28383d',
+      fontFamily:'"Noto Sans SC","Microsoft YaHei",sans-serif'}}>
+    <Movement frame={frame}/>
+    {/* Exactly one restrained chapter caption. No diagrams, cards, HUD or grid. */}
+    <div style={{
+      position:'absolute',left:62,bottom:51,pointerEvents:'none',
+      fontSize:24,fontWeight:560,letterSpacing:1.1,color:'#34464c',
+      textShadow:'0 1px 12px #edece6b8'
+    }}>{CAPTIONS[shot.chapter]}</div>
+    <div style={{
+      position:'absolute',right:61,top:50,pointerEvents:'none',
+      fontSize:12,letterSpacing:2.3,color:'#6b7576'
+    }}>MYMG / ESCAPEMENT</div>
   </AbsoluteFill>;
 };

@@ -3,6 +3,8 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
+import {pipeSections} from './pipe-path.ts';
+import {cameraPose} from './camera-path.ts';
 import {
   steamAtFrame, CYLINDER_LEFT, CYLINDER_RIGHT, CYLINDER_OUTER_RADIUS,
   CYLINDER_INNER_RADIUS, CRANK_X, CRANK_RADIUS, smoothstep, type SteamFrame,
@@ -39,12 +41,24 @@ const Rod: React.FC<{
   </mesh>;
 };
 
+/** One actual continuous tube, with radiused joints instead of broken
+ * cylinder segments or Catmull-Rom spline overshoot through sharp elbows. */
 const Pipe: React.FC<{points: V3[]; color: string; radius?: number}> =
   ({points, color, radius = .08}) => {
-    const curve = useMemo(() =>
-      new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p))), [points]);
+    const curve = useMemo(() => {
+      const path=new THREE.CurvePath<THREE.Vector3>();
+      for(const section of pipeSections(points,.25)){
+        const from=new THREE.Vector3(...section.start);
+        const to=new THREE.Vector3(...section.end);
+        if(section.kind==='elbow' && section.control)
+          path.add(new THREE.QuadraticBezierCurve3(
+            from,new THREE.Vector3(...section.control),to));
+        else path.add(new THREE.LineCurve3(from,to));
+      }
+      return path;
+    },[points]);
     return <mesh castShadow>
-      <tubeGeometry args={[curve, 56, radius, 10, false]}/>
+      <tubeGeometry args={[curve, Math.max(72,points.length*22),radius,14,false]}/>
       <meshStandardMaterial color={color} metalness={.72} roughness={.24}/>
     </mesh>;
   };
@@ -179,24 +193,22 @@ const ValveAssembly: React.FC<{s: SteamFrame; plane: THREE.Plane}> = ({s, plane}
           emissive={(i === 0) === (s.motion === 'right') ? '#9a3a14' : '#145a68'} emissiveIntensity={.38}/>
       </mesh>
     </group>)}
-    <Pipe points={[[-2.12, 2.44, -.10], [-2.12, 2.08, -.10],
-      [-1.65, 1.86, -.10], [-1.65, 1.62, -.10]]} color="#c88b4e" radius={.125}/>
+    {/* The inlet riser is part of ONE tube beginning at the boiler:
+        GovernorThrottle below builds its complete path to this steam chest. */}
+    {/* Exhaust is one continuous riser, ending in a visibly open flanged vent. */}
     <Pipe points={[[-1.16, 1.65, -.13], [-1.16, 2.13, -.13],
-      [-.45, 2.17, -.13], [-.38, 2.43, -.13]]} color="#5d9eb1" radius={.108}/>
-    <mesh position={[-2.12, 2.43, -.10]}>
-      <sphereGeometry args={[.16, 16, 12]}/>
-      <meshStandardMaterial color="#f2ab5d" emissive="#e37824" emissiveIntensity={.9}/>
-    </mesh>
-    <mesh position={[-.38, 2.43, -.13]}>
-      <sphereGeometry args={[.14, 16, 12]}/>
-      <meshStandardMaterial color="#7ecad7" emissive="#2a8294" emissiveIntensity={.8}/>
+      [-.45, 2.17, -.13], [-.38, 2.43, -.13], [-.38, 3.12, -.13]]}
+      color="#5d9eb1" radius={.108}/>
+    <mesh position={[-.38, 3.12, -.13]} rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[.116,.043,12,32]}/>
+      <meshStandardMaterial color="#a4c7d0" metalness={.75} roughness={.29}/>
     </mesh>
   </group>;
 };
 
 const Flywheel: React.FC<{s: SteamFrame}> = ({s}) => {
   return <group>
-    <Rod from={[CRANK_X, 0, -.75]} to={[CRANK_X, 0, 1.12]}
+    <Rod from={[CRANK_X, 0, -1.02]} to={[CRANK_X, 0, 1.48]}
       radius={.13} color="#b5b8b0"/>
     <group position={[CRANK_X, 0, .17]} rotation={[0, 0, s.theta]}>
       <mesh castShadow>
@@ -275,6 +287,151 @@ const EngineMechanics: React.FC<{s: SteamFrame}> = ({s}) => <group>
   <Flywheel s={s}/>
 </group>;
 
+
+/**
+ * This governor is directly above and behind the flywheel bearing, not an
+ * isolated object to the right of the engine. Same rear drive shaft drives
+ * the belt pulley at the spindle foot; bevel gearing turns the vertical shaft.
+ * A bell crank links the rising sleeve to the inline steam inlet butterfly.
+ * Arrangement based on Watt flyball drawings (Smithsonian / Powerhouse).
+ */
+const GOV_X = 1.72;
+const GOV_Z = 1.20;
+const GOV_PIVOT_Y = 2.73;
+const GOV_ARM = .88;
+const THROTTLE_X = .12;
+const THROTTLE_Y = 2.33;
+const THROTTLE_Z = -.28;
+const governorValveAngle = (s:SteamFrame) => s.governor.throttle * Math.PI/2;
+const valveLinkEnd = (s:SteamFrame):V3 => {
+  const a=governorValveAngle(s);
+  return [THROTTLE_X-.35*Math.sin(a),THROTTLE_Y,THROTTLE_Z-.35*Math.cos(a)];
+};
+
+const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
+  const g=s.governor;
+  const radial=GOV_ARM*Math.sin(g.angle);
+  const ballY=GOV_PIVOT_Y-GOV_ARM*Math.cos(g.angle);
+  const pivot:V3=[.90,1.48,GOV_Z];
+  const rockerAngle=-.14+.55*(g.angle-.70);
+  const input:V3=[pivot[0]+.44*Math.cos(rockerAngle),
+    pivot[1]+.44*Math.sin(rockerAngle),GOV_Z];
+  const output:V3=[pivot[0]-.36*Math.sin(rockerAngle),
+    pivot[1]+.36*Math.cos(rockerAngle),GOV_Z];
+  return <group>
+    {/* Spindle stands on the engine bed immediately behind the flywheel. */}
+    <mesh position={[GOV_X,-1.34,GOV_Z]}>
+      <boxGeometry args={[.63,.38,.67]}/>
+      <meshStandardMaterial color="#4a606d" metalness={.64} roughness={.43}/>
+    </mesh>
+    <Rod from={[GOV_X,-1.28,GOV_Z]} to={[GOV_X,2.84,GOV_Z]}
+      radius={.068} color="#bfcace"/>
+    {/* An actual rotating head and both balls turn on the same vertical axis. */}
+    <group position={[GOV_X,0,GOV_Z]} rotation={[0,g.spindlePhase,0]}>
+      <mesh position={[0,GOV_PIVOT_Y,0]}>
+        <cylinderGeometry args={[.18,.18,.20,24]}/>
+        <meshStandardMaterial color="#e5be82" metalness={.84} roughness={.26}/>
+      </mesh>
+      {[-1,1].map(sign=><group key={sign}>
+        <Rod from={[0,GOV_PIVOT_Y,0]} to={[sign*radial,ballY,0]}
+          radius={.052} color="#d9b47d"/>
+        <Rod from={[sign*radial,ballY,0]} to={[0,g.sleeveY,0]}
+          radius={.045} color="#bbc8cc"/>
+        <mesh position={[sign*radial,ballY,0]} castShadow>
+          <sphereGeometry args={[.18,32,24]}/>
+          <meshStandardMaterial color="#d8a367" metalness={.80} roughness={.26}/>
+        </mesh>
+      </group>)}
+    </group>
+    <mesh position={[GOV_X,g.sleeveY,GOV_Z]}>
+      <cylinderGeometry args={[.19,.19,.30,32]}/>
+      <meshStandardMaterial color="#d1d7d5" metalness={.83} roughness={.27}/>
+    </mesh>
+    {/* The sleeve collar does not rotate with the shaft: the fork and rocker
+        can lift the throttle while the flyball spindle is spinning. */}
+    <mesh position={[GOV_X,g.sleeveY,GOV_Z]} rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[.205,.038,12,32]}/>
+      <meshStandardMaterial color="#e4bc7e" metalness={.8} roughness={.25}/>
+    </mesh>
+    <Rod from={[GOV_X-.21,g.sleeveY,GOV_Z]} to={input}
+      radius={.038} color="#c9d0d0"/>
+    <Rod from={pivot} to={input} radius={.045} color="#d6b781"/>
+    <Rod from={pivot} to={output} radius={.045} color="#d6b781"/>
+    <mesh position={pivot}>
+      <sphereGeometry args={[.095,18,12]}/>
+      <meshStandardMaterial color="#e3b778" metalness={.82} roughness={.27}/>
+    </mesh>
+    <Rod from={output} to={valveLinkEnd(s)} radius={.038} color="#c5ced0"/>
+  </group>;
+};
+
+/** The throttle is INLINE in the boiler-to-valve-chest steam supply pipe. */
+const GovernorThrottle: React.FC<{s:SteamFrame}> = ({s}) => {
+  const a=governorValveAngle(s);
+  const left=THROTTLE_X-.28, right=THROTTLE_X+.28;
+  return <group>
+    {/* One uninterrupted steam path: boiler-side downcomer -> transparent
+        valve chamber -> steam-chest inlet. Pipes reach BOTH chamber flanges. */}
+    <Pipe points={[[2.52,5.50,-.75],[2.52,3.48,-.75],
+      [2.20,2.81,-.53],[1.48,THROTTLE_Y,THROTTLE_Z],
+      [right,THROTTLE_Y,THROTTLE_Z]]} color="#c68a57" radius={.12}/>
+    {/* The outlet continues through every elbow into the steam chest without
+        a second unattached pipe piece at its upper-right connection. */}
+    <Pipe points={[[left,THROTTLE_Y,THROTTLE_Z],
+      [-1.86,THROTTLE_Y,THROTTLE_Z],[-2.12,2.44,-.10],
+      [-2.12,2.08,-.10],[-1.65,1.86,-.10],[-1.65,1.62,-.10]]}
+      color="#c68a57" radius={.12}/>
+    {/* The tube through the valve is transparent, NOT an omitted section.
+        This makes the rotating butterfly readable without a broken pipe. */}
+    <mesh position={[THROTTLE_X,THROTTLE_Y,THROTTLE_Z]}
+      rotation={[0,0,Math.PI/2]}>
+      <cylinderGeometry args={[.175,.175,.56,36,1,true]}/>
+      <meshStandardMaterial color="#8faab1" metalness={.39} roughness={.27}
+        transparent opacity={.28} side={THREE.DoubleSide} depthWrite={false}/>
+    </mesh>
+    {[left,right].map(x=>
+      <mesh key={x} position={[x,THROTTLE_Y,THROTTLE_Z]}
+        rotation={[0,Math.PI/2,0]}>
+        <torusGeometry args={[.181,.061,12,40]}/>
+        <meshStandardMaterial color="#bdc8ca" metalness={.83} roughness={.27}/>
+      </mesh>
+    )}
+    {/* A visible butterfly disc remains inside a closed, fully connected body. */}
+    <group position={[THROTTLE_X,THROTTLE_Y,THROTTLE_Z]}
+      rotation={[0,a,0]}>
+      <mesh>
+        <boxGeometry args={[.045,.32,.32]}/>
+        <meshStandardMaterial color="#e6b878" metalness={.79}
+          roughness={.27} side={THREE.DoubleSide}/>
+      </mesh>
+      <Rod from={[0,0,0]} to={[0,0,-.35]}
+        radius={.044} color="#dcc8a5"/>
+    </group>
+  </group>;
+};
+
+/** Compact belt drive on the engine's own axle; small right-angle gearbox. */
+const GovernorDrive: React.FC<{s:SteamFrame}> = ({s}) => <group>
+  {[CRANK_X,GOV_X].map(x=>
+    <group key={x} position={[x,0,GOV_Z]} rotation={[0,0,s.theta]}>
+      <mesh>
+        <torusGeometry args={[.235,.061,14,40]}/>
+        <meshStandardMaterial color="#bb9c6d" metalness={.77} roughness={.30}/>
+      </mesh>
+      <Rod from={[-.22,0,0]} to={[.22,0,0]}
+        radius={.032} color="#ddbb80"/>
+    </group>
+  )}
+  <Rod from={[GOV_X,.235,GOV_Z]} to={[CRANK_X,.235,GOV_Z]}
+    radius={.025} color="#555966" metallic={.20}/>
+  <Rod from={[GOV_X,-.235,GOV_Z]} to={[CRANK_X,-.235,GOV_Z]}
+    radius={.025} color="#555966" metallic={.20}/>
+  <mesh position={[GOV_X,0,GOV_Z]} rotation={[0,s.governor.spindlePhase,0]}>
+    <coneGeometry args={[.19,.26,24]}/>
+    <meshStandardMaterial color="#cfb488" metalness={.76} roughness={.29}/>
+  </mesh>
+</group>;
+
 const Pedestals: React.FC = () => <group>
   {[-2.65, -.55].map(x =>
     <group key={x}>
@@ -288,8 +445,8 @@ const Pedestals: React.FC = () => <group>
       </mesh>
     </group>
   )}
-  <mesh position={[.20, -1.59, -.35]}>
-    <boxGeometry args={[8.90, .20, 2.0]}/>
+  <mesh position={[.20, -1.59, .20]}>
+    <boxGeometry args={[8.90, .20, 3.70]}/>
     <meshStandardMaterial color="#334756" metalness={.54} roughness={.59}/>
   </mesh>
   <mesh position={[.2, -1.75, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -298,7 +455,18 @@ const Pedestals: React.FC = () => <group>
   </mesh>
 </group>;
 
+/** Shared orbital camera and 3D leader-line projection are defined in camera-path.ts. */
 const World: React.FC<{s: SteamFrame}> = ({s}) => {
+  const camera=useThree(state=>state.camera);
+  useEffect(()=>{
+    const pose=cameraPose(s.time);
+    camera.position.set(...pose.eye);
+    camera.lookAt(...pose.target);
+    if(camera instanceof THREE.OrthographicCamera){
+      camera.zoom=pose.zoom;
+      camera.updateProjectionMatrix();
+    }
+  },[camera,s.time]);
   const clipPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, -1), 1.42), []);
   clipPlane.constant = s.cutZ;
   return <>
@@ -313,16 +481,18 @@ const World: React.FC<{s: SteamFrame}> = ({s}) => {
       <EngineMechanics s={s}/>
       <CylinderShell plane={clipPlane} s={s}/>
       <ValveAssembly s={s} plane={clipPlane}/>
+      <GovernorDrive s={s}/>
+      <GovernorAssembly s={s}/>
+      <GovernorThrottle s={s}/>
     </group>
   </>;
 };
 
 /** Storytelling comes from the machine. A single brief title, never a dashboard. */
 const CHAPTERS = [
-  {start:.35, end:2.25, title:'蒸汽机'},
-  {start:3.0, end:5.25, title:'剖开气缸'},
-  {start:7.2, end:9.5, title:'蒸汽推动活塞'},
-  {start:12.55, end:14.85, title:'往复变成旋转'},
+  {start:.15, end:1.02, title:'蒸汽机'},
+  {start:1.34, end:2.85, title:'气缸剖面'},
+  // The governor is taught with one spatial leader-line callout at a time.
 ] as const;
 
 const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
@@ -339,6 +509,77 @@ const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
   }}>{chapter.title}</div>;
 };
 
+/**
+ * Restrained in-frame annotations. Each short line points at a REAL moving
+ * mechanism, using the same Three.js camera track as the rendered scene.
+ * Only one card and one guide line are visible at any moment.
+ */
+const TEACHING_BEATS = [
+  {start:5.42,end:6.56,part:'belt',lines:['飞轮带动皮带','调速器跟着旋转']},
+  {start:6.62,end:7.90,part:'balls',lines:['转速越快','两颗重锤甩得越开']},
+  {start:7.94,end:9.13,part:'sleeve',lines:['重锤抬高套筒','连杆跟着移动']},
+  {start:9.19,end:11.49,part:'valve',lines:['节流阀关小，进汽减少','飞轮逐渐慢下来']},
+  {start:11.56,end:13.55,part:'flywheel',lines:['转速回到稳定','这就是负反馈']},
+] as const;
+
+type TeachingPart = typeof TEACHING_BEATS[number]['part'];
+const anchoredPoint = (part:TeachingPart,s:SteamFrame):V3 => {
+  if(part==='belt') return [(GOV_X+CRANK_X)/2,-.28,GOV_Z];
+  if(part==='sleeve') return [GOV_X,s.governor.sleeveY-.28,GOV_Z];
+  if(part==='valve') return [THROTTLE_X,THROTTLE_Y-.28,THROTTLE_Z];
+  if(part==='flywheel') return [CRANK_X,-.28,.17];
+  const radius=GOV_ARM*Math.sin(s.governor.angle);
+  const phase=s.governor.spindlePhase;
+  return [
+    GOV_X+radius*Math.cos(phase),
+    GOV_PIVOT_Y-GOV_ARM*Math.cos(s.governor.angle)-.28,
+    GOV_Z+radius*Math.sin(phase),
+  ];
+};
+const projectOnCanvas = (t:number,point:V3) => {
+  const pose=cameraPose(t);
+  // Matches the 1280x720 orthographic frustum of <ThreeCanvas>.
+  const camera=new THREE.OrthographicCamera(-640,640,360,-360,.1,100);
+  camera.position.set(...pose.eye);
+  camera.lookAt(...pose.target);
+  camera.zoom=pose.zoom;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  const vector=new THREE.Vector3(...point).project(camera);
+  return {x:(vector.x+1)*640,y:(1-vector.y)*360};
+};
+
+const TeachingCallout: React.FC<{s:SteamFrame}> = ({s}) => {
+  const beat=TEACHING_BEATS.find(b=>s.time>=b.start&&s.time<b.end);
+  if(!beat) return null;
+  const point=projectOnCanvas(s.time,anchoredPoint(beat.part,s));
+  const opacity=smoothstep((s.time-beat.start)/.18)
+    *(1-smoothstep((s.time-beat.end+.18)/.18));
+  return <div data-testid="steam-callout" data-callout-part={beat.part}
+    data-anchor-x={point.x.toFixed(1)} data-anchor-y={point.y.toFixed(1)}
+    aria-hidden="true" style={{position:'absolute',inset:0,
+      opacity,pointerEvents:'none'}}>
+    <svg width="1280" height="720" viewBox="0 0 1280 720"
+      style={{position:'absolute',inset:0,width:'100%',height:'100%'}}>
+      <path d={`M 365 490 L 402 490 L ${(point.x-18).toFixed(1)} ${point.y.toFixed(1)} L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`}
+        stroke="#e9c189" strokeWidth="1.6" strokeLinecap="round"
+        strokeLinejoin="round" fill="none" opacity=".90"/>
+      <circle cx={point.x} cy={point.y} r="6.2" stroke="#ffdc9c"
+        strokeWidth="1.5" fill="#152b38"/>
+      <circle cx={point.x} cy={point.y} r="2.3" fill="#ffce84"/>
+    </svg>
+    <div style={{position:'absolute',left:55,top:436,width:310,
+      boxSizing:'border-box',padding:'14px 12px 16px 18px',
+      fontFamily:'"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif',
+      borderLeft:'3px solid #f2c17c',background:'rgba(12,27,38,.79)',
+      borderRadius:'0 7px 7px 0',boxShadow:'0 7px 28px rgba(7,16,28,.18)',
+      color:'#f3f0e8',fontSize:22,fontWeight:670,letterSpacing:.4,
+      lineHeight:1.48}}>
+      {beat.lines.map((line,i)=><div key={i}>{line}</div>)}
+    </div>
+  </div>;
+};
+
 export const SteamEngineScene: React.FC = () => {
   const frame = useCurrentFrame();
   const s = steamAtFrame(frame);
@@ -347,6 +588,17 @@ export const SteamEngineScene: React.FC = () => {
     data-cut-progress={s.cut.toFixed(4)}
     data-piston-x={s.pistonX.toFixed(4)}
     data-crank-angle={s.theta.toFixed(4)}
+    data-governor-speed={s.governor.relativeSpeed.toFixed(4)}
+    data-governor-angle={s.governor.angle.toFixed(4)}
+    data-governor-sleeve={s.governor.sleeveY.toFixed(4)}
+    data-governor-throttle={s.governor.throttle.toFixed(4)}
+    data-camera-shift={smoothstep((s.time-4.80)/.53).toFixed(4)}
+    data-governor-x={GOV_X.toFixed(2)}
+    data-governor-z={GOV_Z.toFixed(2)}
+    data-pipe-z={THROTTLE_Z.toFixed(2)}
+    data-camera-azimuth={cameraPose(s.time).azimuth.toFixed(5)}
+    data-camera-elevation={cameraPose(s.time).elevation.toFixed(5)}
+    data-throttle-x={THROTTLE_X.toFixed(2)}
     style={{background:'radial-gradient(ellipse at 54% 48%,#213d50 0%,#0e1e2d 67%,#08111d 100%)',
       overflow:'hidden'}}>
     <ThreeCanvas width={1280} height={720} orthographic
@@ -356,5 +608,6 @@ export const SteamEngineScene: React.FC = () => {
       <World s={s}/>
     </ThreeCanvas>
     <ChapterTitle frame={frame}/>
+    <TeachingCallout s={s}/>
   </AbsoluteFill>;
 };

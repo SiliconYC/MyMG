@@ -1,4 +1,6 @@
-/** Visual minimalism and real browser 3D validation; no screenshot/video masquerade. */
+/** Chromium/SwiftShader acceptance: no transparent enclosing compute cube,
+ * real shared task motions, accelerated orbital camera with yaw and pitch.
+ */
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -24,60 +26,111 @@ const seek=async target=>{
     el.dispatchEvent(new Event('input',{bubbles:true}));
     el.dispatchEvent(new Event('change',{bubbles:true}));
   },target);
-  await page.waitForFunction(x=>document.querySelector('[data-testid="frame-readout"]')?.textContent===String(x),target);
-  await page.waitForTimeout(180);
+  await page.waitForFunction(x=>
+    document.querySelector('[data-testid="frame-readout"]')?.textContent===String(x),target);
+  await page.waitForTimeout(170);
 };
 try{
   await page.goto(new URL('#/',site).href,{waitUntil:'networkidle'});
   await page.getByTestId('project-cpu-gpu').waitFor();
   await page.getByTestId('project-cpu-gpu').click();
   assert.equal(new URL(page.url()).hash,'#/cpu-gpu');
-  const marker=page.getByTestId('cpu-gpu-native-scene');
-  await marker.waitFor();
-  assert.equal(await marker.getAttribute('data-renderer'),'react-threejs-webgl');
+  const scene=page.getByTestId('cpu-gpu-native-scene');
+  await scene.waitFor();
+  assert.equal(await scene.getAttribute('data-renderer'),'react-threejs-webgl');
+  assert.equal(await scene.getAttribute('data-chip-design'),'complete-silicon-top');
   assert.equal(await page.locator('video').count(),0);
-  assert.equal(await marker.locator('img').count(),0);
-  const canvas=marker.locator('canvas').first();
+  assert.equal(await scene.locator('img').count(),0);
+  const canvas=scene.locator('canvas').first();
   await canvas.waitFor();
   assert.ok(await canvas.evaluate(el=>{
     const gl=el.getContext('webgl2')||el.getContext('webgl');
-    return !!gl && !gl.isContextLost() && el.width>=100 && el.height>=100;
-  }),'must use a working, original Three.js WebGL canvas');
-  for(const [frame,beat,labels] of [
-    [70,'cpu',['CPU']],
-    [200,'gpu',['GPU']],
-    [350,'compare',['CPU','GPU']],
-  ]){
+    return !!gl&&!gl.isContextLost()&&el.width>=100&&el.height>=100;
+  }),'original Three.js WebGL context required');
+
+  const number=async key=>Number(await scene.getAttribute(key));
+  const image=async(frame,stage,cpu,gpu,cpuWork,gpuWork)=>{
     await seek(frame);
-    assert.equal(await marker.getAttribute('data-workload'),beat);
-    const shown=await marker.locator('span').allTextContents();
-    assert.deepEqual(shown,labels,'No subtitle paragraphs or HUD clutter in the animation');
-    const shot=await marker.screenshot({path:resolve(out,'cpu-gpu-minimal-'+frame+'.png')});
-    assert.ok(shot.byteLength>5000,'Expected a real, populated 3D scene at '+frame);
-    const cpu=Number(await marker.getAttribute('data-cpu-active'));
-    const gpu=Number(await marker.getAttribute('data-gpu-active'));
-    if(frame===70)assert.ok(cpu<=1 && gpu===0,'CPU is observed alone');
-    if(frame===200)assert.equal(gpu,64,'GPU wave is synchronized');
+    assert.equal(await scene.getAttribute('data-workload'),stage);
+    assert.equal(await number('data-task-count'),16);
+    assert.equal(await number('data-cpu-done'),cpu);
+    assert.equal(await number('data-gpu-done'),gpu);
+    assert.equal(await number('data-cpu-working'),cpuWork);
+    assert.equal(await number('data-gpu-working'),gpuWork);
+    assert.equal(await scene.locator('span').count(),1);
+    assert.ok(await number('data-camera-zoom')>=35);
+    assert.ok(await number('data-camera-zoom')<=80);
+    const png=await scene.screenshot({path:resolve(out,'cpu-gpu-orbit-'+frame+'.png')});
+    assert.ok(png.byteLength>6000,'WebGL scene failed at frame '+frame);
+    return png;
+  };
+
+  const start=await image(0,'task',0,0,0,0);
+  const introText=await scene.locator('span').textContent();
+  assert.match(introText,/獨立計算單元/);
+  assert.match(introText,/白色輸入/);
+  assert.match(introText,/藍色結果/);
+  assert.doesNotMatch(introText,/CPU|GPU/);
+  const exampleX=await number('data-example-location');
+  assert.ok(Math.abs(exampleX-await number('data-cpu-location'))>9);
+  const introMid=await image(30,'task',0,0,0,0);
+  assert.ok(Buffer.compare(start,introMid)!==0,'neutral arithmetic operation must animate');
+  assert.ok(await number('data-example-dyed')>.2,'cube must change color ABOVE exposed tile');
+  await image(60,'task',0,0,0,0);
+  assert.equal(await number('data-example-progress'),1);
+  assert.equal(await number('data-example-dyed'),1);
+
+  // The CPU and GPU each receive the identical 16 jobs, not the generic sample.
+  await image(110,'cpu',0,0,4,0);
+  await image(133,'cpu',4,0,0,0);
+  await image(167,'cpu',8,0,0,0);
+  await image(235,'cpu',16,0,0,0);
+
+  // 29 frames = under one second CPU -> GPU, with visible 3D camera orbit.
+  await seek(237);
+  const from={yaw:await number('data-camera-yaw'),pitch:await number('data-camera-pitch')};
+  const before=await scene.screenshot({path:resolve(out,'cpu-gpu-fast-orbit-start.png')});
+  await seek(251);
+  const middle=await scene.screenshot({path:resolve(out,'cpu-gpu-fast-orbit-mid.png')});
+  await seek(266);
+  const to={yaw:await number('data-camera-yaw'),pitch:await number('data-camera-pitch')};
+  const after=await scene.screenshot({path:resolve(out,'cpu-gpu-fast-orbit-end.png')});
+  assert.ok(Math.abs(from.yaw-to.yaw)>.50,'camera yaw must genuinely orbit during transition');
+  assert.ok(Math.abs(from.pitch-to.pitch)>.17,'camera pitch must change during transition');
+  assert.ok(Buffer.compare(before,middle)!==0&&Buffer.compare(middle,after)!==0,
+    'fast transition needs visible intermediary 3D frames, not a static cut');
+  await image(293,'gpu',16,0,0,16);
+  await image(322,'gpu',16,16,0,0);
+  await image(370,'compare',16,16,0,0);
+  await image(419,'compare',16,16,0,0);
+
+  for(const frame of [59,60,94,95,237,250,266,270,271,331,345,346,377]){
+    await seek(frame);
+    if(frame>=60)assert.equal(await number('data-example-progress'),1);
+    const png=await scene.screenshot({path:resolve(out,'cpu-gpu-cut-boundary-'+frame+'.png')});
+    assert.ok(png.byteLength>6000,'blank frame during camera motion');
   }
+
   await seek(200);
   await page.getByRole('button',{name:'前进一帧'}).click();
   assert.equal(await readFrame(),201);
   await page.getByRole('button',{name:'后退一帧'}).click();
   assert.equal(await readFrame(),200);
   await page.getByTestId('play-toggle').click();
-  await page.waitForFunction(()=>Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)>204,
+  await page.waitForFunction(()=>
+    Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)>204,
     null,{timeout:10000});
   await page.getByTestId('play-toggle').click();
   await page.waitForTimeout(160);
   const frozen=await readFrame();
-  await page.waitForTimeout(290);
+  await page.waitForTimeout(300);
   assert.equal(await readFrame(),frozen);
   await page.goto(new URL('#/cpu-gpu',site).href,{waitUntil:'networkidle'});
-  await marker.waitFor();
+  await scene.waitFor();
   await page.setViewportSize({width:390,height:844});
-  await page.screenshot({path:resolve(out,'cpu-gpu-minimal-mobile.png'),fullPage:true});
+  await page.screenshot({path:resolve(out,'cpu-gpu-cinematic-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU minimal 3D verified: clean label-only scene, three shots, live WebGL, mobile and frame controls.');
+  console.log('CPU/GPU cinematic WebGL verified: exposed task core, shared movement, fast yaw/pitch orbit, mobile.');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}
