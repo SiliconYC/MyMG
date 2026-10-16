@@ -4,7 +4,8 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
-import {palletPose, palletLocalTip, contactDistance, type PalletPose} from './escapement-contact';
+import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
+  contactDistance, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 
 /**
@@ -105,33 +106,33 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
   </group>;
 };
 
-/** A slim beveled locking wedge with a narrow contact tip.
- * Local +Y points outward from the wheel; (0,0) is the actual contact.
- * These two tiny wedges replace both oversized ornamental mechanisms.
+/** Small, outward-pointing escapement shoe. The contact NOSE is (0,0).
+ * Its wide BASE is at (0,.19), where the fork arm is welded; the former
+ * mesh attached the arm to the nose, creating a visibly impossible joint.
  */
 function makeSlimPallet():THREE.ExtrudeGeometry {
-  const shape=new THREE.Shape();
-  shape.moveTo(0,0);                   // tooth-facing locking point
-  shape.lineTo(.024,.029);             // short locking land
-  shape.lineTo(.035,.082);             // sloping impulse face
-  shape.lineTo(.075,.18);
-  shape.lineTo(-.075,.18);
-  shape.lineTo(-.032,.072);
-  shape.lineTo(-.012,.019);
-  shape.closePath();
-  const geom=new THREE.ExtrudeGeometry(shape,{
-    depth:.12,bevelEnabled:true,steps:1,
-    bevelSize:.006,bevelThickness:.006,bevelSegments:2,
+  const profile=new THREE.Shape();
+  profile.moveTo(0,0);             // ONLY tooth-catching nose, never fork attachment
+  profile.lineTo(.017,.027);       // locking land
+  profile.lineTo(.023,.080);       // sloping impulse face
+  profile.lineTo(.050,.19);        // broad mounting base
+  profile.lineTo(-.050,.19);
+  profile.lineTo(-.023,.075);
+  profile.lineTo(-.010,.023);
+  profile.closePath();
+  const geometry=new THREE.ExtrudeGeometry(profile,{
+    depth:.12,steps:1,bevelEnabled:true,
+    bevelSize:.004,bevelThickness:.006,bevelSegments:2,
   });
-  geom.translate(0,0,-.10);
-  return geom;
+  geometry.translate(0,0,-.10);
+  return geometry;
 }
 
 const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
   const geometry=useMemo(makeSlimPallet,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
   return <group position={[...palletLocalTip(pose.side),-.06]}
-    rotation={[0,0,-pose.radialAngle]}>
+    rotation={[0,0,palletOrientation(pose.side)]}>
     <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial color={pose.engaged?GOLD:STEEL}
         metalness={.75} roughness={.24}
@@ -139,10 +140,10 @@ const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
         emissiveIntensity={pose.engaged?0.12:0}/>
     </mesh>
     {/* The visible edge of the actual short locking face. */}
-    <Rod a={[0,0,-.118]} b={[.024,.029,-.118]}
+    <Rod a={[0,0,-.118]} b={[.017,.027,-.118]}
       radius={.008} color="#f3dbb0"/>
     {/* The angled impulse face is much longer than the locking land. */}
-    <Rod a={[.024,.029,-.118]} b={[.035,.082,-.118]}
+    <Rod a={[.017,.027,-.118]} b={[.023,.080,-.118]}
       radius={.008} color={BRASS}/>
   </group>;
 };
@@ -158,9 +159,10 @@ const Anchor:React.FC<{state:ClockState}>=({state})=>{
   return <group>
     {([entry,exit] as PalletPose[]).map(pose=>
       <group key={pose.side}>
+        {/* Fork-to-pallet weld lives on the wide BASE, not the tooth tip. */}
         <Rod a={[0,0,-.33]}
-          b={[...palletLocalTip(pose.side),-.13]}
-          radius={.043} color={STEEL}/>
+          b={[...palletLocalBase(pose.side),-.13]}
+          radius={.036} color={STEEL}/>
         <PalletTooth pose={pose}/>
       </group>
     )}
