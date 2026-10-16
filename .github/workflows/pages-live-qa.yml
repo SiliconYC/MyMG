@@ -1,4 +1,4 @@
-name: MyMG Pages - live browser verification
+name: MyMG Pages - live canonical HBM browser verification
 
 # A full public-site QA is deliberately manual/on workflow-file changes:
 # normal commits should NOT consume a browser Runner.
@@ -42,12 +42,11 @@ jobs:
           test -s /tmp/mymg-live.html
           grep -q 'id="root"' /tmp/mymg-live.html
           grep -q '/MyMG/assets/' /tmp/mymg-live.html
-      - name: Live HBM WebGL, transport and six-frame pixel QA
+      - name: Live Python master: MP4 decode, 9 frames, transport and mobile QA
         run: pnpm --filter @mymg/portal qa
         env:
           MYMG_QA_URL: https://siliconyc.github.io/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/pages-live
-          MYMG_QA_REQUIRE_WEBGL: '1'
       - name: Live independent MG demo and mobile QA
         run: pnpm --filter @mymg/portal qa:react
         env:
