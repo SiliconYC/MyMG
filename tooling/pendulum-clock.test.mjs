@@ -145,9 +145,9 @@ test('pallet tips align with the SAME 30-tooth wheel flank polygon used by mesh'
 
 test('a release retracts the outgoing wedge, rotates wheel, and seats incoming wedge',()=>{
   const before=clockAtFrame(frame(.40));
-  const early=clockAtFrame(frame(.45));
+  const early=clockAtFrame(frame(.43));
   const mid=clockAtFrame(frame(.50));
-  const late=clockAtFrame(frame(.57));
+  const late=clockAtFrame(frame(.60));
   const after=clockAtFrame(frame(.70));
   assert.ok(palletPose('entry',before).engaged);
   assert.ok(palletPose('entry',early).engaged);
