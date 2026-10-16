@@ -14,10 +14,11 @@
 
 ## 新增作品
 
-1. `animations/<id>/web` 实现一个由 Remotion `useCurrentFrame()` 决定每一帧内容的 React 组件。
-2. 在 `apps/portal/src/catalog.ts` 中加入作品元数据、组件、长度、分辨率、帧率。
-3. 门户自动显示新卡片及 `/#/<id>` 作品播放页；无需新建单独的 React App。
+1. 在根目录执行 `node tooling/new-mg.mjs example '示例动画'`，自动新建 `animations/example/web` 工作区包、添加门户与 Studio 依赖并更新真实 pnpm 锁文件。
+2. 修改场景 JSX 和 `apps/portal/src/catalog.ts` 的元数据，按需设置独立封面 `cover: {type:'image', src:'...', alt:'...'}`；不设置则使用通用占位图。
+3. 执行 `pnpm check`、`pnpm build:portal`、`pnpm qa:portal:react`，需要 WebGL 的场景再执行严格浏览器 `pnpm qa:portal`。
+4. 门户和 Studio 共用注册表。`/#/<id>` 可直接播放、暂停、拖动与逐帧浏览，不要复制新门户，也不再人工修改 `apps/studio/src/root.tsx`。
 
 作品播放器支持暂停、拖动进度条、逐帧前后退。不要将视频、字体文件或未经授权的素材提交到仓库。
 
-> 首次验收已用 GitHub Runner 成功安装依赖、编译静态门户并在 Chromium 中检查截图；Playwright 按按钮无障碍名称定位控制。\n
+> 真实 WebGL 与关键帧严格验收在 GitHub Runner 上执行；普通 React 交互可在具备 Chromium 的 OpenAI 沙盒运行。

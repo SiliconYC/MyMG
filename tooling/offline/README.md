@@ -1,6 +1,6 @@
 # Linux x64 / Node 22 离线依赖恢复
 
-[打包工作流](https://github.com/SiliconYC/MyMG/actions/workflows/offline-bundle.yml) 仅首次在 dev 引入时自动执行；后续升级 pnpm-lock.yaml 时手动 workflow_dispatch，不在每次提交上重复消耗 Runner。
+[打包工作流](https://github.com/SiliconYC/MyMG/actions/workflows/offline-bundle.yml) 仅在 dev 首次加入工作流或 `pnpm-lock.yaml` 发生变更时自动执行；也可手动 workflow_dispatch，不为普通源码提交消耗 Runner。
 
 Runner 在线下载锁文件完整 pnpm store、pnpm 10.20.0 与 Playwright Chromium。删除 node_modules、阻断 registry 后通过 frozen 离线安装、pnpm check、门户构建和 Chromium 网页 QA，才将压缩包与 SHA256SUMS 发布到**持久 GitHub Release**，标签包含锁文件 SHA256 前 16 位。不要依赖临时 Actions Artifact。
 

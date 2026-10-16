@@ -20,7 +20,7 @@
 ## 新 MG 如何接入
 
 - 在 animations/<slug>/web/ 新建工作区包及 React 场景。
-- 在 apps/studio/src/root.tsx 添加 Composition，声明 ID、宽高、帧率、帧数。
+- 运行 `node tooling/new-mg.mjs <slug> <中文标题>` 自动生成工作区包与场景，并在唯一的 `apps/portal/src/catalog.ts` 中登记 Composition ID、宽高、帧率、帧数；Studio 自动从同一目录生成 Composition，不得重复登记。
 - 从 packages/mg 导入公共能力，只写自身独有的画面与动作。
 - 用 pnpm frames 截取时间线关键点，核验遮挡、运动、构图，再渲染完整视频。
 - 不把生成的 MP4、逐帧图及缓存提交 Git。

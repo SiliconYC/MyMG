@@ -48,7 +48,7 @@ const source=[
 '  const frame=useCurrentFrame();',
 "  return <AbsoluteFill style={{background:'#F1EEE8',color:'#21303B',",
 "    justifyContent:'center',alignItems:'center',fontSize:64}}>",
-'    <div>'+title.trim().replaceAll('<','&lt;').replaceAll('>','&gt;')+'</div>',
+'    <div>{'+JSON.stringify(title.trim())+'}</div>',
 '    <div style={{fontSize:24}}>FRAME {frame}</div>',
 '  </AbsoluteFill>;',
 '};',
