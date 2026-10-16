@@ -183,7 +183,7 @@ const Receiver:React.FC<{s:CycleFrame}>=({s})=>{
     <Rounded pos={[-2.45,.91,.41]} size={[.22,.93,.32]} color={EDGE}/>
     {/* The removable solid side cover actually clears the sightline.
         Moving only toward the camera failed in orthographic projection. */}
-    <group position={[.18*s.reveal,1.66*s.reveal,.38*s.reveal]}>
+    <group position={[.18*s.reveal,8.8*s.reveal,.38*s.reveal]}>
       <Silhouette outline={side} depth={.14} z={1.06} color={BODY}
         metal={.53} opacity={s.shell}/>
     </group>
@@ -224,11 +224,6 @@ const Internals:React.FC<{s:CycleFrame}>=({s})=>{
       .90+1.70*s.ejection,
     ]} angle={[.28*s.ejection,1.8*s.ejection,2.1*s.ejection]}/>}
     {/* The magazine is given a narrow visual slot, not an exploded inventory. */}
-    {/* Magazine stack is visible only when the receiver is opened; the
-        original exterior had floating golden stripes on the magazine. */}
-    {s.reveal>.64&&[0,1,2].map(i=><Round key={i}
-      pos={[.17+i*.07,-.52-i*.38,.44]} scale={.56}
-      angle={[0,0,-.10]}/>)}
     <group position={[-1.12,-.44,.55]} rotation={[0,0,s.trigger*.37]}>
       <Rounded pos={[0,-.26,0]} size={[.12,.58,.13]} radius={.05}
         color={s.trigger>.9?COPPER:EDGE}/>
