@@ -137,7 +137,7 @@ const PalletTooth:React.FC<{side:-1|1;engaged:boolean;releasing:boolean}>=
       <meshStandardMaterial color={engaged?GOLD:STEEL}
         roughness={.24} metalness={.82}
         emissive={engaged?(releasing?'#8a5425':'#4f381a'):'#000000'}
-        emissiveIntensity={engaged?.15:0}/>
+        emissiveIntensity={engaged ? 0.15 : 0}/>
     </mesh>
     {/* Fine 3D face inlays emphasize the two nonparallel working surfaces. */}
     <Rod a={[side*.19,.12,.131]} b={[side*.17,.015,.131]}
