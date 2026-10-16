@@ -1,0 +1,62 @@
+name: MyMG Pages - live browser verification
+
+# A full public-site QA is deliberately manual/on workflow-file changes:
+# normal commits should NOT consume a browser Runner.
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/pages-live-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source and tests
+        uses: actions/checkout@v4
+      - name: Enable pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - name: Install pinned workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium and its libraries
+        run: pnpm --filter @mymg/portal exec playwright install --with-deps chromium
+      - name: Check public Pages entry point
+        run: |
+          set -euo pipefail
+          for n in $(seq 1 8); do
+            if curl --location --fail --silent --show-error https://siliconyc.github.io/MyMG/ -o /tmp/mymg-live.html; then break; fi
+            sleep 5
+          done
+          test -s /tmp/mymg-live.html
+          grep -q 'id="root"' /tmp/mymg-live.html
+          grep -q '/MyMG/assets/' /tmp/mymg-live.html
+      - name: Live HBM WebGL, transport and six-frame pixel QA
+        run: pnpm --filter @mymg/portal qa
+        env:
+          MYMG_QA_URL: https://siliconyc.github.io/MyMG/
+          MYMG_QA_OUTPUT: ${{ github.workspace }}/output/pages-live
+          MYMG_QA_REQUIRE_WEBGL: '1'
+      - name: Live independent MG demo and mobile QA
+        run: pnpm --filter @mymg/portal qa:react
+        env:
+          MYMG_QA_URL: https://siliconyc.github.io/MyMG/
+          MYMG_QA_OUTPUT: ${{ github.workspace }}/output/pages-live/demo
+      - name: Preserve online QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mymg-pages-live-qa
+          path: output/pages-live/
+          if-no-files-found: warn
