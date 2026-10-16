@@ -98,6 +98,15 @@ try{
   await original(197,'gpu',16,0,0,16);
   await original(226,'gpu',16,16,0,0);
   await original(274,'compare',16,16,0,0);
+  assert.equal(await scene.getAttribute('data-story-beat'),'none');
+  const gpuVictory=await original(292,'compare',16,16,0,0);
+  const title=page.getByTestId('cpu-gpu-story-title');
+  assert.equal(await scene.getAttribute('data-story-beat'),'gpu-wins');
+  assert.equal(await title.getAttribute('data-beat'),'gpu-wins');
+  assert.match(await title.textContent(),/第一轮/);
+  assert.match(await title.textContent(),/GPU 胜出/);
+  assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
+    'GPU winner must be visibly legible, not only a DOM label');
   const priorLastVisible=await original(309,'compare',16,16,0,0);
   const priorGone=await original(323,'compare',16,16,0,0);
   assert.notDeepEqual(priorLastVisible,priorGone,
@@ -126,11 +135,24 @@ try{
     return png;
   };
   await mixed(324,'mixed-intro',0,0,0,0,0);
+  assert.equal(await scene.getAttribute('data-story-beat'),'round-two');
+  assert.equal(await title.getAttribute('data-beat'),'round-two');
+  assert.match(await title.textContent(),/第二轮/);
+  assert.match(await title.textContent(),/16 个混合任务/);
   assert.equal(await num('data-camera-zoom'),previousCamera.zoom);
   assert.equal(await num('data-camera-yaw'),previousCamera.yaw);
   assert.equal(await num('data-camera-pitch'),previousCamera.pitch);
   assert.equal(await num('data-camera-distance'),previousCamera.distance);
 
+  await mixed(333,'mixed-intro',0,0,0,0,0);
+  const veil=page.getByTestId('cpu-gpu-round-wipe');
+  assert.equal(await veil.getAttribute('data-active'),'true');
+  assert.ok(await num('data-handover-opacity')>.8);
+  await mixed(342,'mixed-intro',0,0,0,0,0);
+  assert.match(await title.textContent(),/方块 · 球体 · 四面体 · 圆柱/);
+  assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
+    'round-two intertitle must appear while mixed shapes arrive');
+  assert.equal(await num('data-original-task-meshes'),0);
   const shapes=await mixed(364,'mixed-intro',0,0,0,0,0);
   assert.ok(Buffer.compare(priorGone,shapes)!==0,
     'new mixed shapes must actually appear after clean old-result removal');
@@ -144,11 +166,21 @@ try{
   await mixed(630,'mixed-gpu',16,8,0,0,8);
   await mixed(655,'mixed-gpu',16,12,0,0,4);
   await mixed(680,'mixed-gpu',16,16,0,0,0);
+  await mixed(699,'mixed-compare',16,16,0,0,0);
+  assert.equal(await scene.getAttribute('data-story-beat'),'none');
+  const cpuVictory=await mixed(722,'mixed-compare',16,16,0,0,0);
+  assert.equal(await scene.getAttribute('data-story-beat'),'cpu-wins');
+  assert.equal(await title.getAttribute('data-beat'),'cpu-wins');
+  assert.match(await title.textContent(),/第二轮/);
+  assert.match(await title.textContent(),/CPU 胜出/);
+  assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
+    'CPU winner must remain visible during final two-chip shot');
+  assert.notDeepEqual(gpuVictory,cpuVictory);
   await mixed(743,'mixed-compare',16,16,0,0,0);
 
   for(const f of [1,45,140,141,155,170,174,175,249,250,
-    300,309,315,322,323,324,325,328,335,348,364,
-    388,389,519,548,549,561,580,581,688,689,732,743]){
+    280,292,300,309,315,319,320,322,323,324,325,328,335,348,364,375,376,
+    388,389,519,548,549,561,580,581,688,689,700,712,732,743]){
     await seek(f);
     assert.equal(await num('data-original-task-meshes'),f<324?32:0,
       'legacy geometry leaked at '+f);
@@ -176,7 +208,7 @@ try{
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:resolve(out,'cpu-gpu-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU 744-frame native WebGL verified: no intro, no leftover objects, two workloads, perspective orbit and mobile');
+  console.log('CPU/GPU native WebGL verified: GPU victory, visible round-two wipe, CPU victory, clear meshes, perspective and mobile');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}
