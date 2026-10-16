@@ -1,5 +1,5 @@
 import type {ComponentType} from 'react';
-import {HbmInfrastructureCheck} from '@mymg/hbm';
+import {HbmMustard03Native} from '@mymg/hbm';
 import {DemoScene} from '@mymg/demo';
 // @mymg-generator-imports
 
@@ -24,22 +24,22 @@ export type MgProject = {
 export const projects: readonly MgProject[] = [
   {
     id: 'hbm',
-    compositionId: 'HBMInfrastructureCheck',
-    cover: {type: 'image', src: '/MyMG/media/hbm-poster.jpg', alt: 'Mustard-03 HBM 与 GPU 封装全景'}, 
+    compositionId: 'HBMMustard03Native',
+    cover: {type: 'hbm'}, 
     title: 'HBM 高带宽存储器',
     titleEn: 'HBM · MEMORY ARCHITECTURE',
     category: '芯片 / 三维结构',
     description: 'Mustard-03 正式版：从 DRAM 垂直堆叠、TSV 到八组 HBM 与 GPU 封装。',
-    status: 'Python 正版画面 · Web 完整播放',
-    component: HbmInfrastructureCheck,
+    status: 'React / Three.js 原生动画',
+    component: HbmMustard03Native,
     durationInFrames: 345,
     fps: 30,
     width: 1280,
     height: 720,
     notes: [
-      '网页直接播放与 Python 正式入口 make_mustard03.py 同源的完整 345 帧影片；不再用五秒 WebGL 样片替代。',
-      'React 控制播放、暂停、时间轴与逐帧定位，影片随 Pages 发布，不将生成视频提交 Git。',
-      '当前实现保证源影片视觉一致；并非把 Python 的三维几何逐行移植成 React Three Fiber。',
+      '原生 React/Three.js 网页动画：由 JS 按帧计算模型，Three.js WebGL 绘制所有晶片、TSV 铜柱、封装与连接线。',
+      '完整 345 帧与 Python Mustard-03 同时间线；Web 播放不使用视频、逐帧图片或服务器媒体。',
+      '使用原 Python 的 2:1 正交投影与世界坐标，文字、镜头和封装采用固定的真实 3D 几何过程。',
       'HBM 层数和封装为教学示意，不代表实际芯片精确尺寸。',
     ],
   },
