@@ -86,13 +86,17 @@ try{
   assert.ok(gl.valid&&gl.width>0&&gl.height>0,'Active WebGL Three.js scene required');
   assert.equal(await readFrame(),0);
   // Force original composition to natural 1280x720 pixel dimensions for reference comparison.
-  await page.getByTestId('player-shell').evaluate(el=>{el.style.width='1280px';el.style.maxWidth='none';});
+  await page.getByTestId('player-shell').evaluate(el=>{el.style.width='1282px';el.style.maxWidth='none';});
   await page.waitForTimeout(180);
+  const nativeSize=await page.getByTestId('hbm-native-scene').boundingBox();
+  assert.ok(nativeSize && Math.abs(nativeSize.width-1280)<0.2 &&
+    Math.abs(nativeSize.height-720)<0.2,
+    `Need pixel-perfect reference dimensions, got ${JSON.stringify(nativeSize)}`);
   const frames=[0,30,67,129,165,224,273,316,344];
   const images=new Map(),statistics={site,gl,frames:{},changes:{}};
   for(const frame of frames){
     await seek(frame);
-    const png=await page.getByTestId('player-shell').screenshot({path:resolve(out,`hbm-frame-${frame}.png`)});
+    const png=await page.getByTestId('hbm-native-scene').screenshot({path:resolve(out,`hbm-frame-${frame}.png`)});
     const v=await sample(png);
     if(frame>0)assert.ok(v.nonBackground>55&&v.palette>20,
       `HBM Three.js frame ${frame} looks blank: ${JSON.stringify(v)}`);
