@@ -58,7 +58,7 @@ try{
   };
   await shot(40,'task',0,0,0,0);
   await shot(140,'cpu',0,0,4,0);
-  await shot(164,'cpu',4,0,4,0);
+  await shot(164,'cpu',4,0,0,0);
   await shot(280,'cpu',16,0,0,0);
   await shot(352,'gpu',16,0,0,16);
   await shot(380,'gpu',16,16,0,0);
