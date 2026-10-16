@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {
   TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,CENTER,
   cameraAt,completedCount,workingCount,taskAt,stageAt,smooth,
+  storyBeatAt,storyOpacityAt,handoverProgressAt,handoverOpacityAt,
   PERSPECTIVE_FOV,ORIGINAL_FRAMES,shapeAt,
   mixedTaskAt,mixedCompletedCount,mixedWorkingCount,mixedIdleLanes,
   corePosition,type Kind,type Shape,
@@ -204,13 +205,13 @@ const World:React.FC<{frame:number}>=({frame})=>(
 
 const Caption:React.FC<{frame:number}>=({frame})=>{
   const label={
-    cpu:'CPU · 4 個大核心，分 4 批處理同樣的任務',
-    gpu:'GPU · 16 個小單元，同時處理同樣的任務',
-    compare:'同樣 16 項任務，結果全部離開晶片',
-    'mixed-intro':'第二輪 · 16 項不同任務，四種形狀',
-    'mixed-cpu':'CPU · 4 個獨立核心，各自處理不同分支',
-    'mixed-gpu':'GPU · 同組分支不一致，部分通道需要等待',
-    'mixed-compare':'同樣 16 項任務 · 優勢取決於工作負載',
+    cpu:'第一轮 · 相同任务｜CPU 四核心分批处理',
+    gpu:'第一轮 · 相同任务｜GPU 十六路并行',
+    compare:'第一轮 · 相同任务｜并行效率对比',
+    'mixed-intro':'第二轮 · 不同形状代表不同任务分支',
+    'mixed-cpu':'第二轮 · 分歧任务｜CPU 核心独立工作',
+    'mixed-gpu':'第二轮 · 分歧任务｜GPU 分支导致等待',
+    'mixed-compare':'第二轮 · 分歧任务｜两种处理方式',
   }[stageAt(frame)];
   return <div aria-hidden="true" style={{
     position:'absolute',top:56,left:62,pointerEvents:'none',
@@ -219,12 +220,81 @@ const Caption:React.FC<{frame:number}>=({frame})=>{
   }}><span>{label}</span></div>;
 };
 
+
+/**
+ * Short, animated editorial beats layered over the unchanged native WebGL.
+ * Unlike a static slide, a neutral-color diagonal wipe crosses the actual
+ * chip camera shot as completed cubes disappear and new shapes fly in.
+ * Only one major title is ever visible; no extra charts or text panels.
+ */
+const StoryAnnouncement:React.FC<{frame:number}>=({frame})=>{
+  const beat=storyBeatAt(frame);
+  const opacity=storyOpacityAt(frame);
+  const wipeOpacity=handoverOpacityAt(frame);
+  const sweep=handoverProgressAt(frame);
+  const second=beat==='round-two';
+  const gpuWin=beat==='gpu-wins';
+  const cpuWin=beat==='cpu-wins';
+  const entering=second?smooth((frame-324)/12):
+    gpuWin?smooth((frame-276)/12):smooth((frame-700)/12);
+  const foreground=gpuWin?'#3b7892':cpuWin?'#aa7450':'#344951';
+  const left=second?'50%':gpuWin?'68%':'32%';
+  return <>
+    <div aria-hidden="true" data-testid="cpu-gpu-round-wipe"
+      data-active={wipeOpacity>.02?'true':'false'}
+      style={{
+        position:'absolute',zIndex:2,top:'-17%',left:'-48%',
+        width:'96%',height:'135%',pointerEvents:'none',
+        background:'linear-gradient(90deg,transparent 0%,#e6e9e7 32%,#f4f0e7 75%,transparent 100%)',
+        opacity:wipeOpacity*.97,
+        transform:`translateX(${-85+220*sweep}%) rotate(-10deg)`,
+      }}/>
+    {beat!=='none'&&<div aria-hidden="true"
+      data-testid="cpu-gpu-story-title" data-beat={beat}
+      style={{
+        position:'absolute',zIndex:3,
+        top:second?'42%':'50%',left,
+        transform:`translate(-50%,-50%) translateY(${(1-entering)*25}px) scale(${.96+.04*entering})`,
+        opacity,pointerEvents:'none',textAlign:'center',
+        whiteSpace:'nowrap',
+        background:'rgba(246,244,238,.92)',
+        padding:second?'22px 43px 25px':'17px 34px 21px',
+        borderRadius:9,
+        fontFamily:'"Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif',
+        boxShadow:'0 9px 42px rgba(67,79,80,.07)',
+      }}>
+      <div style={{
+        fontSize:second?24:20,fontWeight:650,
+        letterSpacing:second?5:3,color:'#68777b',
+        marginBottom:7,
+      }}>
+        {second?'第二轮 · 新的挑战':
+          gpuWin?'第一轮 · 相同任务':'第二轮 · 分歧任务'}
+      </div>
+      <div style={{
+        fontSize:second?65:63,lineHeight:1.14,
+        fontWeight:820,letterSpacing:second?3:1,
+        color:foreground,
+      }}>
+        {second?'16 个混合任务':gpuWin?'GPU 胜出':'CPU 胜出'}
+      </div>
+      {second&&<div style={{
+        fontSize:22,fontWeight:540,color:'#667378',
+        letterSpacing:1,marginTop:10,
+      }}>方块 · 球体 · 四面体 · 圆柱</div>}
+    </div>}
+  </>;
+};
+
 export const CpuGpuScene:React.FC=()=>{
   const frame=useCurrentFrame();
   return <AbsoluteFill data-testid="cpu-gpu-native-scene"
     data-renderer="react-threejs-webgl"
     data-chip-design="complete-silicon-top"
     data-workload={stageAt(frame)}
+    data-story-beat={storyBeatAt(frame)}
+    data-story-opacity={storyOpacityAt(frame)}
+    data-handover-opacity={handoverOpacityAt(frame)}
     data-cpu-location={CENTER.cpu}
     data-gpu-location={CENTER.gpu}
     data-camera-zoom={cameraAt(frame).zoom}
@@ -254,5 +324,6 @@ export const CpuGpuScene:React.FC=()=>{
       <World frame={frame}/>
     </ThreeCanvas>
     <Caption frame={frame}/>
+    <StoryAnnouncement frame={frame}/>
   </AbsoluteFill>;
 };
