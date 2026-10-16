@@ -19,6 +19,9 @@ const observe=async()=>page.getByTestId('steam-engine-scene').evaluate(el=>({
   cut:Number(el.getAttribute('data-cut-progress')),
   piston:Number(el.getAttribute('data-piston-x')),
   angle:Number(el.getAttribute('data-crank-angle')),
+  opacity:Number(el.getAttribute('data-pipe-opacity')),
+  arrows:Number(el.getAttribute('data-visible-flow-arrows')),
+  flow:Number(el.getAttribute('data-flow-phase')),
 }));
 const seek=async n=>{
   await page.getByTestId('frame-slider').evaluate((el,next)=>{
@@ -53,6 +56,14 @@ try {
     if([55,90,160].includes(f)) await page.getByTestId('steam-engine-scene').screenshot({path:resolve(out,'steam-'+f+'.png')});
   }
   assert.equal(samples[10].cut,0);
+  assert.equal(samples[10].opacity,1);
+  assert.equal(samples[10].arrows,0);
+  assert.ok(samples[55].opacity<1&&samples[55].arrows===12);
+  assert.ok(samples[90].opacity<.32&&samples[90].arrows===12);
+  assert.notEqual(samples[90].flow,samples[105].flow,
+    'arrow positions must actually advance over time');
+  assert.equal(samples[160].opacity,1);
+  assert.equal(samples[160].arrows,0);
   assert.ok(samples[55].cut>.30 && samples[55].cut<.95);
   assert.equal(samples[90].cut,1);
   assert.equal(samples[105].cut,1);
@@ -127,15 +138,15 @@ try {
   }));
   assert.ok(placement.governor>0&&placement.governor<3,
     'governor must be positioned above and next to the flywheel, not off on the right');
-  assert.ok(placement.throttle<placement.governor,
-    'intake throttle must lie upstream toward the steam chest');
-  // Real geometry depth: balls and drive are IN FRONT of the steam supply.
+  assert.ok(Math.abs(placement.throttle-placement.governor)<.001,
+    'valve must be directly below the centrifugal balls, not connected sideways');
+  // The governor's sliding sleeve is directly coaxial with the steam valve.
   const layout=await page.getByTestId('steam-engine-scene').evaluate(el=>({
     governorZ:Number(el.getAttribute('data-governor-z')),
     pipeZ:Number(el.getAttribute('data-pipe-z')),
   }));
-  assert.ok(layout.governorZ-layout.pipeZ>1.0,
-    'flyballs must be mounted in front of the inlet pipe, not hidden behind it');
+  assert.ok(Math.abs(layout.governorZ-layout.pipeZ)<.001,
+    'governor must be directly above the inlet pipe valve without sideways linkage');
   const orbits={};
   for(const n of [15,72,165,185,426]){
     await seek(n);
@@ -211,7 +222,7 @@ try {
   await page.screenshot({path:resolve(out,'steam-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
   await writeFile(resolve(out,'metrics.json'),JSON.stringify(samples,null,2));
-  console.log('PASS: bright chest, separated pipes, steady governor leaders, 20s close-up and overspeed feedback.');
+  console.log('PASS: raised governor directly above brass valve; real transparent 3D cutaway tubes with moving flow arrows.');
 } catch(e) {
   await writeFile(resolve(out,'failure.log'),(e.stack??String(e))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'failure.png'),fullPage:true});}catch{}

@@ -8,14 +8,15 @@ export function cameraPose(t:number){
   const inspect=smoothstep((t-.78)/.43);
   const governorView=smoothstep((t-4.72)/.80);
   const close=smoothstep((t-5.65)/1.10);
+  const ballsFocus=smoothstep((t-7.12)/.55); // Keep flywheel belt in frame before following raised weights
   const valveView=smoothstep((t-12.55)/.95);
   const recovery=smoothstep((t-16.25)/.90);
   const azimuth=.43-.19*inspect-.89*governorView+.25*valveView-.11*recovery;
   const elevation=.255+.065*inspect+.105*governorView
     -.045*valveView-.015*recovery;
   const focus:CameraTriple=[
-    -1.3*inspect+2.90*governorView-.44*valveView+.12*recovery,
-    .06+.12*inspect+1.58*governorView+.16*valveView-.37*recovery,
+    -1.3*inspect+1.77*governorView-.12*valveView+.12*recovery,
+    .24+.12*inspect+1.25*governorView+1.10*ballsFocus-.42*valveView-.95*recovery,
     -.22*governorView+.20*close,
   ];
   const distance=14.2-.9*inspect-.7*governorView-.15*close;

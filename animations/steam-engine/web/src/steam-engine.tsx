@@ -5,11 +5,12 @@ import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {pipeSections} from './pipe-path.ts';
 import {
-  GOV_X,GOV_Z,GOV_PIVOT_Y,GOV_ARM,THROTTLE_X,THROTTLE_Y,THROTTLE_Z,
+  GOV_X,GOV_Z,GOV_LIFT,GOV_PIVOT_Y,GOV_ARM,THROTTLE_X,THROTTLE_Y,THROTTLE_Z,
   THROTTLE_LEFT,THROTTLE_RIGHT,INLET_PORT,EXHAUST_PORT,
   BOILER_TO_VALVE,VALVE_TO_CYLINDER,CYLINDER_TO_EXHAUST,throttleLinkage,
 } from './steam-plumbing.ts';
 import {cameraPose} from './camera-path.ts';
+import {flowOpacity, flowProgress, visibleArrowCount} from './steam-flow.ts';
 import {
   steamAtFrame, CYLINDER_LEFT, CYLINDER_RIGHT, CYLINDER_OUTER_RADIUS,
   CYLINDER_INNER_RADIUS, CRANK_X, CRANK_RADIUS, smoothstep, type SteamFrame,
@@ -46,27 +47,52 @@ const Rod: React.FC<{
   </mesh>;
 };
 
-/** One actual continuous tube, with radiused joints instead of broken
- * cylinder segments or Catmull-Rom spline overshoot through sharp elbows. */
-const Pipe: React.FC<{points: V3[]; color: string; radius?: number}> =
-  ({points, color, radius = .08}) => {
-    const curve = useMemo(() => {
-      const path=new THREE.CurvePath<THREE.Vector3>();
-      for(const section of pipeSections(points,.25)){
-        const from=new THREE.Vector3(...section.start);
-        const to=new THREE.Vector3(...section.end);
-        if(section.kind==='elbow' && section.control)
-          path.add(new THREE.QuadraticBezierCurve3(
-            from,new THREE.Vector3(...section.control),to));
-        else path.add(new THREE.LineCurve3(from,to));
-      }
-      return path;
-    },[points]);
-    return <mesh castShadow>
-      <tubeGeometry args={[curve, Math.max(72,points.length*22),radius,14,false]}/>
-      <meshStandardMaterial color={color} metalness={.72} roughness={.24}/>
-    </mesh>;
-  };
+/** Real translucent Three.js tubes and frame-indexed arrows inside their bores.
+ * No screen-space stickers, video, images or ad hoc straight-only arrows.
+ * Arrow coordinates and tangents come from the SAME continuous pipe curve. */
+const Pipe: React.FC<{
+  points: V3[]; color:string; radius?:number; s:SteamFrame; arrowColor:string; flowId:number;
+}> = ({points,color,radius=.08,s,arrowColor,flowId}) => {
+  const curve=useMemo(()=>{
+    const path=new THREE.CurvePath<THREE.Vector3>();
+    for(const segment of pipeSections(points,.25)){
+      const a=new THREE.Vector3(...segment.start), b=new THREE.Vector3(...segment.end);
+      if(segment.kind==='elbow' && segment.control)
+        path.add(new THREE.QuadraticBezierCurve3(a,new THREE.Vector3(...segment.control),b));
+      else path.add(new THREE.LineCurve3(a,b));
+    }
+    return path;
+  },[points]);
+  const alpha=flowOpacity(s.cut);
+  const count=visibleArrowCount(s.cut);
+  return <group>
+    <mesh castShadow={s.cut<.02}>
+      <tubeGeometry args={[curve,Math.max(96,points.length*28),radius,14,false]}/>
+      <meshStandardMaterial color={color} metalness={.66} roughness={.26}
+        transparent={s.cut>.01} opacity={alpha} depthWrite={s.cut<.01}/>
+    </mesh>
+    {Array.from({length:count},(_,i)=>{
+      const u=flowProgress(s.time,i,4,s.governor.relativeSpeed,flowId);
+      const tangent=curve.getTangentAt(u).normalize();
+      const orientation=new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0,1,0),tangent
+      );
+      const p=curve.getPointAt(u);
+      return <group key={i} position={p} quaternion={orientation}>
+        <mesh position={[0,-.043,0]}>
+          <cylinderGeometry args={[.014,.014,.083,8]}/>
+          <meshBasicMaterial color={arrowColor} transparent
+            opacity={s.cut*.86} depthWrite={false}/>
+        </mesh>
+        <mesh position={[0,.047,0]}>
+          <coneGeometry args={[.046,.079,10]}/>
+          <meshBasicMaterial color={arrowColor} transparent
+            opacity={s.cut*.93} depthWrite={false}/>
+        </mesh>
+      </group>;
+    })}
+  </group>;
+};
 
 /** Only the outer metal envelope is clipped; mechanics and fluids are never clipped. */
 const CylinderShell: React.FC<{plane: THREE.Plane; s: SteamFrame}> = ({plane, s}) => {
@@ -175,8 +201,9 @@ const SteamParticles: React.FC<{s: SteamFrame}> = ({s}) => {
 
 /** The copper and blue tubes terminate INSIDE the cast cylinder wall, with
  * small matching metal collars. No long rectangular box sits on the cylinder. */
-const CylinderPorts:React.FC=()=> <group>
-  <Pipe points={CYLINDER_TO_EXHAUST} color="#63aabb" radius={.104}/>
+const CylinderPorts:React.FC<{s:SteamFrame}>=({s})=> <group>
+  <Pipe points={CYLINDER_TO_EXHAUST} color="#63aabb" radius={.104}
+    s={s} arrowColor="#b6f6ff" flowId={2}/>
   {[{point:INLET_PORT,color:'#c68a57'}, {point:EXHAUST_PORT,color:'#63aabb'}]
     .map(({point,color},i)=><mesh key={i} position={point} castShadow>
       <sphereGeometry args={[.145,24,16]}/>
@@ -280,14 +307,13 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
   const radial=GOV_ARM*Math.sin(g.angle);
   const ballY=GOV_PIVOT_Y-GOV_ARM*Math.cos(g.angle);
   const linkage=throttleLinkage(g.sleeveY);
+  const sleeveY=g.sleeveY+GOV_LIFT;
   return <group>
-    {/* Spindle stands on the engine bed immediately behind the flywheel. */}
-    <mesh position={[GOV_X,-1.34,GOV_Z]}>
-      <boxGeometry args={[.63,.38,.67]}/>
-      <meshStandardMaterial color="#4a606d" metalness={.64} roughness={.43}/>
-    </mesh>
-    <Rod from={[GOV_X,-1.28,GOV_Z]} to={[GOV_X,2.84,GOV_Z]}
-      radius={.068} color="#bfcace"/>
+    {/* Governor shaft passes down directly into the inline inlet valve;
+        no pedestal-mounted levers or horizontal control transmission. */}
+    <Rod from={[GOV_X,THROTTLE_Y+.10,GOV_Z]}
+      to={[GOV_X,GOV_PIVOT_Y+.12,GOV_Z]}
+      radius={.061} color="#bfcace"/>
     {/* An actual rotating head and both balls turn on the same vertical axis. */}
     <group position={[GOV_X,0,GOV_Z]} rotation={[0,g.spindlePhase,0]}>
       <mesh position={[0,GOV_PIVOT_Y,0]}>
@@ -297,7 +323,7 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
       {[-1,1].map(sign=><group key={sign}>
         <Rod from={[0,GOV_PIVOT_Y,0]} to={[sign*radial,ballY,0]}
           radius={.052} color="#d9b47d"/>
-        <Rod from={[sign*radial,ballY,0]} to={[0,g.sleeveY,0]}
+        <Rod from={[sign*radial,ballY,0]} to={[0,sleeveY,0]}
           radius={.045} color="#bbc8cc"/>
         <mesh position={[sign*radial,ballY,0]} castShadow>
           <sphereGeometry args={[.18,32,24]}/>
@@ -305,7 +331,7 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
         </mesh>
       </group>)}
     </group>
-    <mesh position={[GOV_X,g.sleeveY,GOV_Z]}>
+    <mesh position={[GOV_X,sleeveY,GOV_Z]}>
       <cylinderGeometry args={[.19,.19,.30,32]}/>
       <meshStandardMaterial color="#d1d7d5" metalness={.83} roughness={.27}/>
     </mesh>
@@ -317,20 +343,13 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
       <meshBasicMaterial color="#d6b474" transparent opacity={.28}
         depthWrite={false}/>
     </mesh>
-    {/* Sleeve is a stationary sliding bearing; its two-pin horizontal yoke
-        keeps a constant length and follows the guide without stretching. */}
-    <mesh position={[GOV_X,g.sleeveY,GOV_Z]} rotation={[Math.PI/2,0,0]}>
+    {/* Sleeve is a non-rotating bearing, directly above the inlet gate. */}
+    <mesh position={[GOV_X,sleeveY,GOV_Z]} rotation={[Math.PI/2,0,0]}>
       <torusGeometry args={[.205,.038,12,32]}/>
       <meshStandardMaterial color="#e4bc7e" metalness={.8} roughness={.25}/>
     </mesh>
     <Rod from={linkage.collarPin} to={linkage.valvePin}
-      radius={.042} color="#c9d0d0"/>
-    {[linkage.collarPin,linkage.valvePin].map((p,i)=>
-      <mesh key={i} position={p}>
-        <sphereGeometry args={[.085,16,12]}/>
-        <meshStandardMaterial color="#e1bb85" metalness={.79} roughness={.28}/>
-      </mesh>
-    )}
+      radius={.049} color="#c9d0d0"/>
   </group>;
 };
 
@@ -340,8 +359,10 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
 const GovernorThrottle:React.FC<{s:SteamFrame}>=({s})=>{
   const link=throttleLinkage(s.governor.sleeveY);
   return <group>
-    <Pipe points={BOILER_TO_VALVE} color="#c68a57" radius={.12}/>
-    <Pipe points={VALVE_TO_CYLINDER} color="#c68a57" radius={.12}/>
+    <Pipe points={BOILER_TO_VALVE} color="#c68a57" radius={.12}
+      s={s} arrowColor="#ffe3a0" flowId={0}/>
+    <Pipe points={VALVE_TO_CYLINDER} color="#c68a57" radius={.12}
+      s={s} arrowColor="#ffe3a0" flowId={1}/>
     {/* A restrained, slightly translucent cylindrical valve body spans both
         pipe ends. The flanges and pipe axes share exact coordinates. */}
     <mesh position={[THROTTLE_X,THROTTLE_Y,THROTTLE_Z]}
@@ -364,8 +385,6 @@ const GovernorThrottle:React.FC<{s:SteamFrame}>=({s})=>{
       <torusGeometry args={[.075,.030,10,28]}/>
       <meshStandardMaterial color="#b8c8c9" metalness={.75} roughness={.34}/>
     </mesh>
-    <Rod from={link.valvePin} to={link.gateTop}
-      radius={.034} color="#d9c8a7"/>
     <mesh position={link.gateCenter} castShadow>
       <boxGeometry args={[.075,.70,.31]}/>
       <meshStandardMaterial color="#e6b878" metalness={.78} roughness={.28}/>
@@ -449,7 +468,7 @@ const World: React.FC<{s: SteamFrame}> = ({s}) => {
       <Pedestals/>
       <EngineMechanics s={s}/>
       <CylinderShell plane={clipPlane} s={s}/>
-      <CylinderPorts/>
+      <CylinderPorts s={s}/>
       <GovernorDrive s={s}/>
       <GovernorAssembly s={s}/>
       <GovernorThrottle s={s}/>
@@ -500,7 +519,7 @@ type TeachingPart = typeof TEACHING_BEATS[number]['part'];
 const anchoredPoint = (part:TeachingPart,_s:SteamFrame):V3 => {
   if(part==='belt') return [GOV_X,-.28,GOV_Z];
   if(part==='balls') return [GOV_X,GOV_PIVOT_Y-.28,GOV_Z];
-  if(part==='sleeve') return [GOV_X,1.30-.28,GOV_Z];
+  if(part==='sleeve') return [GOV_X,2.9-.28,GOV_Z];
   if(part==='valve') return [THROTTLE_X,THROTTLE_Y-.28,THROTTLE_Z];
   return [CRANK_X,-.78,.17];
 };
@@ -561,6 +580,9 @@ export const SteamEngineScene: React.FC = () => {
     data-governor-sleeve={s.governor.sleeveY.toFixed(4)}
     data-governor-throttle={s.governor.throttle.toFixed(4)}
     data-gate-y={throttleLinkage(s.governor.sleeveY).gateCenter[1].toFixed(4)}
+    data-pipe-opacity={flowOpacity(s.cut).toFixed(4)}
+    data-visible-flow-arrows={visibleArrowCount(s.cut)*3}
+    data-flow-phase={flowProgress(s.time,0,4,s.governor.relativeSpeed,0).toFixed(4)}
     data-yoke-length={Math.hypot(
       ...throttleLinkage(s.governor.sleeveY).collarPin.map(
         (v,i)=>v-throttleLinkage(s.governor.sleeveY).valvePin[i]
