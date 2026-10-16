@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {
   TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,CENTER,GENERIC_X,
   cameraAt,completedCount,workingCount,taskAt,stageAt,smooth,
+  PERSPECTIVE_FOV,
   corePosition,exampleAt,type Kind,
 } from './model';
 
@@ -33,17 +34,20 @@ const Block:React.FC<BlockProps>=({
 const Camera:React.FC<{frame:number}>=({frame})=>{
   const {camera}=useThree();
   useLayoutEffect(()=>{
-    const {focusX,zoom,yaw,pitch,targetY}=cameraAt(frame);
-    // Genuine orbit: yaw rotates around the package's vertical axis, while
-    // pitch changes the viewing elevation. Neither is a screen-space wobble.
-    const radius=23;
+    const {focusX,distance,yaw,pitch,targetY}=cameraAt(frame);
+    // Real perspective: the dolly distance changes on zoom cues. Yaw and pitch
+    // still orbit the target, now with natural near/far size differences.
+    if(!(camera instanceof THREE.PerspectiveCamera)){
+      throw new Error('CPU/GPU must use a PerspectiveCamera');
+    }
+    const radius=distance;
     camera.position.set(
       focusX+radius*Math.cos(pitch)*Math.sin(yaw),
       targetY+radius*Math.sin(pitch),
       radius*Math.cos(pitch)*Math.cos(yaw),
     );
     camera.lookAt(focusX,targetY,0);
-    if(camera instanceof THREE.OrthographicCamera)camera.zoom=zoom;
+    // PerspectiveCamera.zoom stays at 1: no orthographic-style scaling.
     camera.updateProjectionMatrix();
   },[camera,frame]);
   return null;
@@ -204,6 +208,9 @@ export const CpuGpuScene:React.FC=()=>{
     data-cpu-location={CENTER.cpu}
     data-gpu-location={CENTER.gpu}
     data-camera-zoom={cameraAt(frame).zoom}
+    data-camera-projection="perspective"
+    data-camera-fov={PERSPECTIVE_FOV}
+    data-camera-distance={cameraAt(frame).distance}
     data-camera-yaw={cameraAt(frame).yaw}
     data-camera-pitch={cameraAt(frame).pitch}
     data-task-count={TASKS}
@@ -212,8 +219,8 @@ export const CpuGpuScene:React.FC=()=>{
     data-cpu-working={workingCount(frame,'cpu')}
     data-gpu-working={workingCount(frame,'gpu')}
     style={{background:'linear-gradient(#f4f0e7,#e8e2d9)',overflow:'hidden'}}>
-    <ThreeCanvas orthographic width={1280} height={720}
-      camera={{position:[GENERIC_X+7,12,19],zoom:80,near:.1,far:160}}
+    <ThreeCanvas width={1280} height={720}
+      camera={{position:[GENERIC_X+7,12,19],fov:PERSPECTIVE_FOV,near:.1,far:160}}
       gl={{alpha:true,antialias:true,preserveDrawingBuffer:true}}
       style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
       <World frame={frame}/>
