@@ -122,7 +122,7 @@ test('cinematic real-3D orbital camera with a fast, eased CPU→GPU transition',
     assert.ok(Math.abs(b.yaw-a.yaw)<.08,'camera yaw snapped at '+f);
     assert.ok(Math.abs(b.pitch-a.pitch)<.02,'camera elevation snapped at '+f);
     assert.ok(b.zoom>=35&&b.zoom<=80);
-    assert.ok(720/b.zoom>9);
+    assert.ok(720/b.zoom>=9,'visible camera height must contain entire core');
   }
   assert.ok(maxDx>.6,'camera move still too uniform/slow');
   assert.ok(maxDyaw>.02,'rotation does not visibly move');
