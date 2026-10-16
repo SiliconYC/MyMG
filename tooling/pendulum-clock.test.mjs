@@ -6,6 +6,7 @@ import {
   clockAtFrame, FPS, DURATION, TEETH, PERIOD_SECONDS, RELEASE_OFFSET,
 } from '../animations/pendulum-clock/web/src/clock-model.ts';
 import {cameraAtFrame, SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
+import {palletPose, contactDistance, flankAt, PITCH, PALLET_CLEARANCE} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
 
 const frame=(seconds)=>Math.round(seconds*FPS);
 
@@ -100,29 +101,63 @@ test('camera concentrates screen time on explicit observation positions',()=>{
   }
 });
 
-test('fixed readable front, rear, left and right pallet macro views',()=>{
+test('calm storyboard keeps a single legible two-pallet macro for twenty seconds',()=>{
   const front=cameraAtFrame(0);
-  const rear=cameraAtFrame(8*FPS);
-  const entry=cameraAtFrame(18*FPS);
-  const exit=cameraAtFrame(27*FPS);
-  const proof=cameraAtFrame(47*FPS);
+  const back=cameraAtFrame(12*FPS);
+  const first=cameraAtFrame(24*FPS);
+  const second=cameraAtFrame(36*FPS);
+  const proof=cameraAtFrame(48*FPS);
   assert.equal(front.chapter,'front');
-  assert.equal(front.mode,'observe');
-  assert.ok(front.position[2]>12);
-  assert.equal(rear.chapter,'rear');
-  assert.equal(rear.mode,'observe');
-  assert.ok(rear.position[2]<-6);
-  assert.equal(entry.chapter,'entry');
-  assert.equal(entry.mode,'observe');
-  assert.ok(entry.position[2]<-3);
-  assert.ok(entry.target[0]<-.8,'entry pallet in frame');
-  assert.equal(exit.chapter,'exit');
-  assert.ok(exit.target[0]>.8,'exit pallet in frame');
-  assert.ok(Math.hypot(...entry.position)<Math.hypot(...front.position)*.5);
+  assert.equal(back.chapter,'rear');
+  assert.equal(first.chapter,'contact');
+  assert.equal(second.chapter,'contact');
+  assert.equal(first.mode,'observe');
+  assert.deepEqual(first.position,second.position,'NO moving between the pallets');
+  assert.deepEqual(first.target,second.target,'both contacts fit one fixed composition');
+  assert.ok(first.position[2]<-3,'contact camera is actually behind the wheel');
+  assert.ok(first.position[0]===0,'contact shot centered: no frantic side angle');
+  assert.ok(Math.hypot(...first.position)<Math.hypot(...front.position)*.5);
   assert.equal(proof.chapter,'proof');
   assert.ok(proof.position[2]>10);
-  assert.deepEqual(cameraAtFrame(60*FPS).position,front.position,
-    'first / last position exactly match for seamless camera loop');
+  assert.deepEqual(cameraAtFrame(60*FPS).position,front.position);
+});
+
+test('pallet tips align with the SAME 30-tooth wheel flank polygon used by mesh',()=>{
+  const p=flankAt(-4,0);
+  const near=Math.hypot(p.point[0]-p.start[0],p.point[1]-p.start[1]);
+  assert.ok(near>.08&&near<.19,'must contact sloping flank, not detached rim');
+  assert.equal(TEETH,30);
+  assert.ok(PITCH>0);
+  for(let beat=0;beat<60;beat++){
+    const s=clockAtFrame(frame(beat+.80));
+    const active=s.lock;
+    const passive=active==='entry'?'exit':'entry';
+    const a=palletPose(active,s),b=palletPose(passive,s);
+    assert.ok(a.engaged,'the catching pallet MUST be engaged on beat '+beat);
+    assert.ok(contactDistance(active,s)<.012,
+      'tip must touch actual tooth flank within 12mm normalized at beat '+beat);
+    assert.ok(contactDistance(active,s)>=PALLET_CLEARANCE*.9);
+    assert.ok(!b.engaged,'other pallet must let the next tooth move');
+    assert.ok(contactDistance(passive,s)>.13,
+      'inactive pallet must clear rotating gear');
+  }
+});
+
+test('a release retracts the outgoing wedge, rotates wheel, and seats incoming wedge',()=>{
+  const before=clockAtFrame(frame(.40));
+  const early=clockAtFrame(frame(.43));
+  const mid=clockAtFrame(frame(.50));
+  const late=clockAtFrame(frame(.60));
+  const after=clockAtFrame(frame(.70));
+  assert.ok(palletPose('entry',before).engaged);
+  assert.ok(palletPose('entry',early).engaged);
+  assert.ok(!palletPose('entry',mid).engaged);
+  assert.ok(!palletPose('exit',mid).engaged);
+  assert.ok(palletPose('exit',late).engaged);
+  assert.ok(palletPose('exit',after).engaged);
+  assert.ok(contactDistance('exit',after)<.012);
+  assert.ok(before.wheelAngle<mid.wheelAngle);
+  assert.ok(mid.wheelAngle<after.wheelAngle);
 });
 
 test('camera moves smoothly within and across shots and is seek-deterministic',()=>{
@@ -145,13 +180,15 @@ test('all front, rear, and dial parts stay in one ThreeCanvas',()=>{
   assert.match(src,/<CinematicCamera frame={frame}/);
   assert.match(src,/<MinimalSupports\/>/);
   assert.doesNotMatch(src,/const Chassis|<Chassis\/>/);
-  assert.match(src,/makePalletTooth/);
+  assert.match(src,/makeSlimPallet/);
+  assert.match(src,/contactDistance/);
+  assert.match(src,/palletPose/);
   assert.match(src,/<PalletTooth/);
   assert.doesNotMatch(src,/<boxGeometry/);
   assert.match(src,/data-camera-mode={shot.mode}/);
   assert.match(src,/<Pendulum angle={state.pendulumAngle}\/>/);
   assert.match(src,/<EscapeWheel angle={state.wheelAngle}\/>/);
-  assert.match(src,/<Anchor angle={state.anchorAngle}/);
+  assert.match(src,/<Anchor state={state}/);
   assert.match(src,/<Dial angle={state.secondHandAngle}\/>/);
   assert.doesNotMatch(src,/artwork|backgroundImage:|linear-gradient|grid-template|<svg/i);
 });
