@@ -106,7 +106,7 @@ export const projects: readonly MgProject[] = [
     title: 'CPU 与 GPU：两种计算方式',
     titleEn: 'CPU / GPU · PARALLEL COMPUTE',
     category: '芯片 / 三维运算架构',
-    description: '同样 16 个方块从输入到完成：CPU 分批处理，GPU 同时处理；看得见的任务流。',
+    description: '两颗真实芯片形态的 3D 剖视：CPU 四个大核心，GPU 密集小单元；同样 16 项任务进入晶粒、处理后输出。',
     status: 'React / Three.js 原生动画',
     component: CpuGpuScene,
     durationInFrames: 600,
@@ -114,10 +114,10 @@ export const projects: readonly MgProject[] = [
     width: 1280,
     height: 720,
     notes: [
-      '原生实时 Three.js 几何，无 MP4、视频贴图或预渲染帧；可逐帧检视核心、数据包与输出。',
-      '规则任务：大量计算通道执行相同指令、处理不同数据；四个 CPU 核心通过连续多轮完成。',
-      '分支任务：CPU 核心各走不同控制流；GPU 示意为分歧路径分组轮流执行。',
-      '80 条 GPU 运算通道是概念化示意，不代表 80 颗完整 GPU 核心；动画速率不是实际硬件跑分。',
+      '原生 Three.js 半导体封装剖视：方形封装基板、有限接点、硅晶粒，以及 CPU 2×2 大核心或 GPU 4×4 运算阵列；上盖揭开后持续可见内部结构。',
+      '保留同一批 16 项真实任务轨迹：灰色方块由封装外进入硅晶粒内部，核心处理时变蓝，再从另一边离开成为结果。',
+      'CPU 由四个大核心分四批处理；GPU 由 16 个轻量运算单元同步处理。最后镜头拉远，让两个芯片从相同输入重播。',
+      '仅用于解释处理方式，不等于真实 CPU/GPU 微架构、时序、核心数量或性能跑分。',
     ],
   },
   {
