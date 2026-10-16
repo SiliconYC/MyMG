@@ -1,136 +1,143 @@
 import React, {useLayoutEffect} from 'react';
-import {AbsoluteFill, useCurrentFrame} from 'remotion';
+import {AbsoluteFill,useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  CPU_CORES, GPU_LANES, cameraAt, cpuActivity, gpuActivity,
-  cpuActiveCount, gpuActiveCount, smooth, stageAt,
+  TASKS, CPU_CORES, GPU_LANES, cameraAt, completedCount, workingCount,
+  taskAt, sampleAt, stageAt, smooth, type Kind, type Point,
 } from './model';
 
-type Vec3 = [number, number, number];
-const CPU_X = -5.4;
-const GPU_X = 5.4;
-const CPU_COLOR = '#c46f4f';
-const GPU_COLOR = '#5a99a1';
+// Only two visual identities: unprocessed gray and processed blue.
+// Terracotta and slate describe the mechanism, NOT additional task types.
+const INPUT='#c3c5c1';
+const OUTPUT='#418ca7';
+const CPU_BODY='#a98063';
+const GPU_BODY='#788b92';
+const CENTER:Record<Kind,number>={cpu:-6.5,gpu:6.5};
+type Vec=[number,number,number];
 
-/** Deliberately plain geometry; lighting rather than decorations gives depth. */
-const Block: React.FC<{
-  pos: Vec3; size: Vec3; color: string;
-  metal?: number; emissive?: string; power?: number;
-}> = ({pos,size,color,metal=.15,emissive='#000000',power=0}) => (
-  <mesh position={pos}>
+const Box:React.FC<{pos:Vec;size:Vec;color:string;metal?:number;
+  opacity?:number; rotation?:Vec}> =
+({pos,size,color,metal=.05,opacity=1,rotation=[0,0,0]})=>(
+  <mesh position={pos} rotation={rotation}>
     <boxGeometry args={size}/>
-    <meshStandardMaterial color={color} metalness={metal} roughness={.5}
-      emissive={emissive} emissiveIntensity={power}/>
+    <meshStandardMaterial color={color} roughness={.61} metalness={metal}
+      transparent={opacity<1} opacity={opacity}/>
   </mesh>
 );
 
-const Camera: React.FC<{frame:number}> = ({frame}) => {
-  const {camera} = useThree();
-  useLayoutEffect(() => {
-    const {focusX,zoom}=cameraAt(frame);
-    // A single real orthographic 3D camera pans CPU -> GPU -> a shared wide shot.
-    camera.position.set(focusX+6.4,11.8,19);
+const Camera:React.FC<{frame:number}>=({frame})=>{
+  const {camera}=useThree();
+  useLayoutEffect(()=>{
+    const {focusX,zoom,angle}=cameraAt(frame);
+    // Cinematography is authored as 3D movement, not a CSS stage transition.
+    camera.position.set(focusX+4.5+angle*5,11.5,19-angle*9);
     camera.lookAt(focusX,0,0);
-    if(camera instanceof THREE.OrthographicCamera)camera.zoom=zoom;
+    if(camera instanceof THREE.OrthographicCamera) camera.zoom=zoom;
     camera.updateProjectionMatrix();
   },[camera,frame]);
   return null;
 };
 
-const Substrate:React.FC<{x:number}> = ({x}) => (
-  <group position={[x,0,0]}>
-    <Block pos={[0,-.5,0]} size={[7.05,.35,7.05]} color="#353d43" metal={.35}/>
-    <Block pos={[0,-.305,0]} size={[6.84,.075,6.84]} color="#555b5d" metal={.22}/>
-    {/* One low-contrast contact shadow, no floor grid, traces or neon outlines. */}
-    <mesh position={[0,-.715,0]} rotation={[-Math.PI/2,0,0]}>
-      <planeGeometry args={[7.65,7.65]}/>
-      <meshBasicMaterial color="#766f67" transparent opacity={.12} depthWrite={false}/>
-    </mesh>
-  </group>
-);
+const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
+({kind,index,frame})=>{
+  const state=taskAt(frame,kind,index);
+  const pos:Vec=[...state.point];
+  const dyed=new THREE.Color(INPUT).lerp(new THREE.Color(OUTPUT),state.dyed);
+  return <Box pos={pos} size={[.46,.43,.46]} color={'#'+dyed.getHexString()}
+    rotation={[0,state.rotation,0]}/>;
+};
 
-const Cpu:React.FC<{frame:number}>=({frame}) => (
-  <group>
-    <Substrate x={CPU_X}/>
-    {Array.from({length:CPU_CORES},(_,i)=>{
-      const x=CPU_X+(i%2===0?-1.61:1.61);
-      const z=i<2?-1.61:1.61;
-      const activity=cpuActivity(frame,i);
-      return <group key={i} position={[x,0,z]}>
-        <Block pos={[0,.005,0]} size={[2.62,.44,2.62]} color="#695b52" metal={.28}/>
-        <Block pos={[0,.305+.23*activity,0]} size={[2.38,.33,2.38]}
-          color={activity>.2?'#dc9a73':'#b5977e'} metal={.23}
-          emissive={CPU_COLOR} power={activity*.28}/>
-      </group>;
-    })}
-  </group>
-);
-
-const Gpu:React.FC<{frame:number}>=({frame})=>{
-  const energy=gpuActivity(frame);
-  return <group>
-    <Substrate x={GPU_X}/>
-    {Array.from({length:GPU_LANES},(_,i)=>{
-      const x=GPU_X+(i%8-3.5)*.79;
-      const z=(Math.floor(i/8)-3.5)*.79;
-      return <group key={i} position={[x,0,z]}>
-        <Block pos={[0,-.03,0]} size={[.68,.30,.68]} color="#385760" metal={.25}/>
-        <Block pos={[0,.19+energy*.21,0]} size={[.61,.22,.61]}
-          color={energy>.2?'#8dcbd0':'#749aa1'} metal={.16}
-          emissive={GPU_COLOR} power={energy*.34}/>
-      </group>;
-    })}
+const Mechanism:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>{
+  const center=CENTER[kind];
+  const appear=smooth((frame-67)/35);
+  return <group position={[center,0,0]} scale={Math.max(.001,appear)}>
+    {/* Three physically separate regions: source -> machine -> destination. */}
+    <Box pos={[0,-.61,0]} size={[8.35,.26,7.12]} color="#c8c5be"/>
+    <Box pos={[-2.9,-.453,0]} size={[2.3,.075,6.5]} color="#b5b4af"/>
+    <Box pos={[0,-.443,0]} size={[2.23,.075,6.5]} color="#bdbbb4"/>
+    <Box pos={[2.94,-.453,0]} size={[2.3,.075,6.5]} color="#b1c5c8"/>
+    {kind==='cpu'
+      ? Array.from({length:CPU_CORES},(_,i)=>(
+          <group key={i}>
+            <Box pos={[-.15,-.20,(i-1.5)*1.43]} size={[1.28,.44,1.15]}
+              color={CPU_BODY} metal={.22}/>
+            <Box pos={[-.15,.045,(i-1.5)*1.43]} size={[.99,.07,.92]}
+              color="#dbc2aa"/>
+          </group>
+        ))
+      : Array.from({length:GPU_LANES},(_,i)=>(
+          <group key={i}>
+            <Box pos={[(i%4-1.5)*.52,-.23,(Math.floor(i/4)-1.5)*1.43]}
+              size={[.48,.38,.87]} color={GPU_BODY} metal={.18}/>
+            <Box pos={[(i%4-1.5)*.52,-.022,(Math.floor(i/4)-1.5)*1.43]}
+              size={[.39,.05,.71]} color="#b5c5c7"/>
+          </group>
+        ))}
+    {Array.from({length:TASKS},(_,i)=>(
+      <TaskCube key={i} index={i} frame={frame} kind={kind}/>
+    ))}
   </group>;
 };
 
-const World:React.FC<{frame:number}>=({frame})=>(
+const Intro:React.FC<{frame:number}>=({frame})=>{
+  if(frame>=80)return null;
+  const a=1-smooth((frame-65)/14);
+  const {x,y,dyed}=sampleAt(frame);
+  const color=new THREE.Color(INPUT).lerp(new THREE.Color(OUTPUT),dyed);
+  return <group>
+    <Box pos={[-1.8,-.31,0]} size={[1.45,.15,1.45]} color="#aaa9a4" opacity={a}/>
+    <Box pos={[1.8,-.31,0]} size={[1.45,.15,1.45]} color="#b1c5c8" opacity={a}/>
+    <Box pos={[x,y,0]} size={[.99,.99,.99]} color={'#'+color.getHexString()} opacity={a}/>
+  </group>;
+};
+
+const Scene:React.FC<{frame:number}>=({frame})=>(
   <>
     <Camera frame={frame}/>
-    <ambientLight intensity={1.8}/>
-    <directionalLight position={[-9,15,18]} intensity={2.1} color="#fff6ed"/>
-    <directionalLight position={[12,8,-9]} intensity={.8} color="#d7e7e9"/>
-    <Cpu frame={frame}/>
-    <Gpu frame={frame}/>
+    <ambientLight intensity={1.7}/>
+    <directionalLight position={[-7,16,12]} intensity={2.5} color="#fff7eb"/>
+    <directionalLight position={[11,8,-7]} intensity={.65} color="#e4eff2"/>
+    <Intro frame={frame}/>
+    <Mechanism kind="cpu" frame={frame}/>
+    <Mechanism kind="gpu" frame={frame}/>
   </>
 );
 
 const Caption:React.FC<{frame:number}>=({frame})=>{
-  const first=1-smooth((frame-137)/32);
-  const second=smooth((frame-150)/26)*(1-smooth((frame-287)/35));
-  const last=smooth((frame-310)/25);
-  const common:React.CSSProperties={
-    position:'absolute',top:64,fontFamily:'Inter,Arial,sans-serif',
-    fontWeight:700,fontSize:46,letterSpacing:-1.5,lineHeight:1,
-  };
-  return <div style={{position:'absolute',inset:0,pointerEvents:'none'}}>
-    {first>0&&<span style={{...common,left:70,color:CPU_COLOR,opacity:first}}>CPU</span>}
-    {second>0&&<span style={{...common,left:70,color:GPU_COLOR,opacity:second}}>GPU</span>}
-    {last>0&&<>
-      <span style={{...common,left:346,color:CPU_COLOR,opacity:last}}>CPU</span>
-      <span style={{...common,left:888,color:GPU_COLOR,opacity:last}}>GPU</span>
-    </>}
+  const stage=stageAt(frame);
+  const label={
+    task:'任務：把灰色方塊變成藍色',
+    cpu:'CPU · 4 個核心，分批完成',
+    gpu:'GPU · 16 個單元，同時處理',
+    compare:'同樣的任務，不同的並行方式',
+  }[stage];
+  return <div aria-hidden="true" style={{
+    position:'absolute',top:56,left:62,pointerEvents:'none',
+    fontFamily:'"Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif',
+    fontWeight:650,fontSize:31,letterSpacing:.4,color:'#343c40',
+  }}>
+    <span>{label}</span>
   </div>;
 };
 
-/**
- * The image contains only two processors and their motion. No scoreboard,
- * colored particles, floor grid, callouts, or explainer slide text.
- */
 export const CpuGpuScene:React.FC=()=>{
   const frame=useCurrentFrame();
   return <AbsoluteFill data-testid="cpu-gpu-native-scene"
     data-renderer="react-threejs-webgl"
     data-workload={stageAt(frame)}
-    data-cpu-active={cpuActiveCount(frame)}
-    data-gpu-active={gpuActiveCount(frame)}
-    style={{background:'linear-gradient(to bottom,#f4f0e7,#e8e2d9)',overflow:'hidden'}}>
+    data-task-count={TASKS}
+    data-cpu-done={completedCount(frame,'cpu')}
+    data-gpu-done={completedCount(frame,'gpu')}
+    data-cpu-working={workingCount(frame,'cpu')}
+    data-gpu-working={workingCount(frame,'gpu')}
+    style={{background:'linear-gradient(#f4f0e7,#e8e2d9)',overflow:'hidden'}}>
     <ThreeCanvas orthographic width={1280} height={720}
-      camera={{position:[0,12,20],zoom:95,near:.1,far:150}}
+      camera={{position:[4.5,11.5,19],zoom:114,near:.1,far:160}}
       gl={{alpha:true,antialias:true,preserveDrawingBuffer:true}}
       style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
-      <World frame={frame}/>
+      <Scene frame={frame}/>
     </ThreeCanvas>
     <Caption frame={frame}/>
   </AbsoluteFill>;
