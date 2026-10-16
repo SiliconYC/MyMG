@@ -5,6 +5,7 @@ import {resolve} from 'node:path';
 import {
   clockAtFrame, FPS, DURATION, TEETH, PERIOD_SECONDS, RELEASE_OFFSET,
 } from '../animations/pendulum-clock/web/src/clock-model.ts';
+import {cameraAtFrame, CAMERA_KEYS} from '../animations/pendulum-clock/web/src/camera-path.ts';
 
 const frame=(seconds)=>Math.round(seconds*FPS);
 
@@ -78,4 +79,49 @@ test('the new scene uses ThreeCanvas, shares the mechanism model and has no medi
   assert.doesNotMatch(src,/<video|<img|\.mp4|\.webm|\.gif|Date\.now|setInterval/i);
   assert.match(catalog,/id: 'pendulum-clock'/);
   assert.match(catalog,/component: PendulumClockScene/);
+});
+
+
+test('one actual 3D camera circles the unit from front to rear and back',()=>{
+  assert.ok(CAMERA_KEYS.length>=8,'camera needs a multi-stage directed journey');
+  const start=cameraAtFrame(0);
+  const side=cameraAtFrame(11*FPS);
+  const back=cameraAtFrame(23*FPS);
+  const macro=cameraAtFrame(31*FPS);
+  const frontAgain=cameraAtFrame(50*FPS);
+  assert.ok(start.position[2]>18,'front establishing shot');
+  assert.ok(side.position[0]>8,'clear right side revealing depth');
+  assert.ok(back.position[2]<-6,'orbit must SHOW rear face of wheel');
+  assert.ok(macro.position[2]<-5,'rear macro rather than 2D crop');
+  assert.ok(frontAgain.position[2]>9,'return to front seconds hand');
+  assert.ok(Math.hypot(...macro.position)<Math.hypot(...start.position)*.5,
+    'closeup must physically move camera towards the gear');
+  assert.deepEqual(cameraAtFrame(60*FPS).position,start.position,
+    '60s seamless mechanical timeline may repeat without camera teleport');
+});
+
+test('camera is smooth at every frame and seeking is deterministic',()=>{
+  let prev=cameraAtFrame(0);
+  for(let i=1;i<60*FPS;i++){
+    const pose=cameraAtFrame(i);
+    assert.deepEqual(pose,cameraAtFrame(i));
+    for(const n of [...pose.position,...pose.target,pose.fov])
+      assert.ok(Number.isFinite(n),'nonfinite camera value');
+    const move=Math.hypot(...pose.position.map((x,k)=>x-prev.position[k]));
+    assert.ok(move<.22,'camera jerks at frame '+i+': '+move);
+    prev=pose;
+  }
+});
+
+test('all front, rear, and dial parts stay in one ThreeCanvas',()=>{
+  const src=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  assert.equal((src.match(/<ThreeCanvas/g)||[]).length,1,'one 3D world');
+  assert.match(src,/<CinematicCamera frame={frame}/);
+  assert.match(src,/<Chassis\/>/);
+  assert.match(src,/<Pendulum angle={state.pendulumAngle}\/>/);
+  assert.match(src,/<EscapeWheel angle={state.wheelAngle}\/>/);
+  assert.match(src,/<Anchor angle={state.anchorAngle}/);
+  assert.match(src,/<Dial angle={state.secondHandAngle}\/>/);
+  assert.doesNotMatch(src,/artwork|backgroundImage:|linear-gradient|grid-template|<svg/i);
 });
