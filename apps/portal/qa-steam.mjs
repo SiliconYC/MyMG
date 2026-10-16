@@ -110,6 +110,31 @@ try {
     'governor must be positioned above and next to the flywheel, not off on the right');
   assert.ok(placement.throttle<placement.governor,
     'intake throttle must lie upstream toward the steam chest');
+  // Real geometry depth: balls and drive are IN FRONT of the steam supply.
+  const layout=await page.getByTestId('steam-engine-scene').evaluate(el=>({
+    governorZ:Number(el.getAttribute('data-governor-z')),
+    pipeZ:Number(el.getAttribute('data-pipe-z')),
+  }));
+  assert.ok(layout.governorZ-layout.pipeZ>1.0,
+    'flyballs must be mounted in front of the inlet pipe, not hidden behind it');
+  const orbits={};
+  for(const n of [15,72,165,185,306]){
+    await seek(n);
+    orbits[n]=await page.getByTestId('steam-engine-scene').evaluate(el=>({
+      yaw:Number(el.getAttribute('data-camera-azimuth')),
+      pitch:Number(el.getAttribute('data-camera-elevation')),
+    }));
+    await page.getByTestId('steam-engine-scene').screenshot({
+      path:resolve(out,'orbit-'+n+'.png'),
+    });
+  }
+  const toDeg=r=>r*180/Math.PI;
+  assert.ok(toDeg(Math.abs(orbits[185].yaw-orbits[15].yaw))>45,
+    'camera must orbit 45+ degrees around the governor, not just pan sideways');
+  assert.ok(toDeg(Math.abs(orbits[185].pitch-orbits[15].pitch))>7,
+    'camera must change elevation as well as azimuth');
+  assert.ok(toDeg(Math.abs(orbits[306].yaw-orbits[185].yaw))>12,
+    'second orbit should reveal the inlet throttle from another angle');
   // The viewer is guided to five meaningful REAL 3D parts, one at a time.
   const beats=[
     [168,'belt','皮带'],
@@ -162,7 +187,7 @@ try {
   await page.screenshot({path:resolve(out,'steam-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
   await writeFile(resolve(out,'metrics.json'),JSON.stringify(samples,null,2));
-  console.log('PASS: 14-second WebGL governor layout and coupled negative feedback; cutaway, cinematic camera, scrub and pause.');
+  console.log('PASS: elbow pipes, front-most flyballs, real 3D yaw/pitch orbit, moving callouts and feedback.');
 } catch(e) {
   await writeFile(resolve(out,'failure.log'),(e.stack??String(e))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'failure.png'),fullPage:true});}catch{}

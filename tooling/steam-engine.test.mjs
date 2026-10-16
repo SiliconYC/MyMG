@@ -82,7 +82,7 @@ test('scene places governor beside flywheel and valve inline in feed, never isol
   assert.match(src,/const GovernorDrive/);
   assert.match(src,/const valveLinkEnd/);
   assert.match(src,/const GovernorThrottle/);
-  assert.match(src,/\[\[2\.52,4\.95,\-\.75\]/);
+  assert.match(src,/\[\[2\.52,5\.50,\-\.75\]/);
   assert.doesNotMatch(src,/const GOV_X = 4\.82/);
   assert.doesNotMatch(src,/18\.2\)\/2\.1/);
 });
@@ -99,4 +99,67 @@ test('steam delivery and exhaust are connected and teaching text is 3D-anchored'
   assert.match(src,/cameraPose\(s\.time\)/);
   assert.match(src,/cameraPose\(t\)/);
   assert.doesNotMatch(src,/title:'转快，重锤张开'/);
+});
+
+import {pipeSections} from '../animations/steam-engine/web/src/pipe-path.ts';
+import {cameraPose} from '../animations/steam-engine/web/src/camera-path.ts';
+
+test('every steam inlet and exhaust elbow is tangent-connected without gaps',()=>{
+  const paths=[
+    [[2.52,5.50,-.75],[2.52,3.48,-.75],[2.20,2.81,-.53],
+      [1.48,2.33,-.28],[.40,2.33,-.28]],
+    [[-.16,2.33,-.28],[-1.86,2.33,-.28],[-2.12,2.44,-.10],
+      [-2.12,2.08,-.10],[-1.65,1.86,-.10],[-1.65,1.62,-.10]],
+    [[-1.16,1.65,-.13],[-1.16,2.13,-.13],[-.45,2.17,-.13],
+      [-.38,2.43,-.13],[-.38,3.12,-.13]],
+  ];
+  for(const points of paths){
+    const sections=pipeSections(points,.25);
+    assert.deepEqual(sections[0].start,points[0]);
+    assert.deepEqual(sections.at(-1).end,points.at(-1));
+    assert.ok(sections.some(s=>s.kind==='elbow'));
+    for(let i=1;i<sections.length;i++){
+      assert.deepEqual(sections[i-1].end,sections[i].start,
+        'Tube segments must share exactly identical 3D joint vertices');
+    }
+    for(const section of sections){
+      assert.ok(Math.hypot(...section.start.map((x,i)=>x-section.end[i]))>0);
+      if(section.kind==='elbow'){
+        const entering=section.control.map((x,i)=>x-section.start[i]);
+        const leaving=section.end.map((x,i)=>x-section.control[i]);
+        assert.ok(Math.hypot(...entering)>0);
+        assert.ok(Math.hypot(...leaving)>0);
+      }
+    }
+  }
+});
+
+test('governor stands in front of intake pipe, supported by a longer axle and bed',()=>{
+  const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
+  assert.match(src,/const GOV_Z = 1\.20/);
+  assert.match(src,/from=\{\[CRANK_X, 0, -1\.02\]\} to=\{\[CRANK_X, 0, 1\.48\]\}/);
+  assert.match(src,/boxGeometry args=\{\[8\.90, \.20, 3\.70\]\}/);
+  assert.doesNotMatch(src,/new THREE\.CatmullRomCurve3/);
+  assert.match(src,/new THREE\.CurvePath<THREE\.Vector3>/);
+  assert.match(src,/new THREE\.QuadraticBezierCurve3/);
+  // In this camera's forward (+z) direction, the flyweights stay well
+  // ahead of the main steam pipes, including while spinning outward.
+  assert.ok(1.20-.88 > -.28+.12);
+});
+
+test('camera genuinely orbits in yaw AND pitch, rather than translating alone',()=>{
+  const start=cameraPose(.25),cylinder=cameraPose(2.1);
+  const governor=cameraPose(6.1),valve=cameraPose(9.8);
+  const degrees=(x)=>x*180/Math.PI;
+  assert.ok(degrees(Math.abs(governor.azimuth-start.azimuth))>45);
+  assert.ok(degrees(Math.abs(governor.elevation-start.elevation))>7);
+  assert.ok(degrees(Math.abs(valve.azimuth-governor.azimuth))>12);
+  assert.ok(degrees(Math.abs(cylinder.azimuth-start.azimuth))>9);
+  for(const t of [0,2,5,6,8,10,13.8]){
+    const pose=cameraPose(t);
+    const distance=Math.hypot(...pose.eye.map((x,i)=>x-pose.target[i]));
+    assert.ok(distance>11&&distance<15);
+    assert.ok(pose.zoom>=85&&pose.zoom<=132);
+    assert.deepEqual(cameraPose(t),pose);
+  }
 });
