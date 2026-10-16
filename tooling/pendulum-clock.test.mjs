@@ -299,7 +299,7 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
   const anchor=src.split('const Anchor:')[1].split('/** Highlight only')[0];
-  const pendulum=src.split('const Pendulum:')[1].split('/** Only the wheel bearing')[0];
+  const pendulum=src.split('const Pendulum:')[1].split('/** A fixed cylindrical JOURNAL SLEEVE')[0];
   const coupling=src.split('function makeCouplingGeometry()')[1]
     .split('const Ring:')[0];
   const movingJoint=src.split('ONE pivot, ONE angle')[1].split('<ContactHighlights')[0];
@@ -378,7 +378,7 @@ test('bearing has a real rotating shaft through its entire bored sleeve',()=>{
     'shaft must emerge from the back face of the bearing');
   assert.equal(spindleZRange[0],WHEEL_SPINDLE_REAR_Z);
   assert.equal(spindleZRange[1],WHEEL_SPINDLE_FRONT_Z);
-  assert.equal((bearingZRange[0]+bearingZRange[1])/2,BEARING_CENTER_Z);
+  assert.ok(Math.abs((bearingZRange[0]+bearingZRange[1])/2-BEARING_CENTER_Z)<1e-12);
   const scene=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
   assert.match(scene,/ring.holes.push\(bore\)/,
