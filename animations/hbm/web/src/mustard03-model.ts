@@ -4,7 +4,7 @@
  * triangles are rasterised by Three.js/WebGL, not by the Python renderer. */
 export type Point3 = readonly [number,number,number];
 export type Point2 = readonly [number,number];
-export type Primitive = {points: Point2[]; color: string; opacity: number};
+export type Primitive = {points: Point2[]; world?: Point3[]; color: string; opacity: number};
 type Cam = {s:number;tx:number;ty:number;ax:number;ay:number};
 type Draft = {cam:Cam; commands:Primitive[]};
 const clamp=(v:number)=>Math.max(0,Math.min(1,v));
@@ -52,7 +52,7 @@ function project(c:Cam,[x,y,z]:Point3):Point2 {
 }
 function polygon(d:Draft,v:Point3[],col:string,opacity=1) {
   if(opacity<=0.002)return;
-  d.commands.push({points:v.map(p=>project(d.cam,p)),color:col,opacity:clamp(opacity)});
+  d.commands.push({points:v.map(p=>project(d.cam,p)),world:v,color:col,opacity:clamp(opacity)});
 }
 function plane(d:Draft,p:Point2[],color:string,alpha=1){
   if(alpha>0.002)d.commands.push({points:p,color,opacity:clamp(alpha)});
