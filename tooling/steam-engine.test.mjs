@@ -152,7 +152,7 @@ test('governor stands in front of intake pipe, supported by a longer axle and be
 
 test('camera genuinely orbits in yaw AND pitch, rather than translating alone',()=>{
   const start=cameraPose(.25),cylinder=cameraPose(2.1);
-  const governor=cameraPose(6.1),valve=cameraPose(9.8);
+  const governor=cameraPose(8.5),valve=cameraPose(14.1);
   const degrees=(x)=>x*180/Math.PI;
   assert.ok(degrees(Math.abs(governor.azimuth-start.azimuth))>45);
   assert.ok(degrees(Math.abs(governor.elevation-start.elevation))>7);
