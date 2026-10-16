@@ -8,7 +8,7 @@ import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
   contactDistance, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
-  PALLET_THICKNESS, PALLET_ARM_WELD_Z,
+  PALLET_THICKNESS, PALLET_ARM_WELD_Z, FORK_ARM_PLANE_Z,
   WHEEL_SPINDLE_RADIUS, WHEEL_SPINDLE_REAR_Z, WHEEL_SPINDLE_FRONT_Z,
   BEARING_CENTER_Z, BEARING_DEPTH, BEARING_INNER_RADIUS,
   BEARING_OUTER_RADIUS, bearingZRange, spindleZRange, zOverlap}
@@ -21,7 +21,7 @@ import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
  *
  * Layout, back -> front along z:
  *   pendulum and steel chassis  z=-0.98
- *   anchor arms                z=-0.33..pallet plane
+ *   both fork arms             z=-0.02 throughout (no axial slope)
  *   BOTH pallets and wheel    same z=-0.02 working plane
  *   rotating escape spindle   z=-0.55..0.16 through the rear bearing
  *   dial support / dial        z=1.65..2.15
@@ -47,12 +47,12 @@ const Axle:React.FC<AxleProps>=({position,radius,depth,color})=>
   </mesh>;
 
 /** One solid round shaft, with small rounded end edges.
- * The fork rods meet its axis at z=-.33 and the pendulum stem at z=-.91.
- * Both rod ends extend INTO the shaft; the shaft continues beyond both
- * embedded rod centres, so neither connection terminates on a flat cap.
+ * The coplanar fork rods meet its axis at z=-.02; the pendulum stem is
+ * behind them at z=-.91. The same shaft spans BOTH with >.04 penetration
+ * past their centre lines: no extra offset linkage or additional collar.
  */
-const COUPLING_CENTER_Z=-.62;
-const COUPLING_LENGTH=.72;       // ends -0.98 and -0.26; 0.07 beyond each rod
+const COUPLING_CENTER_Z=-.465;
+const COUPLING_LENGTH=1.03;      // -0.98..+0.05; 0.07 past BOTH rod axes
 const COUPLING_RADIUS=.085;
 const COUPLING_FILLET=.022;
 
@@ -218,8 +218,9 @@ const Anchor:React.FC<{state:ClockState}>=({state})=>{
   return <group>
     {([entry,exit] as PalletPose[]).map(pose=>
       <group key={pose.side}>
-        {/* Fork-to-pallet weld lives on the wide BASE, not the tooth tip. */}
-        <Rod a={[0,0,-.33]}
+        {/* Both ends are in the wheel XY plane, and seated INSIDE the
+            central shaft / pallet base respectively. No Z-sloping arm. */}
+        <Rod a={[0,0,FORK_ARM_PLANE_Z]}
           b={[...palletLocalBase(pose.side),PALLET_ARM_WELD_Z]}
           radius={.036} color={STEEL}/>
         <PalletTooth pose={pose}/>
@@ -393,6 +394,7 @@ export const PendulumClockScene:React.FC=()=>{
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
     data-wheel-plane-z={WHEEL_PLANE_Z}
     data-pallet-plane-z={PALLET_PLANE_Z}
+    data-fork-arm-plane-z={FORK_ARM_PLANE_Z}
     data-wheel-bearing-axial-overlap={zOverlap(bearingZRange,spindleZRange).toFixed(5)}
     data-wheel-bearing-running-clearance={(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS).toFixed(5)}
     style={{overflow:'hidden',background:'#edece6',color:'#28383d',

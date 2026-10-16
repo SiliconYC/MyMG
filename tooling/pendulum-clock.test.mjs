@@ -13,7 +13,7 @@ import {palletPose, palletLocalTip, palletWorldTip, contactDistance,
 
 import {
   WHEEL_PLANE_Z,WHEEL_THICKNESS,PALLET_PLANE_Z,PALLET_THICKNESS,
-  PALLET_ARM_WELD_Z,WHEEL_SPINDLE_RADIUS,WHEEL_SPINDLE_REAR_Z,
+  PALLET_ARM_WELD_Z,FORK_ARM_PLANE_Z,WHEEL_SPINDLE_RADIUS,WHEEL_SPINDLE_REAR_Z,
   WHEEL_SPINDLE_FRONT_Z,BEARING_CENTER_Z,BEARING_DEPTH,
   BEARING_INNER_RADIUS,BEARING_OUTER_RADIUS,
   wheelZRange,palletZRange,bearingZRange,spindleZRange,zOverlap,
@@ -315,7 +315,7 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
   const radius=getNumber('COUPLING_RADIUS');
   const fillet=getNumber('COUPLING_FILLET');
   const back=centre-length/2,front=centre+length/2;
-  const pendulumStemZ=-.91,forkArmZ=-.33;
+  const pendulumStemZ=-.91,forkArmZ=FORK_ARM_PLANE_Z;
   assert.ok(back<pendulumStemZ-.04,
     'round coupling must extend beyond the pendulum rod by > 0.04');
   assert.ok(front>forkArmZ+.04,
@@ -340,8 +340,8 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
   assert.doesNotMatch(support,/<Axle /,
     'the rear support must no longer be an opaque floating cylinder');
   assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-6\.28,0\]\}/);
-  assert.match(anchor,/a=\{\[0,0,-\.33\]\}/,
-    'both fork arms begin inside the front of the coupling');
+  assert.match(anchor,/a=\{\[0,0,FORK_ARM_PLANE_Z\]\}/,
+    'both fork arms begin at the shaft axis in the same plane as the wheel');
 });
 
 test('visible pallet shoes and escapement wheel occupy the same axial contact plane',()=>{
@@ -363,6 +363,49 @@ test('visible pallet shoes and escapement wheel occupy the same axial contact pl
   assert.match(scene,/geometry.translate\(0,0,-PALLET_THICKNESS\/2\)/);
   assert.match(scene,/position=\{\[\.\.\.palletLocalTip\(pose.side\),PALLET_PLANE_Z\]\}/);
   assert.match(scene,/b=\{\[\.\.\.palletLocalBase\(pose.side\),PALLET_ARM_WELD_Z\]\}/);
+});
+
+test('both full fork arms stay flat in the escapement wheel working plane',()=>{
+  assert.equal(FORK_ARM_PLANE_Z,WHEEL_PLANE_Z,
+    'fork rod root must not be set back behind the wheel');
+  assert.equal(FORK_ARM_PLANE_Z,PALLET_PLANE_Z,
+    'fork rod root and pallet shoe must share the same working plane');
+  assert.equal(FORK_ARM_PLANE_Z,PALLET_ARM_WELD_Z,
+    'fork rod must have zero axial slope between root and pallet base');
+  const rodRadius=.036;
+  const armZRange=[FORK_ARM_PLANE_Z-rodRadius,FORK_ARM_PLANE_Z+rodRadius];
+  assert.ok(wheelZRange[0]<=armZRange[0] &&
+    wheelZRange[1]>=armZRange[1],
+    'entire fork arm thickness must fit inside wheel tooth thickness');
+  const src=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  const fork=src.split('const Anchor:')[1].split('/** Highlight only')[0];
+  assert.match(fork,/a=\{\[0,0,FORK_ARM_PLANE_Z\]\}/,
+    'both fork roots must be at the wheel plane, never z=-.33');
+  assert.match(fork,/b=\{\[\.\.\.palletLocalBase\(pose.side\),PALLET_ARM_WELD_Z\]\}/);
+  assert.doesNotMatch(fork,/a=\{\[0,0,-\.33\]\}/);
+  const coupling=src.match(/const COUPLING_CENTER_Z=(-?[\d.]+);[\s\S]*?const COUPLING_LENGTH=([\d.]+);/);
+  assert.ok(coupling,'a single extended common shaft is required');
+  const centre=Number(coupling[1]),half=Number(coupling[2])/2;
+  assert.ok(centre+half>FORK_ARM_PLANE_Z+.04,
+    'shared shaft must extend past flat fork rods, not just meet the ends');
+  assert.ok(centre-half<-.91-.04,
+    'same cylinder must still embed the rear pendulum stem');
+  for(const sec of [0,.2,.45,.8,1.4,24.5,59.6]){
+    const a=clockAtFrame(Math.round(sec*FPS)).pendulumAngle;
+    const c=Math.cos(a),sin=Math.sin(a);
+    for(const side of ['entry','exit']){
+      const base=palletLocalBase(side);
+      const localStart=[0,0,FORK_ARM_PLANE_Z];
+      const localEnd=[base[0],base[1],PALLET_ARM_WELD_Z];
+      const rotateZ=([x,y,z])=>[x*c+y*sin,-x*sin+y*c,z];
+      const [,,rootZ]=rotateZ(localStart);
+      const [,,palletZ]=rotateZ(localEnd);
+      assert.equal(rootZ,palletZ,
+        `arm ${side} tilts out of working plane at ${sec}s`);
+      assert.equal(rootZ,WHEEL_PLANE_Z);
+    }
+  }
 });
 
 test('bearing has a real rotating shaft through its entire bored sleeve',()=>{
