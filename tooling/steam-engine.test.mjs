@@ -86,3 +86,17 @@ test('scene places governor beside flywheel and valve inline in feed, never isol
   assert.doesNotMatch(src,/const GOV_X = 4\.82/);
   assert.doesNotMatch(src,/18\.2\)\/2\.1/);
 });
+
+test('steam delivery and exhaust are connected and teaching text is 3D-anchored',()=>{
+  const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
+  assert.match(src,/\[right,THROTTLE_Y,THROTTLE_Z\]/);
+  assert.match(src,/\[left,THROTTLE_Y,THROTTLE_Z\]/);
+  assert.match(src,/cylinderGeometry args=\{\[\.175,\.175,\.56/);
+  assert.match(src,/\[\-.38, 3\.12, \-.13\]/);
+  assert.match(src,/const projectOnCanvas/);
+  assert.match(src,/const TeachingCallout/);
+  assert.match(src,/data-anchor-x/);
+  assert.match(src,/cameraPose\(s\.time\)/);
+  assert.match(src,/cameraPose\(t\)/);
+  assert.doesNotMatch(src,/title:'转快，重锤张开'/);
+});
