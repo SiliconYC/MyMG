@@ -43,31 +43,33 @@ export const stageAt=(frame:number):Stage=>
   frame<689?'mixed-gpu':'mixed-compare';
 
 /**
- * Three clearly legible editorial beats in the SAME live Three.js film:
- * first result (GPU), unmistakable round-two handover, second result (CPU).
- * The interlude is placed over the existing camera motion, not a slide or
- * an extra single-cube demo. Victory refers to these illustrative workloads.
+ * Symmetric chapter introductions and chip-anchored conclusions.
+ * Only the workload changes; the 3D camera keeps its original continuous path.
+ * All timings are frames, so Remotion seek and browser playback agree exactly.
  */
-export type StoryBeat='none'|'gpu-wins'|'round-two'|'cpu-wins';
+export type StoryBeat='none'|'round-one'|'gpu-wins'|'round-two'|'cpu-wins';
 export const storyBeatAt=(frame:number):StoryBeat=>
+  frame<56?'round-one':
   frame>=700?'cpu-wins':
-  frame>=324&&frame<376?'round-two':
-  frame>=276&&frame<320?'gpu-wins':'none';
+  frame>=324&&frame<380?'round-two':
+  frame>=274&&frame<316?'gpu-wins':'none';
+
 export const storyOpacityAt=(frame:number)=>{
   switch(storyBeatAt(frame)){
-    case 'gpu-wins':return smooth((frame-276)/10)*
-      (1-smooth((frame-311)/9));
-    case 'round-two':return smooth((frame-324)/9)*
-      (1-smooth((frame-363)/13));
+    case 'round-one':return smooth(frame/11)*(1-smooth((frame-44)/12));
+    case 'gpu-wins':return smooth((frame-274)/10)*
+      (1-smooth((frame-306)/10));
+    case 'round-two':return smooth((frame-324)/11)*
+      (1-smooth((frame-368)/12));
     case 'cpu-wins':return smooth((frame-700)/10);
     default:return 0;
   }
 };
-/** A brief sweeping veil makes the workload handover visible as an edit. */
-export const handoverProgressAt=(frame:number)=>smooth((frame-308)/52);
+/** Quiet linear-light sweep in the cut between the two workloads. */
+export const handoverProgressAt=(frame:number)=>
+  smooth((frame-309)/44);
 export const handoverOpacityAt=(frame:number)=>
-  smooth((frame-310)/10)*(1-smooth((frame-348)/12));
-
+  smooth((frame-311)/11)*(1-smooth((frame-340)/12));
 
 /**
  * Act I starts directly on the CPU: the obsolete single-tile introduction and

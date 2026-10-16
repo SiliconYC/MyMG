@@ -158,42 +158,45 @@ test('38-degree perspective keeps first CPU, second GPU and all transitions in f
 });
 
 
-test('winners appear only AFTER their full 16-job results, with a separate round-two transition',()=>{
-  assert.equal(storyBeatAt(0),'none');
+test('two symmetric introductions precede chip-anchored GPU and CPU verdicts',()=>{
+  for(const f of [0,8,27,44,55]){
+    assert.equal(storyBeatAt(f),'round-one');
+    assert.equal(completedCount(f,'gpu'),0,'first round is introduced before GPU runs');
+  }
+  assert.equal(storyBeatAt(56),'none');
   assert.equal(storyBeatAt(200),'none');
-  assert.equal(storyBeatAt(275),'none');
-  for(const f of [276,289,309,319]){
+  assert.equal(storyBeatAt(273),'none');
+  for(const f of [274,288,306,315]){
     assert.equal(storyBeatAt(f),'gpu-wins');
     assert.equal(completedCount(f,'cpu'),16);
     assert.equal(completedCount(f,'gpu'),16);
   }
-  assert.equal(storyBeatAt(321),'none');
-  assert.equal(storyBeatAt(323),'none');
-  for(const f of [324,332,345,364,375]){
+  for(const f of [316,320,323])assert.equal(storyBeatAt(f),'none');
+  for(const f of [324,336,350,370,379]){
     assert.equal(storyBeatAt(f),'round-two');
     assert.equal(mixedCompletedCount(f,'cpu'),0);
     assert.equal(mixedCompletedCount(f,'gpu'),0);
   }
-  assert.equal(storyBeatAt(376),'none');
+  assert.equal(storyBeatAt(380),'none');
   assert.equal(storyBeatAt(699),'none');
   for(const f of [700,715,743]){
     assert.equal(storyBeatAt(f),'cpu-wins');
     assert.equal(mixedCompletedCount(f,'cpu'),16);
     assert.equal(mixedCompletedCount(f,'gpu'),16);
   }
-  assert.equal(storyOpacityAt(300)>0.99,true,'first winner stays legible');
-  assert.ok(storyOpacityAt(342)>.99,'second round header stays legible');
-  assert.ok(storyOpacityAt(726)>.99,'final CPU result persists on screen');
-  assert.ok(storyOpacityAt(320)===0&&storyOpacityAt(323)===0);
-  assert.ok(handoverOpacityAt(313)>0);
-  assert.ok(handoverOpacityAt(330)>.95);
+  assert.ok(storyOpacityAt(23)>.99,'round one title is readable');
+  assert.ok(storyOpacityAt(345)>.99,'matching round two title is readable');
+  assert.ok(storyOpacityAt(293)>.99,'GPU verdict is readable');
+  assert.ok(storyOpacityAt(725)>.99,'CPU verdict stays visible');
+  assert.equal(storyOpacityAt(56),0);
+  assert.equal(storyOpacityAt(316),0);
   assert.equal(handoverOpacityAt(360),0);
+  assert.ok(handoverOpacityAt(330)>.95);
   for(let f=0;f<DURATION;f++){
-    const beat=storyBeatAt(f);
-    const opacity=storyOpacityAt(f);
-    assert.ok(opacity>=0&&opacity<=1);
+    const o=storyOpacityAt(f);
+    assert.ok(o>=0&&o<=1);
     assert.ok(handoverOpacityAt(f)>=0&&handoverOpacityAt(f)<=1);
-    if(beat==='none')assert.equal(opacity,0);
+    if(storyBeatAt(f)==='none')assert.equal(o,0);
     if(f>0)assert.ok(handoverProgressAt(f)>=handoverProgressAt(f-1));
   }
 });
@@ -213,9 +216,14 @@ test('the entire previous workload is UNMOUNTED before second-shape rendering',(
   assert.match(source,/<tetrahedronGeometry/);
   assert.match(source,/<cylinderGeometry/);
   assert.match(source,/THREE\.PerspectiveCamera/);
-  assert.match(source,/GPU 胜出/);
-  assert.match(source,/CPU 胜出/);
-  assert.match(source,/第二轮 · 新的挑战/);
+  assert.match(source,/gpuWin\?'GPU':'CPU'/);
+  assert.match(source,/胜出/);
+  assert.match(source,/16 个相同任务/);
+  assert.match(source,/16 个混合任务/);
+  assert.match(source,/胜出/);
+  assert.match(source,/VictoryTrace/);
+  assert.match(source,/data-layout=\{chapter\?'chapter':'verdict'\}/);
+  assert.doesNotMatch(source,/borderRadius:9|boxShadow:|rgba\(246,244,238,\.92\)/);
   assert.match(source,/cpu-gpu-round-wipe/);
   assert.match(source,/cpu-gpu-story-title/);
   assert.match(source,/storyBeatAt\(frame\)/);
