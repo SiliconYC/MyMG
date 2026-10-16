@@ -61,6 +61,7 @@ const GenericArithmeticUnit:React.FC<{frame:number}>=({frame})=>{
     (1-smooth((state.progress-.60)/.12));
   const shade=new THREE.Color(WHITE).lerp(new THREE.Color(BLUE),state.dyed);
   const activity=state.phase==='processing';
+  const pos:Vec=[state.point[0],state.point[1]-.20*inside,state.point[2]];
   return <group position={[GENERIC_X,0,0]}>
     <Block pos={[0,-.32,0]} size={[2.55,.32,2.55]} color="#65757a" metal={.24}/>
     <Block pos={[0,-.035,0]} size={[2.05,.26,2.05]}
@@ -70,8 +71,7 @@ const GenericArithmeticUnit:React.FC<{frame:number}>=({frame})=>{
       glow={BLUE} power={activity?.08:.005}/>
     <Block pos={[-.44,.125,0]} size={[.20,.012,.88]} color="#8e9fa1"/>
     <Block pos={[.44,.125,0]} size={[.20,.012,.88]} color="#8e9fa1"/>
-    <Block pos={[...state.point.slice(0,1),state.point[1]-.20*inside,
-      state.point[2]] as Vec}
+    <Block pos={pos}
       size={[.56*state.coreScale,.56*state.coreScale,.56*state.coreScale]}
       color={'#'+shade.getHexString()}
       rotation={[0,state.rotation,0]}/>
