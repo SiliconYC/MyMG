@@ -60,21 +60,41 @@ try{
   };
   await shot(40,'task',0,0,0,0);
   // Package first, then its lid travels away revealing real core sizes.
-  await seek(94);
+  await seek(64);
   const closedCpu=await marker.screenshot({path:resolve(out,'cpu-package-lid-closed.png')});
-  await seek(115);
+  await seek(89);
   const openCpu=await marker.screenshot({path:resolve(out,'cpu-package-lid-retracting.png')});
   assert.ok(Buffer.compare(closedCpu,openCpu)!==0,'CPU chip cover must physically move');
   await shot(140,'cpu',0,0,4,0);
-  await shot(164,'cpu',4,0,0,0);
+  await shot(164,'cpu',4,0,4,0);
   await shot(280,'cpu',16,0,0,0);
-  await seek(314);
+  await seek(312);
   const gpuOpening=await marker.screenshot({path:resolve(out,'gpu-silicon-reveal.png')});
   assert.ok(gpuOpening.byteLength>8000,'GPU array must be visible while lid lifts');
   await shot(352,'gpu',16,0,0,16);
   await shot(380,'gpu',16,16,0,0);
-  await shot(430,'compare',0,0,0,0);
-  await shot(530,'compare',4,16,4,0);
+  await shot(430,'compare',16,16,0,0);
+  await shot(475,'compare',16,16,0,0);
+  // Regression: old scene cut at frame 80 (intro vanished), 291 (GPU popped),
+  // 424 (all jobs reset), while orthographic zoom cropped the chip package.
+  const boundaryFrames=[0,79,80,285,286,291,292,404,405,423,424,475];
+  let previousCompletedCpu=0,previousCompletedGpu=0;
+  for(const f of boundaryFrames){
+    await seek(f);
+    const zoom=Number(await marker.getAttribute('data-camera-zoom'));
+    const cpuDone=Number(await marker.getAttribute('data-cpu-done'));
+    const gpuDone=Number(await marker.getAttribute('data-gpu-done'));
+    assert.ok(zoom>=40&&zoom<=67&&720/zoom>10.5,
+      'Camera clips the top/bottom of processor package at frame '+f);
+    assert.ok(cpuDone>=previousCompletedCpu,'CPU vanished/reset at frame '+f);
+    assert.ok(gpuDone>=previousCompletedGpu,'GPU vanished/reset at frame '+f);
+    previousCompletedCpu=cpuDone;
+    previousCompletedGpu=gpuDone;
+    const png=await marker.screenshot({path:resolve(out,'cpu-gpu-continuity-'+f+'.png')});
+    assert.ok(png.byteLength>6000,'Scene became empty around boundary frame '+f);
+  }
+  assert.equal(previousCompletedCpu,16);
+  assert.equal(previousCompletedGpu,16);
   await seek(200);
   await page.getByRole('button',{name:'前进一帧'}).click();
   assert.equal(await readFrame(),201);
@@ -93,7 +113,7 @@ try{
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:resolve(out,'cpu-gpu-task-flow-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU task-flow WebGL QA passed: source, working cores, dyed output, replay, player, mobile.');
+  console.log('CPU/GPU continuous WebGL QA passed: no reset/cut at boundaries, safe camera zoom, real jobs, player, mobile.');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}
