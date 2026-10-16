@@ -15,7 +15,7 @@ export type Stage='task'|'cpu'|'gpu'|'compare';
 export type TaskPhase='waiting'|'entering'|'processing'|'leaving'|'done';
 export type Point=readonly [number,number,number];
 
-export const GENERIC_X=-21.5;
+export const GENERIC_X=-26.5;
 export const CENTER:Record<Kind,number>={cpu:-8.4,gpu:8.4};
 export const CHIP_HALF=3.275;
 /** Exterior queue and result grids are entirely outside each chip. */
@@ -32,7 +32,7 @@ export const stageAt=(frame:number):Stage=>
 
 /** Camera is one continuously moving observer; no scene or object teleport. */
 export const cameraAt=(frame:number)=>{
-  const cpu=smooth((frame-67)/50);
+  const cpu=smooth((frame-55)/65);
   const gpu=smooth((frame-257)/60);
   const together=smooth((frame-380)/70);
   return {
