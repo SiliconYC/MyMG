@@ -55,6 +55,34 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  animations/steam-engine/web:
+    dependencies:
+      '@react-three/fiber':
+        specifier: ^9.3.0
+        version: 9.8.2(@types/react@19.3.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(three@0.181.2)
+      '@remotion/three':
+        specifier: 4.0.534
+        version: 4.0.534(@react-three/fiber@9.8.2(@types/react@19.3.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(three@0.181.2))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)(remotion@4.0.534(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(three@0.181.2)
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      remotion:
+        specifier: 4.0.534
+        version: 4.0.534(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      three:
+        specifier: ^0.181.0
+        version: 0.181.2
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.3.0
+      '@types/three':
+        specifier: ^0.181.0
+        version: 0.181.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   apps/portal:
     dependencies:
       '@mymg/demo':
@@ -63,6 +91,9 @@ importers:
       '@mymg/hbm':
         specifier: workspace:*
         version: link:../../animations/hbm/web
+      '@mymg/steam-engine':
+        specifier: workspace:*
+        version: link:../../animations/steam-engine/web
       '@mymg/mg':
         specifier: workspace:*
         version: link:../../packages/mg
@@ -115,6 +146,9 @@ importers:
       '@mymg/hbm':
         specifier: workspace:*
         version: link:../../animations/hbm/web
+      '@mymg/steam-engine':
+        specifier: workspace:*
+        version: link:../../animations/steam-engine/web
       '@mymg/mg':
         specifier: workspace:*
         version: link:../../packages/mg
