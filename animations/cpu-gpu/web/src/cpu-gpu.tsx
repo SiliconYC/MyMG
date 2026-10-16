@@ -5,7 +5,7 @@ import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   TASKS, TASK_CUBE_SIZE, CPU_CORES, GPU_LANES, cameraAt, completedCount, workingCount,
-  taskAt, stageAt, smooth, corePosition, lidOpening,
+  taskAt, stageAt, smooth, corePosition, lidOpening, lidScale,
   type Kind,
 } from './model';
 
@@ -114,7 +114,8 @@ const Lid:React.FC<{frame:number;kind:Kind}>=({frame,kind})=>{
   // open>=.998 created an unmistakable one-frame disappearance.
   // Raise and slide backwards inside the camera framing, then fade softly.
   const alpha=1-smooth((open-.61)/.39);
-  return <group position={[0,1.26*open,-2.10*open]}>
+  const shrink=Math.max(.00001,lidScale(frame,kind));
+  return <group position={[0,1.26*open,-2.10*open]} scale={shrink}>
     <Box pos={[0,.58,0]} size={[5.50,.29,5.50]} color={tone} metal={.73}
       opacity={alpha}/>
     <Box pos={[0,.734,0]} size={[4.55,.027,4.55]}
@@ -189,6 +190,8 @@ export const CpuGpuScene:React.FC=()=>{
     data-chip-design="package-with-exposed-silicon"
     data-workload={stageAt(frame)}
     data-camera-zoom={cameraAt(frame).zoom}
+    data-cpu-lid-scale={lidScale(frame,'cpu')}
+    data-gpu-lid-scale={lidScale(frame,'gpu')}
     data-task-count={TASKS}
     data-cpu-done={completedCount(frame,'cpu')}
     data-gpu-done={completedCount(frame,'gpu')}
