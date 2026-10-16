@@ -13,7 +13,8 @@ export const BEAT_SECONDS = 1;
 export const PERIOD_SECONDS = 2;
 export const RELEASE_OFFSET = 0.42;
 export const RELEASE_DURATION = 0.18;
-export const PENDULUM_AMPLITUDE = 0.115;
+/** Visible fork travel must carry each tooth clear of its opposite pallet. */
+export const PENDULUM_AMPLITUDE = 0.145;
 /** The release window is a segment of the pendulum's swing, not a second motor. */
 export const RELEASE_START_ANGLE = PENDULUM_AMPLITUDE * Math.cos(Math.PI * RELEASE_OFFSET);
 export const RELEASE_END_ANGLE = PENDULUM_AMPLITUDE * Math.cos(Math.PI * (RELEASE_OFFSET + RELEASE_DURATION));
