@@ -286,3 +286,26 @@ test('all front, rear, and dial parts stay in one ThreeCanvas',()=>{
   assert.match(src,/<Dial angle={state.secondHandAngle}\/>/);
   assert.doesNotMatch(src,/artwork|backgroundImage:|linear-gradient|grid-template|<svg/i);
 });
+
+test('pendulum and escapement share exactly one bare coaxial cylinder connector',()=>{
+  const src=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  const anchor=src.split('const Anchor:')[1].split('/** Highlight only')[0];
+  const pendulum=src.split('const Pendulum:')[1].split('/** Only the wheel bearing')[0];
+  const movingJoint=src.split('ONE pivot, ONE angle')[1].split('<ContactHighlights')[0];
+  const support=src.split('const MinimalSupports:')[1].split('const Dial:')[0];
+
+  assert.match(movingJoint,
+    /<Axle position=\{\[0,0,-\.62\]\} radius=\{\.085\} depth=\{\.58\} color=\{STEEL\}\/>/,
+    'a single plain round shaft must connect the pendulum to the pallet fork');
+  assert.equal((movingJoint.match(/<Axle /g)||[]).length,1,
+    'no auxiliary coupling, collar or stacked connector');
+  assert.doesNotMatch(anchor,/<Axle /,
+    'anchor must not contain ornamental pivot bosses');
+  assert.doesNotMatch(pendulum,/<Axle /,
+    'pendulum must not contain ornamental pivot bosses');
+  assert.equal((support.match(/<Axle /g)||[]).length,1,
+    'only the separate escape-wheel bearing is retained');
+  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-6\.28,0\]\}/,
+    'the pendulum stem must actually reach the common pivot');
+});
