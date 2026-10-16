@@ -5,6 +5,8 @@ on:
     branches: [dev]
     paths:
       - 'apps/portal/**'
+      - '!apps/portal/README.md'
+      - '!apps/portal/**/*.md'
       - 'animations/*/web/**'
       - 'packages/mg/**'
       - 'pnpm-workspace.yaml'
