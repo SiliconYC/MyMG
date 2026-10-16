@@ -39,6 +39,53 @@ const Axle:React.FC<AxleProps>=({position,radius,depth,color})=>
     <meshStandardMaterial color={color} metalness={.69} roughness={.28}/>
   </mesh>;
 
+/** One solid round shaft, with small rounded end edges.
+ * The fork rods meet its axis at z=-.33 and the pendulum stem at z=-.91.
+ * Both rod ends extend INTO the shaft; the shaft continues beyond both
+ * embedded rod centres, so neither connection terminates on a flat cap.
+ */
+const COUPLING_CENTER_Z=-.62;
+const COUPLING_LENGTH=.72;       // ends -0.98 and -0.26; 0.07 beyond each rod
+const COUPLING_RADIUS=.085;
+const COUPLING_FILLET=.022;
+
+/** Revolved quarter-circles yield real rounded metal, not a flat cylinder
+ * with a decorative torus or several disconnected capped cylinders.
+ */
+function makeCouplingGeometry():THREE.LatheGeometry {
+  const half=COUPLING_LENGTH/2;
+  const r=COUPLING_RADIUS;
+  const f=COUPLING_FILLET;
+  const steps=8;
+  const profile:THREE.Vector2[]=[
+    new THREE.Vector2(0,-half),
+    new THREE.Vector2(r-f,-half),
+  ];
+  for(let i=1;i<=steps;i++){
+    const t=i/steps*Math.PI/2;
+    profile.push(new THREE.Vector2(
+      r-f+f*Math.sin(t),-half+f*(1-Math.cos(t))));
+  }
+  profile.push(new THREE.Vector2(r,half-f));
+  for(let i=1;i<=steps;i++){
+    const t=i/steps*Math.PI/2;
+    profile.push(new THREE.Vector2(
+      r-f+f*Math.cos(t),half-f+f*Math.sin(t)));
+  }
+  profile.push(new THREE.Vector2(0,half));
+  return new THREE.LatheGeometry(profile,64);
+}
+
+const PendulumAnchorCoupling:React.FC=()=>{
+  const geometry=useMemo(makeCouplingGeometry,[]);
+  useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
+  return <mesh geometry={geometry}
+    position={[0,0,COUPLING_CENTER_Z]} rotation={[Math.PI/2,0,0]}
+    castShadow receiveShadow>
+    <meshStandardMaterial color={STEEL} metalness={.77} roughness={.28}/>
+  </mesh>;
+};
+
 const Ring:React.FC<{position:Vec3;radius:number;tube:number;color:string}>=
 ({position,radius,tube,color})=>
   <mesh position={[...position]} castShadow>
@@ -263,9 +310,9 @@ const Movement:React.FC<{frame:number}>=({frame})=>{
       {/* ONE pivot, ONE angle: pendulum rod, pendulum bob and both pallets
           form a single physically connected rotating Three.js assembly. */}
       <group position={[0,2.56,0]} rotation={[0,0,-state.pendulumAngle]}>
-        {/* The ONLY connector between pendulum and escape pallets:
-            one plain coaxial cylinder, no collars, joints or extra links. */}
-        <Axle position={[0,0,-.62]} radius={.085} depth={.58} color={STEEL}/>
+        {/* One lathed cylindrical coupling; the rod ends are submerged
+            inside it, with rounded shoulders on both exposed ends. */}
+        <PendulumAnchorCoupling/>
         <Pendulum/>
         <Anchor state={state}/>
       </group>

@@ -287,25 +287,49 @@ test('all front, rear, and dial parts stay in one ThreeCanvas',()=>{
   assert.doesNotMatch(src,/artwork|backgroundImage:|linear-gradient|grid-template|<svg/i);
 });
 
-test('pendulum and escapement share exactly one bare coaxial cylinder connector',()=>{
+test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
   const anchor=src.split('const Anchor:')[1].split('/** Highlight only')[0];
   const pendulum=src.split('const Pendulum:')[1].split('/** Only the wheel bearing')[0];
+  const coupling=src.split('function makeCouplingGeometry()')[1]
+    .split('const Ring:')[0];
   const movingJoint=src.split('ONE pivot, ONE angle')[1].split('<ContactHighlights')[0];
   const support=src.split('const MinimalSupports:')[1].split('const Dial:')[0];
 
-  assert.match(movingJoint,
-    /<Axle position=\{\[0,0,-\.62\]\} radius=\{\.085\} depth=\{\.58\} color=\{STEEL\}\/>/,
-    'a single plain round shaft must connect the pendulum to the pallet fork');
-  assert.equal((movingJoint.match(/<Axle /g)||[]).length,1,
-    'no auxiliary coupling, collar or stacked connector');
-  assert.doesNotMatch(anchor,/<Axle /,
-    'anchor must not contain ornamental pivot bosses');
-  assert.doesNotMatch(pendulum,/<Axle /,
-    'pendulum must not contain ornamental pivot bosses');
+  const getNumber=name=>{
+    const match=src.match(new RegExp(`const ${name}=(-?[\\d.]+);`));
+    assert.ok(match,`missing coupling dimension ${name}`);
+    return Number(match[1]);
+  };
+  const centre=getNumber('COUPLING_CENTER_Z');
+  const length=getNumber('COUPLING_LENGTH');
+  const radius=getNumber('COUPLING_RADIUS');
+  const fillet=getNumber('COUPLING_FILLET');
+  const back=centre-length/2,front=centre+length/2;
+  const pendulumStemZ=-.91,forkArmZ=-.33;
+  assert.ok(back<pendulumStemZ-.04,
+    'round coupling must extend beyond the pendulum rod by > 0.04');
+  assert.ok(front>forkArmZ+.04,
+    'round coupling must extend beyond the fork arms by > 0.04');
+  assert.ok(radius>.044 && radius>.036,
+    'rod centres must be swallowed by a wider coupling');
+  assert.ok(fillet>.01 && fillet<radius*.4,
+    'ends should be actually rounded without enormous ball-shaped bosses');
+  assert.match(coupling,/new THREE.LatheGeometry\(profile,64\)/);
+  assert.match(coupling,/const steps=8/);
+  assert.match(coupling,/Math.sin\(t\)/);
+  assert.match(coupling,/Math.cos\(t\)/);
+  assert.equal((coupling.match(/<mesh geometry=/g)||[]).length,1,
+    'one continuous mesh, not a stack of fake fillet rings');
+  assert.equal((movingJoint.match(/<PendulumAnchorCoupling\/>/g)||[]).length,1);
+  assert.doesNotMatch(movingJoint,/<Axle |<Ring /,
+    'no old flush-ended axle or decorative collars at the joint');
+  assert.doesNotMatch(anchor,/<Axle /);
+  assert.doesNotMatch(pendulum,/<Axle /);
   assert.equal((support.match(/<Axle /g)||[]).length,1,
-    'only the separate escape-wheel bearing is retained');
-  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-6\.28,0\]\}/,
-    'the pendulum stem must actually reach the common pivot');
+    'only the unrelated wheel bearing is retained');
+  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-6\.28,0\]\}/);
+  assert.match(anchor,/a=\{\[0,0,-\.33\]\}/,
+    'both fork arms begin inside the front of the coupling');
 });
