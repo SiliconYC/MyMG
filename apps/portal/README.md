@@ -26,3 +26,10 @@
 ## 线上验收
 
 2026-10-16 GitHub Pages 发布已成功，`has_pages=true`；[部署执行](https://github.com/SiliconYC/MyMG/actions/runs/38843210375) 和 [真实 Chromium / WebGL / 双作品测试](https://github.com/SiliconYC/MyMG/actions/runs/38851346908) 已通过。后续需要查线上截图时手动执行 `.github/workflows/pages-live-qa.yml`，不要每次提交都运行。
+
+## CPU / GPU 原生 3D MG
+
+- 首頁卡片及直達路由：`https://siliconyc.github.io/MyMG/#/cpu-gpu`。
+- React Three.js 實時 WebGL 場景，21 秒循環、30 FPS、630 幀；可拖曳、逐幀、暫停。
+- 相同指令與分歧工作兩種情境，實際動態 3D 運算單元和輸出格，不用影片、圖片序列或替代玩家。
+- 檢查：`pnpm check`、`pnpm build:portal`、`pnpm --filter @mymg/portal qa:cpu-gpu`（需先啟動預覽及 Playwright Chromium）。

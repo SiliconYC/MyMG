@@ -39,3 +39,16 @@
 @keyframes steam-conrod-cycle{to{transform:rotate(-18deg)}}
 @media(prefers-reduced-motion:reduce){.steam-conrod,.steam-flywheel{animation:none}}
 @media(max-width:700px){.steam-flywheel{width:118px;height:118px}}
+
+.artwork-cpu-gpu{background:radial-gradient(ellipse at center,#244c5a 0%,#071624 72%);display:flex;align-items:center;justify-content:center;gap:25px;perspective:700px}
+.mini-die{display:grid;padding:12px;border:8px solid #234453;transform:rotateX(22deg) rotateZ(-11deg);box-shadow:14px 16px 0 #071622,0 17px 35px #000b}
+.mini-cpu{width:145px;height:142px;grid-template-columns:repeat(2,1fr);gap:10px;background:#48372c;border-color:#987245}
+.mini-cpu i{display:block;background:#ffb364;box-shadow:inset 0 0 0 4px #cf833d,0 0 18px #ffb46499}
+.mini-gpu{width:160px;height:144px;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(8,1fr);gap:3px;background:#0e3442;border-color:#297789}
+.mini-gpu i{display:block;background:#4ae8e2;box-shadow:0 0 7px #54ede7a5}
+.mini-gpu i:nth-child(3n){background:#a1fffa}
+.mini-vs{font-size:50px;color:#a1bbcf;font-weight:200}
+.mini-labels{position:absolute;left:15%;right:15%;bottom:55px;display:flex;justify-content:space-between;letter-spacing:3px;color:#e4eef1}
+.mini-labels b:first-child{color:#ffc183}.mini-labels b:last-child{color:#6aefea}
+.artwork-cpu-gpu .artwork-label{bottom:18px;font-size:10px}
+@media(max-width:480px){.mini-die{scale:.75;margin:-15px}.artwork-cpu-gpu{gap:0}}

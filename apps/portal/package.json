@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "qa": "node qa-portal.mjs",
     "qa:react": "node qa-react.mjs",
-    "qa:clock": "node qa-clock.mjs"
+    "qa:clock": "node qa-clock.mjs",
+    "qa:cpu-gpu": "node qa-cpu-gpu.mjs"
   },
   "dependencies": {
+    "@mymg/cpu-gpu": "workspace:*",
     "@mymg/demo": "workspace:*",
     "@mymg/hbm": "workspace:*",
     "@mymg/mg": "workspace:*",
