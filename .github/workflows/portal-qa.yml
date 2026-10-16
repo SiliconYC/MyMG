@@ -91,6 +91,12 @@ jobs:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
 
+      - name: Verify automatic cycling (#29), 3D orbit and native WebGL screenshots
+        run: pnpm --filter @mymg/portal exec node qa-automatic-fire.mjs
+        env:
+          MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
+          MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal/automatic-fire
+
       - name: Verify GPU-independent demo in Chromium
         run: pnpm --filter @mymg/portal qa:react
         env:

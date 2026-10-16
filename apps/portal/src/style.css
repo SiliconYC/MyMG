@@ -64,3 +64,12 @@
 .artwork-cpu-gpu-minimal .mini-labels b:first-child{color:#af6448}
 .artwork-cpu-gpu-minimal .mini-labels b:last-child{color:#477f83}
 @media(max-width:480px){.artwork-cpu-gpu-minimal{gap:27px}}
+
+/* One quiet, angular mechanical silhouette. No extra typography or spark effects. */
+.artwork-automatic{background:radial-gradient(ellipse at 54% 48%,#334853 0%,#101f29 72%)}
+.auto-body{position:absolute;left:24%;top:33%;width:40%;height:26%;background:#677d86;border:2px solid #adbac0;box-shadow:8px 10px 0 #1a2c35;transform:skewY(-5deg)}
+.auto-bolt{position:absolute;left:33%;top:38%;width:15%;height:15%;background:#a5c7c9;box-shadow:4px 4px 0 #35515e;transform:skewY(-5deg)}
+.auto-stock{position:absolute;left:10%;top:41%;width:16%;height:11%;background:#344954;transform:skewY(-13deg);box-shadow:3px 7px #12232d}
+.auto-barrel{position:absolute;left:64%;top:41%;width:29%;height:10%;background:#718992;border-right:7px solid #d1d4cd;transform:skewY(-5deg)}
+.auto-mag{position:absolute;left:35%;top:58%;width:10%;height:27%;background:#425864;transform:rotate(-10deg);box-shadow:5px 5px #152936}
+.auto-grip{position:absolute;left:54%;top:58%;width:8%;height:23%;background:#455b65;transform:rotate(16deg)}

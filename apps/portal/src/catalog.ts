@@ -4,13 +4,14 @@ import {DemoScene} from '@mymg/demo';
 import {PendulumClockScene} from '@mymg/pendulum-clock';
 import {SteamEngineScene} from '@mymg/steam-engine';
 import {CpuGpuScene} from '@mymg/cpu-gpu';
+import {AutomaticFireScene} from '@mymg/automatic-fire';
 // @mymg-generator-imports
 
 /** Single catalog powers all portal cards and player routes. */
 export type MgProject = {
   id: string;
   compositionId: string;
-  cover?: {type: 'hbm'} | {type: 'clock'} | {type: 'steam'} | {type: 'cpu-gpu'} | {type: 'image'; src: string; alt: string};
+  cover?: {type: 'hbm'} | {type: 'clock'} | {type: 'steam'} | {type: 'cpu-gpu'} | {type: 'automatic-fire'} | {type: 'image'; src: string; alt: string};
   title: string;
   titleEn: string;
   category: string;
@@ -117,6 +118,26 @@ export const projects: readonly MgProject[] = [
       '规则任务：大量计算通道执行相同指令、处理不同数据；四个 CPU 核心通过连续多轮完成。',
       '分支任务：CPU 核心各走不同控制流；GPU 示意为分歧路径分组轮流执行。',
       '80 条 GPU 运算通道是概念化示意，不代表 80 颗完整 GPU 核心；动画速率不是实际硬件跑分。',
+    ],
+  },
+  {
+    id: 'automatic-fire',
+    compositionId: 'AutomaticFireScene',
+    cover: {type: 'automatic-fire'},
+    title: '連發的原理 · 槍機的循環',
+    titleEn: 'AUTOMATIC FIRE / THE MECHANICAL CYCLE',
+    category: '機械 / 三維剖視',
+    description: '扳機持續按住，槍機退回與復進，下一次擊發如何自動接續？',
+    status: 'React / Three.js 原生動畫',
+    component: AutomaticFireScene,
+    durationInFrames: 720,
+    fps: 30,
+    width: 1280,
+    height: 720,
+    notes: [
+      '單一原生 3D 剖視模型；24 秒全程由 Three.js 依時間軸運算運鏡與機構，沒有 MP4 或圖片替代。',
+      '概念示意：連發與半自動的關鍵差別在於持續扣住扳機後，前者能在自動循環中再次擊發；後者需重新扣動扳機。',
+      '模型零件、尺寸及時序經刻意抽象，不代表真實槍械的設計、製造或改裝方式。',
     ],
   },
   // @mymg-generator-projects
