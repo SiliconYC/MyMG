@@ -7,8 +7,8 @@ import {steamAtFrame,CRANK_X,CRANK_RADIUS,CONNECTING_ROD,
 import {governorAtFrame,GOVERNOR_START_FRAME,loadReliefAt,NOMINAL_ANGLE} from
   '../animations/steam-engine/web/src/governor-model.ts';
 
-test('14-second runtime and crank / piston / connecting rod stay linked',()=>{
-  assert.equal(DURATION,420);
+test('20-second runtime and crank / piston / connecting rod stay linked',()=>{
+  assert.equal(DURATION,600);
   for(let frame=0;frame<DURATION;frame++){
     const s=steamAtFrame(frame);
     assert.ok(Number.isFinite(s.pistonX));
@@ -39,20 +39,23 @@ test('governor driven by crank since frame 0, deterministic under seeking',()=>{
   assert.notEqual(governorAtFrame(30).spindlePhase,governorAtFrame(0).spindlePhase);
   assert.deepEqual(governorAtFrame(235),governorAtFrame(235));
   assert.equal(loadReliefAt(6),0);
-  assert.ok(loadReliefAt(7)>.9);
-  assert.equal(loadReliefAt(9),0);
+  assert.ok(loadReliefAt(8.5)>.9);
+  assert.equal(loadReliefAt(13),0);
 });
 
 test('unloading raises speed, balls lift sleeve, throttle closes, and governor recovers',()=>{
-  const neutral=governorAtFrame(190);
-  const rise=governorAtFrame(220);
-  const peak=governorAtFrame(240);
-  const recovered=governorAtFrame(350);
-  assert.ok(rise.relativeSpeed>neutral.relativeSpeed+.20);
-  assert.ok(rise.angle>neutral.angle+.15);
-  assert.ok(peak.sleeveY>neutral.sleeveY+.35);
-  assert.ok(peak.throttle<neutral.throttle-.3);
-  assert.ok(recovered.relativeSpeed<peak.relativeSpeed-.20);
+  const neutral=governorAtFrame(225);
+  const rise=governorAtFrame(270);
+  const peak=governorAtFrame(360);
+  const recovered=governorAtFrame(510);
+  assert.ok(rise.relativeSpeed>neutral.relativeSpeed+.40);
+  assert.ok(peak.relativeSpeed>neutral.relativeSpeed+.64,
+    'overspeed should be visually obvious, not a tiny wobble');
+  assert.ok(rise.angle>neutral.angle+.35);
+  assert.ok(peak.sleeveY>neutral.sleeveY+.70,
+    'collar rise must be readable in a close-up');
+  assert.ok(peak.throttle<neutral.throttle-.38);
+  assert.ok(recovered.relativeSpeed<peak.relativeSpeed-.64);
   assert.ok(Math.abs(recovered.relativeSpeed-1)<.03);
   assert.ok(Math.abs(recovered.throttle-neutral.throttle)<.04);
   // Two equal upper and lower arms meet the ball and slide collar exactly.
@@ -63,13 +66,13 @@ test('unloading raises speed, balls lift sleeve, throttle closes, and governor r
     const lower=Math.hypot(radial,ballHeight-sample.sleeveY);
     assert.ok(Math.abs(upper-.88)<1e-9);
     assert.ok(Math.abs(lower-.88)<1e-9);
-    assert.ok(sample.angle>=.2 && sample.angle<=1.15);
+    assert.ok(sample.angle>=.2 && sample.angle<=1.23);
   }
   assert.ok(Math.abs(neutral.angle-NOMINAL_ANGLE)<.001);
 });
 
 test('steam piston and governor spindle use shared integrated crank phase',()=>{
-  const a=steamAtFrame(224),b=steamAtFrame(225);
+  const a=steamAtFrame(315),b=steamAtFrame(316);
   assert.ok(Math.abs(b.theta-a.theta-b.governor.omega/30)<.005);
   assert.notEqual(a.pistonX,b.pistonX);
   assert.notEqual(a.governor.spindlePhase,b.governor.spindlePhase);
@@ -82,7 +85,7 @@ test('scene places governor beside flywheel and valve inline in feed, never isol
   assert.match(src,/const GovernorDrive/);
   assert.match(src,/const valveLinkEnd/);
   assert.match(src,/const GovernorThrottle/);
-  assert.match(src,/\[\[2\.52,5\.50,\-\.75\]/);
+  assert.match(src,/\[\[\.78,4\.28,\-\.78\]/);
   assert.doesNotMatch(src,/const GOV_X = 4\.82/);
   assert.doesNotMatch(src,/18\.2\)\/2\.1/);
 });
@@ -92,7 +95,7 @@ test('steam delivery and exhaust are connected and teaching text is 3D-anchored'
   assert.match(src,/\[right,THROTTLE_Y,THROTTLE_Z\]/);
   assert.match(src,/\[left,THROTTLE_Y,THROTTLE_Z\]/);
   assert.match(src,/cylinderGeometry args=\{\[\.175,\.175,\.56/);
-  assert.match(src,/\[\-.38, 3\.12, \-.13\]/);
+  assert.match(src,/\[\-3\.24,3\.08,\-\.88\]/);
   assert.match(src,/const projectOnCanvas/);
   assert.match(src,/const TeachingCallout/);
   assert.match(src,/data-anchor-x/);
@@ -106,12 +109,12 @@ import {cameraPose} from '../animations/steam-engine/web/src/camera-path.ts';
 
 test('every steam inlet and exhaust elbow is tangent-connected without gaps',()=>{
   const paths=[
-    [[2.52,5.50,-.75],[2.52,3.48,-.75],[2.20,2.81,-.53],
-      [1.48,2.33,-.28],[.40,2.33,-.28]],
-    [[-.16,2.33,-.28],[-1.86,2.33,-.28],[-2.12,2.44,-.10],
-      [-2.12,2.08,-.10],[-1.65,1.86,-.10],[-1.65,1.62,-.10]],
-    [[-1.16,1.65,-.13],[-1.16,2.13,-.13],[-.45,2.17,-.13],
-      [-.38,2.43,-.13],[-.38,3.12,-.13]],
+    [[.78,4.28,-.78],[.78,2.70,-.78],
+      [.78,2.33,-.28],[.40,2.33,-.28]],
+    [[-.16,2.33,-.28],[-1.90,2.33,-.28],
+      [-2.12,2.19,-.10],[-2.12,1.82,-.10]],
+    [[-1.16,1.76,-.13],[-1.16,2.06,-.88],
+      [-3.24,2.06,-.88],[-3.24,3.08,-.88]],
   ];
   for(const points of paths){
     const sections=pipeSections(points,.25);
@@ -159,7 +162,29 @@ test('camera genuinely orbits in yaw AND pitch, rather than translating alone',(
     const pose=cameraPose(t);
     const distance=Math.hypot(...pose.eye.map((x,i)=>x-pose.target[i]));
     assert.ok(distance>11&&distance<15);
-    assert.ok(pose.zoom>=85&&pose.zoom<=132);
+    assert.ok(pose.zoom>=85&&pose.zoom<=191);
     assert.deepEqual(cameraPose(t),pose);
   }
+});
+
+test('teaching callouts never chase spinning flyweights or flywheel spokes',()=>{
+  const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
+  const anchors=src.slice(src.indexOf('const anchoredPoint ='),
+    src.indexOf('const projectOnCanvas ='));
+  assert.ok(anchors.length>200);
+  assert.match(anchors,/part==='balls'\) return \[GOV_X,GOV_PIVOT_Y/);
+  assert.match(anchors,/part==='sleeve'\) return \[GOV_X,1\.30/);
+  assert.doesNotMatch(anchors,/spindlePhase|Math\.sin|Math\.cos|\.governor\.angle/);
+  assert.match(src,/Math\.max\(\.08,radial\)/,
+    'a subtle visible orbit trace must expose changing flyball radius');
+});
+
+test('valve chest contrasts with background, and copper/blue piping stays separate',()=>{
+  const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
+  assert.match(src,/color="#91aebb"/);
+  assert.match(src,/color="#5d7c8d"/);
+  assert.match(src,/color="#a2bbc6"/);
+  assert.match(src,/\[\[\.78,4\.28,-\.78\]/);
+  assert.match(src,/\[\[-1\.16,1\.76,-\.13\]/);
+  assert.doesNotMatch(src,/\[2\.52,5\.50,-\.75\]/);
 });
