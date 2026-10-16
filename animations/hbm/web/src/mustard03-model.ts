@@ -126,13 +126,13 @@ function inlay(d:Draft,x:number,y:number,z:number,a:number){
     [x-1.02,y+.75,z],[x-1.02,y-.75,z]],'#f7fdf9',a*.36,1);
 }
 function contacts(d:Draft,x:number,y:number,z:number,alpha:number){
-  for(let k=0;k<8;k++)dot(d,[x-.85+k*.25,y+DIE_SY/2+.052,z+.075],1.45,'#f8d89e',alpha*.74);
+  for(let k=0;k<8;k++)dot(d,[x-.85+k*.25,y+DIE_SY/2+.052,z+.075],Math.max(.8,Math.min(1.6,d.cam.s/40)),'#f8d89e',alpha*.74);
 }
 function seams(d:Draft,x:number,y:number,z:number,alpha:number){
   for(let j=0;j<9;j++){
     const px=x-.96+j*.24;
     path(d,[[px,y+DIE_SY/2,z+.045],[px,y+DIE_SY/2,z+.11]],'#e0e5e2',.61*alpha,
-      Math.max(1,Math.round(d.cam.s/66)));
+      Math.max(1,Math.floor(d.cam.s/66)));
   }
 }
 function unifiedStack(d:Draft,x:number,y:number,alpha=1,rise=0,shadowAlpha=1) {
@@ -144,7 +144,7 @@ function unifiedStack(d:Draft,x:number,y:number,alpha=1,rise=0,shadowAlpha=1) {
     [x+DIE_SX/2,y-DIE_SY/2,BASE_Z-.052],
     [x+DIE_SX/2,y+DIE_SY/2,BASE_Z-.052],
     [x-DIE_SX/2,y+DIE_SY/2,BASE_Z-.052]
-  ],'#1d383a',57/255*alpha*shadowAlpha*.72);
+  ],'#1d383a',57/255*alpha*shadowAlpha);
   box(d,x,y,DIE_SX+.08,DIE_SY+.07,BASE_Z+rise,BASE_H,
     '#C7A575','#8E6943','#AE8557',alpha);
   contacts(d,x,y,BASE_Z+rise,alpha);
