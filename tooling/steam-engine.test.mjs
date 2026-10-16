@@ -6,6 +6,12 @@ import {steamAtFrame,CRANK_X,CRANK_RADIUS,CONNECTING_ROD,
   '../animations/steam-engine/web/src/steam-model.ts';
 import {governorAtFrame,GOVERNOR_START_FRAME,loadReliefAt,NOMINAL_ANGLE} from
   '../animations/steam-engine/web/src/governor-model.ts';
+import {GOV_X,GOV_Z,THROTTLE_X,THROTTLE_Y,THROTTLE_Z,THROTTLE_LEFT,THROTTLE_RIGHT,
+  INLET_PORT,EXHAUST_PORT,BOILER_TO_VALVE,VALVE_TO_CYLINDER,
+  CYLINDER_TO_EXHAUST,throttleLinkage} from
+  '../animations/steam-engine/web/src/steam-plumbing.ts';
+import {pipeSections} from '../animations/steam-engine/web/src/pipe-path.ts';
+import {cameraPose} from '../animations/steam-engine/web/src/camera-path.ts';
 
 test('20-second runtime and crank / piston / connecting rod stay linked',()=>{
   assert.equal(DURATION,600);
@@ -78,76 +84,77 @@ test('steam piston and governor spindle use shared integrated crank phase',()=>{
   assert.notEqual(a.governor.spindlePhase,b.governor.spindlePhase);
 });
 
-test('scene places governor beside flywheel and valve inline in feed, never isolated',()=>{
+test('bare cylinder has exactly two embedded side ports and no valve chest',()=>{
   const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
-  assert.match(src,/const GOV_X = 1\.72/);
-  assert.match(src,/const THROTTLE_X = \.12/);
-  assert.match(src,/const GovernorDrive/);
-  assert.match(src,/const valveLinkEnd/);
+  assert.match(src,/const CylinderPorts/);
+  assert.match(src,/<CylinderPorts\/>/);
+  assert.doesNotMatch(src,/ValveAssembly|spoolX|valveLinkEnd|rockerAngle/);
   assert.match(src,/const GovernorThrottle/);
-  assert.match(src,/\[\[\.78,4\.28,\-\.78\]/);
-  assert.doesNotMatch(src,/const GOV_X = 4\.82/);
-  assert.doesNotMatch(src,/18\.2\)\/2\.1/);
+  assert.match(src,/const GovernorDrive/);
+  for(const p of [INLET_PORT,EXHAUST_PORT]){
+    assert.ok(p[0]>CYLINDER_LEFT&&p[0]<CYLINDER_RIGHT);
+    assert.ok(Math.abs(Math.hypot(p[1],p[2])-1.10)<.01,
+      'port must physically enter the cylinder surface (no detached fitting)');
+  }
+  assert.deepEqual(VALVE_TO_CYLINDER.at(-1),INLET_PORT);
+  assert.deepEqual(CYLINDER_TO_EXHAUST[0],EXHAUST_PORT);
+  assert.deepEqual(BOILER_TO_VALVE.at(-1),[THROTTLE_RIGHT,THROTTLE_Y,THROTTLE_Z]);
+  assert.deepEqual(VALVE_TO_CYLINDER[0],[THROTTLE_LEFT,THROTTLE_Y,THROTTLE_Z]);
 });
 
-test('steam delivery and exhaust are connected and teaching text is 3D-anchored',()=>{
-  const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
-  assert.match(src,/\[right,THROTTLE_Y,THROTTLE_Z\]/);
-  assert.match(src,/\[left,THROTTLE_Y,THROTTLE_Z\]/);
-  assert.match(src,/cylinderGeometry args=\{\[\.175,\.175,\.56/);
-  assert.match(src,/\[\-3\.24,3\.08,\-\.88\]/);
-  assert.match(src,/const projectOnCanvas/);
-  assert.match(src,/const TeachingCallout/);
-  assert.match(src,/data-anchor-x/);
-  assert.match(src,/cameraPose\(s\.time\)/);
-  assert.match(src,/cameraPose\(t\)/);
-  assert.doesNotMatch(src,/title:'转快，重锤张开'/);
-});
-
-import {pipeSections} from '../animations/steam-engine/web/src/pipe-path.ts';
-import {cameraPose} from '../animations/steam-engine/web/src/camera-path.ts';
-
-test('every steam inlet and exhaust elbow is tangent-connected without gaps',()=>{
-  const paths=[
-    [[.78,4.28,-.78],[.78,2.70,-.78],
-      [.78,2.33,-.28],[.40,2.33,-.28]],
-    [[-.16,2.33,-.28],[-1.90,2.33,-.28],
-      [-2.12,2.19,-.10],[-2.12,1.82,-.10]],
-    [[-1.16,1.76,-.13],[-1.16,2.06,-.88],
-      [-3.24,2.06,-.88],[-3.24,3.08,-.88]],
-  ];
-  for(const points of paths){
+test('intake, outlet and exhaust pipes use continuous tangent-connected elbows',()=>{
+  for(const points of [BOILER_TO_VALVE,VALVE_TO_CYLINDER,CYLINDER_TO_EXHAUST]){
     const sections=pipeSections(points,.25);
     assert.deepEqual(sections[0].start,points[0]);
     assert.deepEqual(sections.at(-1).end,points.at(-1));
     assert.ok(sections.some(s=>s.kind==='elbow'));
     for(let i=1;i<sections.length;i++){
       assert.deepEqual(sections[i-1].end,sections[i].start,
-        'Tube segments must share exactly identical 3D joint vertices');
+        'pipe joints must share EXACTLY matching 3D endpoints');
     }
-    for(const section of sections){
-      assert.ok(Math.hypot(...section.start.map((x,i)=>x-section.end[i]))>0);
-      if(section.kind==='elbow'){
-        const entering=section.control.map((x,i)=>x-section.start[i]);
-        const leaving=section.end.map((x,i)=>x-section.control[i]);
-        assert.ok(Math.hypot(...entering)>0);
-        assert.ok(Math.hypot(...leaving)>0);
-      }
+    for(const part of sections){
+      assert.ok(Math.hypot(...part.end.map((x,i)=>x-part.start[i]))>0);
     }
   }
 });
 
-test('governor stands in front of intake pipe, supported by a longer axle and bed',()=>{
+test('governor sleeve drives a rigid constant-length yoke and sliding gate',()=>{
+  let originalLength=null;
+  let originalElevation=null;
+  for(let frame=0;frame<600;frame++){
+    const {sleeveY}=governorAtFrame(frame);
+    const {collarPin,valvePin,gateBottom,gateTop,gateCenter}=throttleLinkage(sleeveY);
+    assert.equal(collarPin[1],sleeveY);
+    assert.equal(valvePin[1],sleeveY);
+    assert.equal(collarPin[0],GOV_X-.21);
+    assert.equal(collarPin[2],GOV_Z);
+    assert.deepEqual([valvePin[0],valvePin[2]],[THROTTLE_X,THROTTLE_Z]);
+    const length=Math.hypot(...valvePin.map((x,i)=>x-collarPin[i]));
+    if(originalLength===null) originalLength=length;
+    if(originalElevation===null) originalElevation=gateCenter[1]-sleeveY;
+    assert.ok(Math.abs(length-originalLength)<1e-12,'linkage must NEVER stretch');
+    assert.ok(Math.abs(gateCenter[1]-sleeveY-originalElevation)<1e-12);
+    assert.ok(Math.abs(gateTop[1]-gateBottom[1]-.70)<1e-12);
+  }
+  const normal=throttleLinkage(governorAtFrame(225).sleeveY);
+  const fast=throttleLinkage(governorAtFrame(360).sleeveY);
+  assert.ok(normal.gateTop[1]<THROTTLE_Y-.12,
+    'normal gate must retract clear of the steam inlet bore');
+  assert.ok(fast.gateBottom[1]<THROTTLE_Y-.12
+    && fast.gateTop[1]>THROTTLE_Y+.12,
+    'overspeed gate must visibly cover the entire intake bore');
+  assert.ok(fast.gateCenter[1]>normal.gateCenter[1]+.7);
+  assert.ok(governorAtFrame(360).throttle<governorAtFrame(225).throttle-.38);
+});
+
+test('throttle uses a straight stem through a housing, not a rotating disc on a wrong axle',()=>{
   const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
-  assert.match(src,/const GOV_Z = 1\.20/);
-  assert.match(src,/from=\{\[CRANK_X, 0, -1\.02\]\} to=\{\[CRANK_X, 0, 1\.48\]\}/);
-  assert.match(src,/boxGeometry args=\{\[8\.90, \.20, 3\.70\]\}/);
-  assert.doesNotMatch(src,/new THREE\.CatmullRomCurve3/);
+  assert.match(src,/from=\{link\.valvePin\} to=\{link\.gateTop\}/);
+  assert.match(src,/position=\{link\.gateCenter\}/);
+  assert.match(src,/from=\{linkage\.collarPin\} to=\{linkage\.valvePin\}/);
+  assert.doesNotMatch(src,/governorValveAngle|valveLinkEnd|<ValveAssembly/);
   assert.match(src,/new THREE\.CurvePath<THREE\.Vector3>/);
   assert.match(src,/new THREE\.QuadraticBezierCurve3/);
-  // In this camera's forward (+z) direction, the flyweights stay well
-  // ahead of the main steam pipes, including while spinning outward.
-  assert.ok(1.20-.88 > -.28+.12);
 });
 
 test('camera genuinely orbits in yaw AND pitch, rather than translating alone',()=>{
@@ -179,12 +186,12 @@ test('teaching callouts never chase spinning flyweights or flywheel spokes',()=>
     'a subtle visible orbit trace must expose changing flyball radius');
 });
 
-test('valve chest contrasts with background, and copper/blue piping stays separate',()=>{
+test('single gate valve and two separated colored pipes are the only steam accessories',()=>{
   const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
-  assert.match(src,/color="#91aebb"/);
-  assert.match(src,/color="#5d7c8d"/);
-  assert.match(src,/color="#a2bbc6"/);
-  assert.match(src,/\[\[\.78,4\.28,-\.78\]/);
-  assert.match(src,/\[\[-1\.16,1\.76,-\.13\]/);
-  assert.doesNotMatch(src,/\[2\.52,5\.50,-\.75\]/);
+  assert.match(src,/Pipe points=\{BOILER_TO_VALVE\}/);
+  assert.match(src,/Pipe points=\{VALVE_TO_CYLINDER\}/);
+  assert.match(src,/Pipe points=\{CYLINDER_TO_EXHAUST\}/);
+  assert.match(src,/color="#c68a57"/);
+  assert.match(src,/color="#63aabb"/);
+  assert.doesNotMatch(src,/color="#91aebb"|color="#a2bbc6"|ValveAssembly/);
 });
