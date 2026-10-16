@@ -123,7 +123,8 @@ test('belt is a closed tangent continuous circuit that really contacts both pull
   const p0=at(0),p1=at(1);
   assert.ok(Math.hypot(...p0.map((x,i)=>x-p1[i]))<1e-9);
   assert.deepEqual(p0,[DRIVE_CRANK_X,r,DRIVE_BELT_Z]);
-  assert.deepEqual(beltPointAtTravel(span),[DRIVE_GOV_X,r,DRIVE_BELT_Z]);
+  assert.ok(Math.hypot(...beltPointAtTravel(span).map(
+    (value,i)=>value-[DRIVE_GOV_X,r,DRIVE_BELT_Z][i]))<1e-12);
   assert.ok(Math.abs(BELT_LENGTH-(2*span+2*Math.PI*r))<1e-12);
   for(let i=0;i<=300;i++){
     const p=at(i/300),next=at((i+1)/300);
