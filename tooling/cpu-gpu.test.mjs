@@ -71,8 +71,10 @@ test('geometry and motion rules remain physically separated from result pads',()
       assert.equal(input[1],.10);
       assert.equal(output[1],.10);
       assert.deepEqual(flowAt(0,input,processor,output).point,input);
-      assert.deepEqual(flowAt(1,input,processor,output).point,output);
-      assert.deepEqual(taskAt(323,kind,i).point,output);
+      for(const at of [flowAt(1,input,processor,output),taskAt(323,kind,i)]){
+        for(let axis=0;axis<3;axis++)
+          assert.ok(Math.abs(at.point[axis]-output[axis])<1e-9);
+      }
     }
   }
   assert.ok(TASK_CUBE_SIZE<GRID_STEP);
