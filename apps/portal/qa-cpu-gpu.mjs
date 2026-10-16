@@ -1,6 +1,4 @@
-/** Chromium/SwiftShader acceptance: no transparent enclosing compute cube,
- * real shared task motions, perspective dolly and fast yaw/pitch orbit.
- */
+/** Real Chromium/SwiftShader WebGL acceptance of both CPU/GPU workloads. */
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -19,162 +17,154 @@ page.on('pageerror',e=>errors.push(e.message));
 page.on('response',r=>{if(r.status()>=400)errors.push(r.status()+' '+r.url());});
 const readFrame=async()=>Number(await page.getByTestId('frame-readout').textContent());
 const seek=async target=>{
-  const slider=page.getByTestId('frame-slider');
-  await slider.evaluate((el,next)=>{
-    const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
-    set.call(el,String(next));
+  await page.getByTestId('frame-slider').evaluate((el,next)=>{
+    const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+    setter.call(el,String(next));
     el.dispatchEvent(new Event('input',{bubbles:true}));
     el.dispatchEvent(new Event('change',{bubbles:true}));
   },target);
-  await page.waitForFunction(x=>
-    document.querySelector('[data-testid="frame-readout"]')?.textContent===String(x),target);
-  await page.waitForTimeout(170);
+  await page.waitForFunction(target=>
+    document.querySelector('[data-testid="frame-readout"]')?.textContent===String(target),target);
+  await page.waitForTimeout(150);
 };
 try{
   await page.goto(new URL('#/',site).href,{waitUntil:'networkidle'});
-  await page.getByTestId('project-cpu-gpu').waitFor();
   await page.getByTestId('project-cpu-gpu').click();
   assert.equal(new URL(page.url()).hash,'#/cpu-gpu');
   const scene=page.getByTestId('cpu-gpu-native-scene');
   await scene.waitFor();
   assert.equal(await scene.getAttribute('data-renderer'),'react-threejs-webgl');
-  assert.equal(await scene.getAttribute('data-chip-design'),'complete-silicon-top');
   assert.equal(await scene.getAttribute('data-camera-projection'),'perspective');
   assert.equal(Number(await scene.getAttribute('data-camera-fov')),38);
   assert.equal(await page.locator('video').count(),0);
   assert.equal(await scene.locator('img').count(),0);
+  const slider=page.getByTestId('frame-slider');
+  assert.equal(Number(await slider.getAttribute('max')),743);
   const canvas=scene.locator('canvas').first();
   await canvas.waitFor();
   assert.ok(await canvas.evaluate(el=>{
     const gl=el.getContext('webgl2')||el.getContext('webgl');
-    return !!gl&&!gl.isContextLost()&&el.width>=100&&el.height>=100;
-  }),'original Three.js WebGL context required');
-
-  const number=async key=>Number(await scene.getAttribute(key));
-  const image=async(frame,stage,cpu,gpu,cpuWork,gpuWork)=>{
+    return !!gl&&!gl.isContextLost()&&el.width>100&&el.height>100;
+  }),'must render original Three.js WebGL, not video or static images');
+  const num=async key=>Number(await scene.getAttribute(key));
+  const screenshot=async(frame,file='cpu-gpu-'+frame+'.png')=>{
     await seek(frame);
-    assert.equal(await scene.getAttribute('data-workload'),stage);
-    assert.equal(await number('data-task-count'),16);
-    assert.equal(await number('data-cpu-done'),cpu);
-    assert.equal(await number('data-gpu-done'),gpu);
-    assert.equal(await number('data-cpu-working'),cpuWork);
-    assert.equal(await number('data-gpu-working'),gpuWork);
     assert.equal(await scene.locator('span').count(),1);
-    assert.ok(await number('data-camera-zoom')>=35);
-    assert.ok(await number('data-camera-zoom')<=80);
-    assert.ok(await number('data-camera-distance')>10);
-    assert.ok(await number('data-camera-distance')<65);
-    const png=await scene.screenshot({path:resolve(out,'cpu-gpu-orbit-'+frame+'.png')});
-    assert.ok(png.byteLength>6000,'WebGL scene failed at frame '+frame);
+    assert.ok(await num('data-camera-zoom')>=35);
+    assert.ok(await num('data-camera-distance')>10);
+    const png=await scene.screenshot({path:resolve(out,file)});
+    assert.ok(png.byteLength>6000,'blank WebGL scene at frame '+frame);
     return png;
   };
 
-  const start=await image(0,'task',0,0,0,0);
-  const introText=await scene.locator('span').textContent();
-  assert.match(introText,/獨立計算單元/);
-  assert.match(introText,/白色輸入/);
-  assert.match(introText,/藍色結果/);
-  assert.doesNotMatch(introText,/CPU|GPU/);
-  const exampleX=await number('data-example-location');
-  assert.ok(Math.abs(exampleX-await number('data-cpu-location'))>9);
-  const introDistance=await number('data-camera-distance');
-  const introMid=await image(30,'task',0,0,0,0);
-  assert.ok(Buffer.compare(start,introMid)!==0,'neutral arithmetic operation must animate');
-  assert.ok(await number('data-example-dyed')>.2,'cube must change color ABOVE exposed tile');
-  await image(60,'task',0,0,0,0);
-  assert.equal(await number('data-example-progress'),1);
-  assert.equal(await number('data-example-dyed'),1);
+  // Act I: the first rendered frame is ALREADY CPU; no generic single tile.
+  const cpuIntro=await screenshot(0);
+  assert.equal(await scene.getAttribute('data-workload'),'cpu');
+  assert.match(await scene.locator('span').textContent(),/CPU/);
+  assert.doesNotMatch(await scene.locator('span').textContent(),/獨立計算單元|輸入 \+1/);
+  assert.equal(await num('data-original-task-meshes'),32);
+  assert.equal(await num('data-mixed-task-meshes'),0);
+  assert.equal(await num('data-cpu-done'),0);
+  assert.equal(await num('data-gpu-done'),0);
 
-  // The CPU and GPU each receive the identical 16 jobs, not the generic sample.
-  await image(110,'cpu',0,0,4,0);
-  assert.ok(await number('data-camera-distance')>introDistance,
-    'perspective move must pull back when framing all CPU job pads');
-  await image(133,'cpu',4,0,0,0);
-  await image(167,'cpu',8,0,0,0);
-  await image(235,'cpu',16,0,0,0);
+  const original=async(f,stage,cpuDone,gpuDone,cpuWork,gpuWork)=>{
+    const png=await screenshot(f);
+    assert.equal(await scene.getAttribute('data-workload'),stage);
+    assert.equal(await num('data-original-task-meshes'),32);
+    assert.equal(await num('data-mixed-task-meshes'),0);
+    assert.equal(await num('data-task-count'),16);
+    assert.equal(await num('data-cpu-done'),cpuDone);
+    assert.equal(await num('data-gpu-done'),gpuDone);
+    assert.equal(await num('data-cpu-working'),cpuWork);
+    assert.equal(await num('data-gpu-working'),gpuWork);
+    return png;
+  };
+  const cpuWork=await original(14,'cpu',0,0,4,0);
+  assert.notDeepEqual(cpuIntro,cpuWork,'CPU must visibly process from the start');
+  await original(37,'cpu',4,0,0,0);
+  await original(71,'cpu',8,0,0,0);
+  await original(139,'cpu',16,0,0,0);
 
-  // 29 frames = under one second CPU -> GPU, with visible 3D camera orbit.
-  await seek(237);
-  const from={yaw:await number('data-camera-yaw'),pitch:await number('data-camera-pitch')};
-  const before=await scene.screenshot({path:resolve(out,'cpu-gpu-fast-orbit-start.png')});
-  await seek(251);
-  const middle=await scene.screenshot({path:resolve(out,'cpu-gpu-fast-orbit-mid.png')});
-  await seek(266);
-  const to={yaw:await number('data-camera-yaw'),pitch:await number('data-camera-pitch')};
-  const after=await scene.screenshot({path:resolve(out,'cpu-gpu-fast-orbit-end.png')});
-  assert.ok(Math.abs(from.yaw-to.yaw)>.50,'camera yaw must genuinely orbit during transition');
-  assert.ok(Math.abs(from.pitch-to.pitch)>.17,'camera pitch must change during transition');
+  const before=await screenshot(141,'fast-cpu-gpu-start.png');
+  const from={yaw:await num('data-camera-yaw'),pitch:await num('data-camera-pitch')};
+  const middle=await screenshot(155,'fast-cpu-gpu-middle.png');
+  const after=await screenshot(170,'fast-cpu-gpu-end.png');
+  const to={yaw:await num('data-camera-yaw'),pitch:await num('data-camera-pitch')};
+  assert.ok(Math.abs(from.yaw-to.yaw)>.50);
+  assert.ok(Math.abs(from.pitch-to.pitch)>.17);
   assert.ok(Buffer.compare(before,middle)!==0&&Buffer.compare(middle,after)!==0,
-    'fast transition needs visible intermediary 3D frames, not a static cut');
-  await image(293,'gpu',16,0,0,16);
-  await image(322,'gpu',16,16,0,0);
-  await image(370,'compare',16,16,0,0);
-  await image(419,'compare',16,16,0,0);
-  assert.ok(await number('data-camera-distance')>introDistance*1.8,
-    'final two-chip framing must come from a real 3D dolly, not orthographic zoom');
+    'the perspective camera must actually orbit');
 
-  // The FIRST 420 frames stay intact; at frame 420 a second, independently
-  // animated set of 16 mixed geometry tasks enters the very same ThreeCanvas.
-  const firstActLastCamera={
-    zoom:await number('data-camera-zoom'),
-    x:await number('data-cpu-location'),
-    yaw:await number('data-camera-yaw'),
-    pitch:await number('data-camera-pitch'),
-    distance:await number('data-camera-distance'),
+  await original(197,'gpu',16,0,0,16);
+  await original(226,'gpu',16,16,0,0);
+  await original(274,'compare',16,16,0,0);
+  const priorLastVisible=await original(309,'compare',16,16,0,0);
+  const priorGone=await original(323,'compare',16,16,0,0);
+  assert.notDeepEqual(priorLastVisible,priorGone,
+    'old 16+16 results should fade out BEFORE the next scene');
+  const previousCamera={
+    zoom:await num('data-camera-zoom'),
+    yaw:await num('data-camera-yaw'),
+    pitch:await num('data-camera-pitch'),
+    distance:await num('data-camera-distance'),
   };
-  const mixedImage=async(f,stage,cpuDone,gpuDone,cpuWork,gpuWork,idle)=>{
-    await seek(f);
+
+  // Act II: all 32 old TaskCube meshes have been unmounted, not just hidden.
+  const mixed=async(f,stage,cpuDone,gpuDone,cpuWork,gpuWork,idle)=>{
+    const png=await screenshot(f,'cpu-gpu-mixed-'+f+'.png');
     assert.equal(await scene.getAttribute('data-workload'),stage);
-    assert.equal(await number('data-mixed-task-count'),16);
-    assert.equal(await number('data-mixed-cpu-done'),cpuDone);
-    assert.equal(await number('data-mixed-gpu-done'),gpuDone);
-    assert.equal(await number('data-mixed-cpu-working'),cpuWork);
-    assert.equal(await number('data-mixed-gpu-working'),gpuWork);
-    if(idle!==undefined)assert.equal(await number('data-mixed-gpu-idle'),idle);
-    assert.equal(await scene.locator('span').count(),1);
-    const png=await scene.screenshot({
-      path:resolve(out,'cpu-gpu-mixed-'+f+'.png'),
-    });
-    assert.ok(png.byteLength>6000,'mixed WebGL stage failed '+f);
+    assert.equal(await num('data-original-task-meshes'),0,
+      'old blue cubes must not still be in the second workload');
+    assert.equal(await num('data-mixed-task-meshes'),32,
+      'only the new 4-shape tasks may be mounted');
+    assert.equal(await num('data-mixed-task-count'),16);
+    assert.equal(await num('data-mixed-cpu-done'),cpuDone);
+    assert.equal(await num('data-mixed-gpu-done'),gpuDone);
+    assert.equal(await num('data-mixed-cpu-working'),cpuWork);
+    assert.equal(await num('data-mixed-gpu-working'),gpuWork);
+    if(idle!==undefined)assert.equal(await num('data-mixed-gpu-idle'),idle);
     return png;
   };
-  await mixedImage(420,'mixed-intro',0,0,0,0,0);
-  assert.equal(await number('data-camera-zoom'),firstActLastCamera.zoom);
-  assert.equal(await number('data-camera-yaw'),firstActLastCamera.yaw);
-  assert.equal(await number('data-camera-pitch'),firstActLastCamera.pitch);
-  assert.equal(await number('data-camera-distance'),firstActLastCamera.distance);
-  const newShapes=await mixedImage(460,'mixed-intro',0,0,0,0,0);
-  const cpuChanging=await mixedImage(525,'mixed-cpu',0,0,4,0,0);
-  assert.notDeepEqual(newShapes,cpuChanging);
-  await mixedImage(537,'mixed-cpu',4,0,0,0,0);
-  await mixedImage(585,'mixed-cpu',12,0,0,0,0);
-  await mixedImage(609,'mixed-cpu',16,0,0,0,0);
-  await mixedImage(660,'mixed-gpu',16,0,0,0,0);
-  const divergent=await mixedImage(679,'mixed-gpu',16,0,0,4,12);
-  await mixedImage(701,'mixed-gpu',16,4,0,0,12);
-  await mixedImage(726,'mixed-gpu',16,8,0,0,8);
-  await mixedImage(751,'mixed-gpu',16,12,0,0,4);
-  await mixedImage(776,'mixed-gpu',16,16,0,0,0);
-  const comparison=await mixedImage(839,'mixed-compare',16,16,0,0,0);
-  assert.ok(Buffer.compare(divergent,comparison)!==0);
-  assert.equal(await page.locator('video').count(),0);
+  await mixed(324,'mixed-intro',0,0,0,0,0);
+  assert.equal(await num('data-camera-zoom'),previousCamera.zoom);
+  assert.equal(await num('data-camera-yaw'),previousCamera.yaw);
+  assert.equal(await num('data-camera-pitch'),previousCamera.pitch);
+  assert.equal(await num('data-camera-distance'),previousCamera.distance);
 
-  for(const frame of [59,60,94,95,237,250,266,270,271,331,345,346,377,
-    419,420,431,455,482,485,615,645,657,677,785,828,839]){
-    await seek(frame);
-    if(frame>=60)assert.equal(await number('data-example-progress'),1);
-    const png=await scene.screenshot({path:resolve(out,'cpu-gpu-cut-boundary-'+frame+'.png')});
-    assert.ok(png.byteLength>6000,'blank frame during camera motion');
+  const shapes=await mixed(364,'mixed-intro',0,0,0,0,0);
+  assert.ok(Buffer.compare(priorGone,shapes)!==0,
+    'new mixed shapes must actually appear after clean old-result removal');
+  await mixed(429,'mixed-cpu',0,0,4,0,0);
+  await mixed(441,'mixed-cpu',4,0,0,0,0);
+  await mixed(489,'mixed-cpu',12,0,0,0,0);
+  await mixed(513,'mixed-cpu',16,0,0,0,0);
+  await mixed(564,'mixed-gpu',16,0,0,0,0);
+  await mixed(583,'mixed-gpu',16,0,0,4,12);
+  await mixed(605,'mixed-gpu',16,4,0,0,12);
+  await mixed(630,'mixed-gpu',16,8,0,0,8);
+  await mixed(655,'mixed-gpu',16,12,0,0,4);
+  await mixed(680,'mixed-gpu',16,16,0,0,0);
+  await mixed(743,'mixed-compare',16,16,0,0,0);
+
+  for(const f of [1,45,140,141,155,170,174,175,249,250,
+    300,309,315,322,323,324,325,328,335,348,364,
+    388,389,519,548,549,561,580,581,688,689,732,743]){
+    await seek(f);
+    assert.equal(await num('data-original-task-meshes'),f<324?32:0,
+      'legacy geometry leaked at '+f);
+    assert.equal(await num('data-mixed-task-meshes'),f>=324?32:0);
+    const image=await scene.screenshot({path:resolve(out,'cpu-gpu-boundary-'+f+'.png')});
+    assert.ok(image.byteLength>6000);
   }
 
-  await seek(200);
+  await seek(104);
   await page.getByRole('button',{name:'前进一帧'}).click();
-  assert.equal(await readFrame(),201);
+  assert.equal(await readFrame(),105);
   await page.getByRole('button',{name:'后退一帧'}).click();
-  assert.equal(await readFrame(),200);
+  assert.equal(await readFrame(),104);
   await page.getByTestId('play-toggle').click();
   await page.waitForFunction(()=>
-    Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)>204,
+    Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)>108,
     null,{timeout:10000});
   await page.getByTestId('play-toggle').click();
   await page.waitForTimeout(160);
@@ -184,9 +174,9 @@ try{
   await page.goto(new URL('#/cpu-gpu',site).href,{waitUntil:'networkidle'});
   await scene.waitFor();
   await page.setViewportSize({width:390,height:844});
-  await page.screenshot({path:resolve(out,'cpu-gpu-cinematic-mobile.png'),fullPage:true});
+  await page.screenshot({path:resolve(out,'cpu-gpu-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU 28s WebGL verified: original act I unchanged, 16 mixed shapes, CPU paths, SIMT masked GPU paths, perspective and mobile.');
+  console.log('CPU/GPU 744-frame native WebGL verified: no intro, no leftover objects, two workloads, perspective orbit and mobile');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}

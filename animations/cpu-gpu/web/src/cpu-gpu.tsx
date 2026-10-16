@@ -4,11 +4,11 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {
-  TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,CENTER,GENERIC_X,
+  TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,CENTER,
   cameraAt,completedCount,workingCount,taskAt,stageAt,smooth,
   PERSPECTIVE_FOV,ORIGINAL_FRAMES,shapeAt,
   mixedTaskAt,mixedCompletedCount,mixedWorkingCount,mixedIdleLanes,
-  corePosition,exampleAt,type Kind,type Shape,
+  corePosition,type Kind,type Shape,
 } from './model';
 
 const WHITE='#e7e6e1';
@@ -52,37 +52,6 @@ const Camera:React.FC<{frame:number}>=({frame})=>{
     camera.updateProjectionMatrix();
   },[camera,frame]);
   return null;
-};
-
-/** 
- * The generic unit is an EXPOSED, opaque arithmetic tile just like every
- * CPU/GPU core. Its white input glides ABOVE the top and changes blue while
- * on the tile. The previous translucent 1.96×0.71×1.96 casing submerged
- * the result cube and made the example look completely different.
- */
-const GenericArithmeticUnit:React.FC<{frame:number}>=({frame})=>{
-  const state=exampleAt(frame);
-  const inside=smooth((state.progress-.27)/.13)*
-    (1-smooth((state.progress-.60)/.12));
-  const shade=new THREE.Color(WHITE).lerp(new THREE.Color(BLUE),state.dyed);
-  const activity=state.phase==='processing';
-  const pos:Vec=[state.point[0],state.point[1]-.20*inside,state.point[2]];
-  return <group position={[GENERIC_X,0,0]}>
-    <Block pos={[0,-.32,0]} size={[2.55,.32,2.55]} color="#65757a" metal={.24}/>
-    <Block pos={[0,-.035,0]} size={[2.05,.26,2.05]}
-      color="#9badae" metal={.20}/>
-    <Block pos={[0,.108,0]} size={[1.83,.026,1.83]}
-      color={activity?'#c8b49d':'#b5c1bf'} metal={.13}
-      glow={BLUE} power={activity?.08:.005}/>
-    <Block pos={[-.44,.125,0]} size={[.20,.012,.88]} color="#8e9fa1"/>
-    <Block pos={[.44,.125,0]} size={[.20,.012,.88]} color="#8e9fa1"/>
-    <Block pos={pos}
-      size={[.56*state.coreScale,.56*state.coreScale,.56*state.coreScale]}
-      color={'#'+shade.getHexString()}
-      rotation={[0,state.rotation,0]}/>
-    <Block pos={[-2.55,-.15,0]} size={[1.10,.06,1.10]} color="#c6c5bf"/>
-    <Block pos={[2.55,-.15,0]} size={[1.10,.06,1.10]} color="#a9c6cb"/>
-  </group>;
 };
 
 /** CPU/GPU both have a complete, solid top slab; no cutaway hole or lid. */
@@ -157,9 +126,10 @@ const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
   const state=taskAt(frame,kind,index);
   const p=state.progress;
   const inside=smooth((p-.27)/.13)*(1-smooth((p-.60)/.12));
-  // Act I remains EXACTLY the same through frame 419. Its completed cubes
-  // dissolve during Act II's transition instead of resetting or teleporting.
-  const fade=1-smooth((frame-427)/25);
+  // Complete the clearing BEFORE the next workload is mounted.
+  // The last act-I result is invisible on frame 323, and on frame 324 all
+  // original TaskCube meshes are unmounted, never merely opacity=0.
+  const fade=1-smooth((frame-(ORIGINAL_FRAMES-14))/13);
   const size=TASK_CUBE_SIZE*state.coreScale;
   const pos:Vec=[
     state.point[0],state.point[1]-.20*inside,state.point[2],
@@ -187,7 +157,7 @@ const ShapeGeometry:React.FC<{shape:Shape}>=({shape})=>{
 const MixedTask:React.FC<{kind:Kind;index:number;frame:number}>=
 ({kind,index,frame})=>{
   const state=mixedTaskAt(frame,kind,index);
-  const appear=smooth((frame-431-(index%4)*2-Math.floor(index/4))/24);
+  const appear=smooth((frame-327-(index%4)*2-Math.floor(index/4))/24);
   const shade=new THREE.Color(WHITE)
     .lerp(new THREE.Color('#98a3a5'),state.idle?.56:0)
     .lerp(new THREE.Color(BLUE),state.dyed);
@@ -213,7 +183,7 @@ const Chip:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>
     <Package kind={kind}/>
     {kind==='cpu'?<CpuDie frame={frame}/>:<GpuDie frame={frame}/>}
     <JobStations/>
-    {Array.from({length:TASKS},(_,i)=>(
+    {frame<ORIGINAL_FRAMES&&Array.from({length:TASKS},(_,i)=>(
       <TaskCube key={i} kind={kind} index={i} frame={frame}/>
     ))}
     {frame>=ORIGINAL_FRAMES&&Array.from({length:TASKS},(_,i)=>(
@@ -227,7 +197,6 @@ const World:React.FC<{frame:number}>=({frame})=>(
     <ambientLight intensity={1.55}/>
     <directionalLight position={[-7,16,12]} intensity={2.55} color="#fff7eb"/>
     <directionalLight position={[11,8,-7]} intensity={.78} color="#e4eff2"/>
-    <GenericArithmeticUnit frame={frame}/>
     <Chip kind="cpu" frame={frame}/>
     <Chip kind="gpu" frame={frame}/>
   </>
@@ -235,7 +204,6 @@ const World:React.FC<{frame:number}>=({frame})=>(
 
 const Caption:React.FC<{frame:number}>=({frame})=>{
   const label={
-    task:'獨立計算單元：白色輸入 +1 → 藍色結果',
     cpu:'CPU · 4 個大核心，分 4 批處理同樣的任務',
     gpu:'GPU · 16 個小單元，同時處理同樣的任務',
     compare:'同樣 16 項任務，結果全部離開晶片',
@@ -257,9 +225,6 @@ export const CpuGpuScene:React.FC=()=>{
     data-renderer="react-threejs-webgl"
     data-chip-design="complete-silicon-top"
     data-workload={stageAt(frame)}
-    data-example-progress={exampleAt(frame).progress}
-    data-example-dyed={exampleAt(frame).dyed}
-    data-example-location={GENERIC_X}
     data-cpu-location={CENTER.cpu}
     data-gpu-location={CENTER.gpu}
     data-camera-zoom={cameraAt(frame).zoom}
@@ -269,6 +234,8 @@ export const CpuGpuScene:React.FC=()=>{
     data-camera-yaw={cameraAt(frame).yaw}
     data-camera-pitch={cameraAt(frame).pitch}
     data-task-count={TASKS}
+    data-original-task-meshes={frame<ORIGINAL_FRAMES?TASKS*2:0}
+    data-mixed-task-meshes={frame>=ORIGINAL_FRAMES?TASKS*2:0}
     data-cpu-done={completedCount(frame,'cpu')}
     data-gpu-done={completedCount(frame,'gpu')}
     data-cpu-working={workingCount(frame,'cpu')}
@@ -281,7 +248,7 @@ export const CpuGpuScene:React.FC=()=>{
     data-mixed-gpu-idle={mixedIdleLanes(frame)}
     style={{background:'linear-gradient(#f4f0e7,#e8e2d9)',overflow:'hidden'}}>
     <ThreeCanvas width={1280} height={720}
-      camera={{position:[GENERIC_X+7,12,19],fov:PERSPECTIVE_FOV,near:.1,far:160}}
+      camera={{position:[CENTER.cpu+7,12,19],fov:PERSPECTIVE_FOV,near:.1,far:160}}
       gl={{alpha:true,antialias:true,preserveDrawingBuffer:true}}
       style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
       <World frame={frame}/>
