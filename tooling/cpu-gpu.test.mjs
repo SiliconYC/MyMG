@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {
   DURATION,FPS,TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,
-  GENERIC_X,CENTER,CHIP_HALF,GRID_STEP,
+  GENERIC_X,CENTER,CHIP_HALF,GRID_STEP,INPUT_X,
   stageAt,cameraAt,jobProgress,taskAt,taskPositions,
   completedCount,workingCount,corePosition,exampleAt,
 } from '../animations/cpu-gpu/web/src/model.ts';
@@ -34,6 +34,8 @@ test('a standalone generic arithmetic unit exists BEFORE any CPU/GPU story',()=>
   assert.equal(completedCount(80,'cpu'),0,'example is NOT a CPU task');
   assert.equal(completedCount(80,'gpu'),0,'example is NOT a GPU task');
   assert.ok(CENTER.cpu-GENERIC_X>9,'intro must not be geometrically inside CPU');
+  assert.ok(CENTER.cpu+INPUT_X-GENERIC_X>1280/(2*cameraAt(0).zoom)+.8,
+    'first frame must show only neutral calculator, not the CPU input grid');
 });
 
 test('CPU batches 4; GPU runs 16 in parallel; all results persist',()=>{
