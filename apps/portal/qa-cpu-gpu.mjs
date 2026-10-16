@@ -49,7 +49,7 @@ try{
   const num=async key=>Number(await scene.getAttribute(key));
   const screenshot=async(frame,file='cpu-gpu-'+frame+'.png')=>{
     await seek(frame);
-    assert.equal(await scene.locator('span').count(),1);
+    assert.equal(await scene.getByTestId('cpu-gpu-caption').count(),1);
     assert.ok(await num('data-camera-zoom')>=35);
     assert.ok(await num('data-camera-distance')>10);
     const png=await scene.screenshot({path:resolve(out,file)});
@@ -60,8 +60,15 @@ try{
   // Act I: the first rendered frame is ALREADY CPU; no generic single tile.
   const cpuIntro=await screenshot(0);
   assert.equal(await scene.getAttribute('data-workload'),'cpu');
-  assert.match(await scene.locator('span').textContent(),/CPU/);
-  assert.doesNotMatch(await scene.locator('span').textContent(),/獨立計算單元|輸入 \+1/);
+  assert.match(await scene.getByTestId('cpu-gpu-caption').textContent(),/CPU/);
+  assert.doesNotMatch(await scene.getByTestId('cpu-gpu-caption').textContent(),/獨立計算單元|輸入 \+1/);
+  const title=page.getByTestId('cpu-gpu-story-title');
+  assert.equal(await scene.getAttribute('data-story-beat'),'round-one');
+  assert.equal(await title.getAttribute('data-layout'),'chapter');
+  await screenshot(22,'cpu-gpu-round-one-opening.png');
+  assert.match(await title.textContent(),/同质任务/);
+  assert.match(await title.textContent(),/16 个相同任务/);
+  assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98);
   assert.equal(await num('data-original-task-meshes'),32);
   assert.equal(await num('data-mixed-task-meshes'),0);
   assert.equal(await num('data-cpu-done'),0);
@@ -100,9 +107,11 @@ try{
   await original(274,'compare',16,16,0,0);
   assert.equal(await scene.getAttribute('data-story-beat'),'none');
   const gpuVictory=await original(292,'compare',16,16,0,0);
-  const title=page.getByTestId('cpu-gpu-story-title');
   assert.equal(await scene.getAttribute('data-story-beat'),'gpu-wins');
   assert.equal(await title.getAttribute('data-beat'),'gpu-wins');
+  assert.equal(await title.getAttribute('data-layout'),'verdict');
+  assert.equal(await title.evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)',
+    'winner must not be boxed over the 3D model');
   assert.match(await title.textContent(),/第一轮/);
   assert.match(await title.textContent(),/GPU 胜出/);
   assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
@@ -137,6 +146,7 @@ try{
   await mixed(324,'mixed-intro',0,0,0,0,0);
   assert.equal(await scene.getAttribute('data-story-beat'),'round-two');
   assert.equal(await title.getAttribute('data-beat'),'round-two');
+  assert.equal(await title.getAttribute('data-layout'),'chapter');
   assert.match(await title.textContent(),/第二轮/);
   assert.match(await title.textContent(),/16 个混合任务/);
   assert.equal(await num('data-camera-zoom'),previousCamera.zoom);
@@ -149,7 +159,7 @@ try{
   assert.equal(await veil.getAttribute('data-active'),'true');
   assert.ok(await num('data-handover-opacity')>.8);
   await mixed(342,'mixed-intro',0,0,0,0,0);
-  assert.match(await title.textContent(),/方块 · 球体 · 四面体 · 圆柱/);
+  assert.match(await title.textContent(),/形状不同 · 分支各异/);
   assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
     'round-two intertitle must appear while mixed shapes arrive');
   assert.equal(await num('data-original-task-meshes'),0);
@@ -171,6 +181,7 @@ try{
   const cpuVictory=await mixed(722,'mixed-compare',16,16,0,0,0);
   assert.equal(await scene.getAttribute('data-story-beat'),'cpu-wins');
   assert.equal(await title.getAttribute('data-beat'),'cpu-wins');
+  assert.equal(await title.getAttribute('data-layout'),'verdict');
   assert.match(await title.textContent(),/第二轮/);
   assert.match(await title.textContent(),/CPU 胜出/);
   assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
@@ -178,8 +189,8 @@ try{
   assert.notDeepEqual(gpuVictory,cpuVictory);
   await mixed(743,'mixed-compare',16,16,0,0,0);
 
-  for(const f of [1,45,140,141,155,170,174,175,249,250,
-    280,292,300,309,315,319,320,322,323,324,325,328,335,348,364,375,376,
+  for(const f of [1,13,22,45,54,55,56,140,141,155,170,174,175,249,250,
+    274,280,292,300,309,315,319,320,322,323,324,325,328,335,348,364,375,376,379,380,
     388,389,519,548,549,561,580,581,688,689,700,712,732,743]){
     await seek(f);
     assert.equal(await num('data-original-task-meshes'),f<324?32:0,
