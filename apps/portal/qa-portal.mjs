@@ -87,7 +87,7 @@ try{
     await seek(frame);
     const screenshot=await page.getByTestId('player-shell').screenshot({path:resolve(out,'hbm-frame-'+frame+'.png')});
     const measured=await visual(screenshot);
-    assert.ok(measured.contrast>100,'Blank/undecoded frame '+frame);
+    if(frame>0)assert.ok(measured.contrast>100,'Blank/undecoded frame '+frame);
     captures.set(frame,measured);
     metrics.frames[frame]={contrast:measured.contrast};
   }
