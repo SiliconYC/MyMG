@@ -6,8 +6,9 @@ import * as THREE from 'three';
 import {
   TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,CENTER,GENERIC_X,
   cameraAt,completedCount,workingCount,taskAt,stageAt,smooth,
-  PERSPECTIVE_FOV,
-  corePosition,exampleAt,type Kind,
+  PERSPECTIVE_FOV,ORIGINAL_FRAMES,shapeAt,
+  mixedTaskAt,mixedCompletedCount,mixedWorkingCount,mixedIdleLanes,
+  corePosition,exampleAt,type Kind,type Shape,
 } from './model';
 
 const WHITE='#e7e6e1';
@@ -111,7 +112,9 @@ const CpuDie:React.FC<{frame:number}>=({frame})=><group>
   {Array.from({length:CPU_CORES},(_,i)=>{
     const [x,,z]=corePosition('cpu',i);
     const active=Array.from({length:TASKS},(_,t)=>t).some(t=>
-      t%CPU_CORES===i&&taskAt(frame,'cpu',t).phase==='processing');
+      t%CPU_CORES===i&&
+      (frame<ORIGINAL_FRAMES?taskAt(frame,'cpu',t).phase==='processing':
+        mixedTaskAt(frame,'cpu',t).active));
     return <group key={i}>
       <Block pos={[x,-.003,z]} size={[2.02,.12,2.03]}
         color="#997e69" metal={.29}/>
@@ -127,12 +130,15 @@ const CpuDie:React.FC<{frame:number}>=({frame})=><group>
 const GpuDie:React.FC<{frame:number}>=({frame})=><group>
   {Array.from({length:GPU_LANES},(_,i)=>{
     const [x,,z]=corePosition('gpu',i);
-    const active=taskAt(frame,'gpu',i).phase==='processing';
+    const active=frame<ORIGINAL_FRAMES?
+      taskAt(frame,'gpu',i).phase==='processing':
+      mixedTaskAt(frame,'gpu',i).active;
+    const idle=frame>=ORIGINAL_FRAMES&&mixedTaskAt(frame,'gpu',i).idle;
     return <group key={i}>
       <Block pos={[x,-.003,z]} size={[.89,.105,1.02]}
         color="#547886" metal={.25}/>
       <Block pos={[x,.058,z]} size={[.77,.020,.89]}
-        color={active?'#b0d8df':'#8aabb4'} metal={.16}
+        color={active?'#b0d8df':idle?'#5b777e':'#8aabb4'} metal={.16}
         glow={GPU} power={active?.20:.005}/>
     </group>;
   })}
@@ -151,13 +157,55 @@ const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
   const state=taskAt(frame,kind,index);
   const p=state.progress;
   const inside=smooth((p-.27)/.13)*(1-smooth((p-.60)/.12));
+  // Act I remains EXACTLY the same through frame 419. Its completed cubes
+  // dissolve during Act II's transition instead of resetting or teleporting.
+  const fade=1-smooth((frame-427)/25);
   const size=TASK_CUBE_SIZE*state.coreScale;
   const pos:Vec=[
     state.point[0],state.point[1]-.20*inside,state.point[2],
   ];
   const color=new THREE.Color(WHITE).lerp(new THREE.Color(BLUE),state.dyed);
   return <Block pos={pos} size={[size,size,size]}
-    color={'#'+color.getHexString()} rotation={[0,state.rotation,0]}/>;
+    color={'#'+color.getHexString()} rotation={[0,state.rotation,0]}
+    opacity={fade}/>;
+};
+
+
+/** One shared silhouette palette: 4 cubes, spheres, tetrahedra and cylinders. */
+const ShapeGeometry:React.FC<{shape:Shape}>=({shape})=>{
+  if(shape==='sphere')return <sphereGeometry args={[.30,18,12]}/>;
+  if(shape==='tetrahedron')return <tetrahedronGeometry args={[.42,0]}/>;
+  if(shape==='cylinder')return <cylinderGeometry args={[.265,.265,.56,16]}/>;
+  return <boxGeometry args={[.53,.53,.53]}/>;
+};
+
+/**
+ * Four shapes stand for four DIFFERENT execution branches. All geometry
+ * remains in one ThreeCanvas; task positions are evaluated from the frame,
+ * so seeking and restarting reproduce the exact same shot.
+ */
+const MixedTask:React.FC<{kind:Kind;index:number;frame:number}>=
+({kind,index,frame})=>{
+  const state=mixedTaskAt(frame,kind,index);
+  const appear=smooth((frame-431-(index%4)*2-Math.floor(index/4))/24);
+  const shade=new THREE.Color(WHITE)
+    .lerp(new THREE.Color('#98a3a5'),state.idle?.56:0)
+    .lerp(new THREE.Color(BLUE),state.dyed);
+  const scale=appear*state.coreScale;
+  return <mesh
+    position={[
+      state.point[0],
+      state.point[1]+.78*(1-appear),
+      state.point[2],
+    ]}
+    scale={[scale,scale,scale]}
+    rotation={[.06,state.rotation,shapeAt(index)==='tetrahedron'?.19:0]}>
+    <ShapeGeometry shape={shapeAt(index)}/>
+    <meshStandardMaterial color={'#'+shade.getHexString()}
+      metalness={.08} roughness={.46}
+      emissive={state.active?BLUE:'#000000'}
+      emissiveIntensity={state.active?.14:0}/>
+  </mesh>;
 };
 
 const Chip:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>
@@ -167,6 +215,9 @@ const Chip:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>
     <JobStations/>
     {Array.from({length:TASKS},(_,i)=>(
       <TaskCube key={i} kind={kind} index={i} frame={frame}/>
+    ))}
+    {frame>=ORIGINAL_FRAMES&&Array.from({length:TASKS},(_,i)=>(
+      <MixedTask key={i} kind={kind} index={i} frame={frame}/>
     ))}
   </group>;
 
@@ -188,6 +239,10 @@ const Caption:React.FC<{frame:number}>=({frame})=>{
     cpu:'CPU · 4 個大核心，分 4 批處理同樣的任務',
     gpu:'GPU · 16 個小單元，同時處理同樣的任務',
     compare:'同樣 16 項任務，結果全部離開晶片',
+    'mixed-intro':'第二輪 · 16 項不同任務，四種形狀',
+    'mixed-cpu':'CPU · 4 個獨立核心，各自處理不同分支',
+    'mixed-gpu':'GPU · 同組分支不一致，部分通道需要等待',
+    'mixed-compare':'同樣 16 項任務 · 優勢取決於工作負載',
   }[stageAt(frame)];
   return <div aria-hidden="true" style={{
     position:'absolute',top:56,left:62,pointerEvents:'none',
@@ -218,6 +273,12 @@ export const CpuGpuScene:React.FC=()=>{
     data-gpu-done={completedCount(frame,'gpu')}
     data-cpu-working={workingCount(frame,'cpu')}
     data-gpu-working={workingCount(frame,'gpu')}
+    data-mixed-task-count={frame>=ORIGINAL_FRAMES?TASKS:0}
+    data-mixed-cpu-done={mixedCompletedCount(frame,'cpu')}
+    data-mixed-gpu-done={mixedCompletedCount(frame,'gpu')}
+    data-mixed-cpu-working={mixedWorkingCount(frame,'cpu')}
+    data-mixed-gpu-working={mixedWorkingCount(frame,'gpu')}
+    data-mixed-gpu-idle={mixedIdleLanes(frame)}
     style={{background:'linear-gradient(#f4f0e7,#e8e2d9)',overflow:'hidden'}}>
     <ThreeCanvas width={1280} height={720}
       camera={{position:[GENERIC_X+7,12,19],fov:PERSPECTIVE_FOV,near:.1,far:160}}
