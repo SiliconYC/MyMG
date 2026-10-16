@@ -62,6 +62,14 @@ const CpuGpuArtwork: React.FC = () => (
   </div>
 );
 
+const AutomaticArtwork: React.FC = () => (
+  <div className="artwork artwork-automatic" aria-hidden="true">
+    <div className="auto-stock"/><div className="auto-body"/>
+    <div className="auto-bolt"/><div className="auto-barrel"/>
+    <div className="auto-mag"/><div className="auto-grip"/>
+  </div>
+);
+
 const ProjectCard: React.FC<{project: MgProject; index: number}> = ({project, index}) => (
   <a className="project-card" href={`#/${encodeURIComponent(project.id)}`} data-testid={`project-${project.id}`}>
     <div className="project-art">
@@ -69,6 +77,7 @@ const ProjectCard: React.FC<{project: MgProject; index: number}> = ({project, in
         project.cover?.type === 'clock' ? <ClockArtwork /> :
         project.cover?.type === 'steam' ? <SteamArtwork /> :
         project.cover?.type === 'cpu-gpu' ? <CpuGpuArtwork /> :
+        project.cover?.type === 'automatic-fire' ? <AutomaticArtwork /> :
         project.cover?.type === 'image' ?
           <img className="artwork-cover" src={project.cover.src} alt={project.cover.alt} loading="lazy" /> :
           <div className="artwork artwork-placeholder" aria-hidden="true">

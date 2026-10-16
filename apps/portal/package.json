@@ -14,6 +14,7 @@
     "qa:cpu-gpu": "node qa-cpu-gpu.mjs"
   },
   "dependencies": {
+    "@mymg/automatic-fire": "workspace:*",
     "@mymg/cpu-gpu": "workspace:*",
     "@mymg/demo": "workspace:*",
     "@mymg/hbm": "workspace:*",
