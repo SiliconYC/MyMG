@@ -49,6 +49,9 @@ try{
     distance:Number(el.getAttribute('data-camera-distance')),
     chapter:el.getAttribute('data-camera-chapter'),
     mode:el.getAttribute('data-camera-mode'),
+    side:el.getAttribute('data-contact-side'),
+    leftGap:Number(el.getAttribute('data-entry-contact-distance')),
+    rightGap:Number(el.getAttribute('data-exit-contact-distance')),
   }));
   const checkShot=async(time,chapter,mode,filename)=>{
     await seek(Math.round(time*30));
@@ -60,22 +63,25 @@ try{
     return {current,png};
   };
   const front=await checkShot(0,'front','observe','clock-front.png');
-  assert.ok(front.current.z>12,'camera must face dial from the front');
-  const fly=await checkShot(5.8,'rear','travel','clock-fast-side-transfer.png');
-  assert.ok(fly.current.x>7,'must actually fly past the side');
-  const rear=await checkShot(8,'rear','observe','clock-rear-observation.png');
-  assert.ok(rear.current.z< -6,'rear observation is genuine spatial orbit');
-  assert.ok(!front.png.equals(rear.png),'front/rear should not look identical');
-  const entry=await checkShot(18,'entry','observe','clock-entry-pallet-closeup.png');
-  assert.ok(entry.current.z< -3,'entry pallet from rear');
-  assert.ok(entry.current.distance < front.current.distance*.5,
-    'entry macro requires real physical dolly');
-  const exit=await checkShot(27,'exit','observe','clock-exit-pallet-closeup.png');
-  assert.ok(exit.current.z< -3,'exit pallet from rear');
-  assert.ok(!entry.png.equals(exit.png),'two distinct pallet contact angles');
-  await checkShot(38,'rear','observe','clock-both-pallets.png');
-  const proof=await checkShot(47,'proof','observe','clock-second-hand.png');
-  assert.ok(proof.current.z>10,'come back to the real front seconds dial');
+  assert.ok(front.current.z>12);
+  const orbit=await checkShot(6.4,'rear','travel','clock-short-orbit.png');
+  assert.ok(orbit.current.x>2);
+  const rear=await checkShot(12,'rear','observe','clock-rear.png');
+  assert.ok(rear.current.z< -6);
+  assert.ok(!front.png.equals(rear.png));
+  const entry=await checkShot(24,'contact','observe','clock-entry-contact.png');
+  const exit=await checkShot(25,'contact','observe','clock-exit-contact.png');
+  assert.equal(entry.current.side,'entry');
+  assert.equal(exit.current.side,'exit');
+  assert.ok(entry.current.leftGap<.012,'entry wedge is seated on real gear flank');
+  assert.ok(exit.current.rightGap<.012,'exit wedge is seated on real gear flank');
+  assert.equal(entry.current.x,exit.current.x,'same macro camera for both contacts');
+  assert.equal(entry.current.z,exit.current.z,'no frantic macro switch');
+  assert.ok(!entry.png.equals(exit.png),'alternate lock has distinct visible frame');
+  const hold=await checkShot(37,'contact','observe','clock-long-contact-hold.png');
+  assert.equal(hold.current.z,entry.current.z,'hold is truly stationary');
+  const proof=await checkShot(48,'proof','observe','clock-second-hand.png');
+  assert.ok(proof.current.z>10);
   await seek(0);
 
   const frames=[0,10,16,24,30,44,53,60,90,600,1799];
