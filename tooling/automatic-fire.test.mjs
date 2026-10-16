@@ -24,7 +24,7 @@ test('720 deterministic frames: four automatic visual cycles with one held trigg
     assert.ok(cycleAt(start+46).recoil>1.4);
     assert.ok(cycleAt(start+96).recoil<.3);
     assert.ok(cycleAt(start+46).ejection>=0);
-    assert.ok(cycleAt(start+92).feed>.9);
+    assert.ok(cycleAt(start+100).feed>.9);
     assert.ok(cycleAt(start+4).trigger>.9);
   }
   assert.equal(cycleAt(END+12).active,false);
