@@ -24,7 +24,7 @@ export const stageAt = (frame: number): Stage =>
 export const cameraAt = (frame: number) => ({
   focusX: -5.4 + 10.8 * smooth((frame - 134) / 43)
     - 5.4 * smooth((frame - 287) / 45),
-  zoom: 85 - 38 * smooth((frame - 287) / 45),
+  zoom: 95 - 48 * smooth((frame - 287) / 45),
 });
 
 /** CPU: each large independent core takes its own turn. */
