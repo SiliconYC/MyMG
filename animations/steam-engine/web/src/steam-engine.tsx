@@ -370,6 +370,12 @@ const GovernorThrottle:React.FC<{s:SteamFrame}>=({s})=>{
       <boxGeometry args={[.075,.70,.31]}/>
       <meshStandardMaterial color="#e6b878" metalness={.78} roughness={.28}/>
     </mesh>
+    {/* Short valve bonnet encloses the upward-running gate at overspeed. */}
+    <mesh position={[THROTTLE_X,THROTTLE_Y+.29,THROTTLE_Z]}>
+      <cylinderGeometry args={[.14,.14,.55,24,1,true]}/>
+      <meshStandardMaterial color="#a0bac0" metalness={.49} roughness={.34}
+        transparent opacity={.28} side={THREE.DoubleSide} depthWrite={false}/>
+    </mesh>
   </group>;
 };
 
@@ -481,7 +487,7 @@ const TEACHING_BEATS = [
   {start:5.42,end:7.23,part:'belt',lines:['飞轮带动皮带','调速器跟着转动']},
   {start:7.26,end:10.73,part:'balls',lines:['转速升高','两颗重锤向外张开']},
   {start:10.77,end:13.31,part:'sleeve',lines:['重锤张开，套筒上升','进汽阀门被直接带动']},
-  {start:13.35,end:16.26,part:'valve',lines:['阀片升起，进汽减少','发动机开始减速']},
+  {start:13.35,end:16.26,part:'valve',lines:['节流阀片升起，进汽减少','发动机开始减速']},
   {start:16.30,end:19.72,part:'flywheel',lines:['转速降低后，重锤收回','系统自动恢复稳定']},
 ] as const;
 
@@ -554,6 +560,12 @@ export const SteamEngineScene: React.FC = () => {
     data-governor-angle={s.governor.angle.toFixed(4)}
     data-governor-sleeve={s.governor.sleeveY.toFixed(4)}
     data-governor-throttle={s.governor.throttle.toFixed(4)}
+    data-gate-y={throttleLinkage(s.governor.sleeveY).gateCenter[1].toFixed(4)}
+    data-yoke-length={Math.hypot(
+      ...throttleLinkage(s.governor.sleeveY).collarPin.map(
+        (v,i)=>v-throttleLinkage(s.governor.sleeveY).valvePin[i]
+      )
+    ).toFixed(4)}
     data-camera-shift={smoothstep((s.time-4.80)/.53).toFixed(4)}
     data-governor-x={GOV_X.toFixed(2)}
     data-governor-z={GOV_Z.toFixed(2)}
