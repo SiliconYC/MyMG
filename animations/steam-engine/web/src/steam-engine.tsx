@@ -349,7 +349,7 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
       <meshStandardMaterial color="#e4bc7e" metalness={.8} roughness={.25}/>
     </mesh>
     <Rod from={linkage.collarPin} to={linkage.valvePin}
-      radius={.049} color="#c9d0d0"/>}
+      radius={.049} color="#c9d0d0"/>
   </group>;
 };
 
@@ -385,8 +385,6 @@ const GovernorThrottle:React.FC<{s:SteamFrame}>=({s})=>{
       <torusGeometry args={[.075,.030,10,28]}/>
       <meshStandardMaterial color="#b8c8c9" metalness={.75} roughness={.34}/>
     </mesh>
-    <Rod from={link.valvePin} to={link.gateTop}
-      radius={.034} color="#d9c8a7"/>
     <mesh position={link.gateCenter} castShadow>
       <boxGeometry args={[.075,.70,.31]}/>
       <meshStandardMaterial color="#e6b878" metalness={.78} roughness={.28}/>
