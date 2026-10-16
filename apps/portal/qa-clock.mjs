@@ -43,33 +43,39 @@ try{
     return !!gl && !gl.isContextLost() && el.width>0 && el.height>0;
   });
   assert.ok(webgl,'Working Three.js WebGL canvas required');
-  const front=await scene.screenshot({path:resolve(out,'cinematic-front.png')});
   const camera=async()=>scene.evaluate(el=>({
     x:Number(el.getAttribute('data-camera-x')),
     z:Number(el.getAttribute('data-camera-z')),
     distance:Number(el.getAttribute('data-camera-distance')),
-    chapter:el.getAttribute('data-camera-chapter')
+    chapter:el.getAttribute('data-camera-chapter'),
+    mode:el.getAttribute('data-camera-mode'),
   }));
-  const startCamera=await camera();
-  assert.ok(startCamera.z>18,'front hero camera must be positioned IN FRONT');
-  await seek(11*30);
-  const sideCamera=await camera();
-  assert.ok(sideCamera.x>8,'camera must make an actual side orbit');
-  await scene.screenshot({path:resolve(out,'cinematic-side.png')});
-  await seek(23*30);
-  const rearCamera=await camera();
-  assert.ok(rearCamera.z< -6,'3D camera must pass BEHIND the escapement');
-  assert.equal(rearCamera.chapter,'escapement');
-  const rear=await scene.screenshot({path:resolve(out,'cinematic-rear.png')});
-  assert.ok(!front.equals(rear),'front and rear views must be visually different');
-  await seek(31*30);
-  const macro=await camera();
-  assert.ok(macro.distance < startCamera.distance*.5,
-    'real camera dolly/zoom must move close to the anchor pallets');
-  await scene.screenshot({path:resolve(out,'cinematic-tooth-closeup.png')});
-  await seek(50*30);
-  assert.ok((await camera()).z>9,'final dial reveal must come back to the front');
-  await scene.screenshot({path:resolve(out,'cinematic-dial.png')});
+  const checkShot=async(time,chapter,mode,filename)=>{
+    await seek(Math.round(time*30));
+    await page.waitForTimeout(140);
+    const current=await camera();
+    assert.equal(current.chapter,chapter,'shot at '+time+' seconds');
+    assert.equal(current.mode,mode,'shot mode at '+time+' seconds');
+    const png=await scene.screenshot({path:resolve(out,filename)});
+    return {current,png};
+  };
+  const front=await checkShot(0,'front','observe','clock-front.png');
+  assert.ok(front.current.z>12,'camera must face dial from the front');
+  const fly=await checkShot(5.8,'rear','travel','clock-fast-side-transfer.png');
+  assert.ok(fly.current.x>7,'must actually fly past the side');
+  const rear=await checkShot(8,'rear','observe','clock-rear-observation.png');
+  assert.ok(rear.current.z< -6,'rear observation is genuine spatial orbit');
+  assert.ok(!front.png.equals(rear.png),'front/rear should not look identical');
+  const entry=await checkShot(18,'entry','observe','clock-entry-pallet-closeup.png');
+  assert.ok(entry.current.z< -3,'entry pallet from rear');
+  assert.ok(entry.current.distance < front.current.distance*.5,
+    'entry macro requires real physical dolly');
+  const exit=await checkShot(27,'exit','observe','clock-exit-pallet-closeup.png');
+  assert.ok(exit.current.z< -3,'exit pallet from rear');
+  assert.ok(!entry.png.equals(exit.png),'two distinct pallet contact angles');
+  await checkShot(38,'rear','observe','clock-both-pallets.png');
+  const proof=await checkShot(47,'proof','observe','clock-second-hand.png');
+  assert.ok(proof.current.z>10,'come back to the real front seconds dial');
   await seek(0);
 
   const frames=[0,10,16,24,30,44,53,60,90,600,1799];

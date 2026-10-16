@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 import {
   clockAtFrame, FPS, DURATION, TEETH, PERIOD_SECONDS, RELEASE_OFFSET,
 } from '../animations/pendulum-clock/web/src/clock-model.ts';
-import {cameraAtFrame, CAMERA_KEYS} from '../animations/pendulum-clock/web/src/camera-path.ts';
+import {cameraAtFrame, SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
 
 const frame=(seconds)=>Math.round(seconds*FPS);
 
@@ -82,33 +82,58 @@ test('the new scene uses ThreeCanvas, shares the mechanism model and has no medi
 });
 
 
-test('one actual 3D camera circles the unit from front to rear and back',()=>{
-  assert.ok(CAMERA_KEYS.length>=8,'camera needs a multi-stage directed journey');
-  const start=cameraAtFrame(0);
-  const side=cameraAtFrame(11*FPS);
-  const back=cameraAtFrame(23*FPS);
-  const macro=cameraAtFrame(31*FPS);
-  const frontAgain=cameraAtFrame(50*FPS);
-  assert.ok(start.position[2]>18,'front establishing shot');
-  assert.ok(side.position[0]>8,'clear right side revealing depth');
-  assert.ok(back.position[2]<-6,'orbit must SHOW rear face of wheel');
-  assert.ok(macro.position[2]<-5,'rear macro rather than 2D crop');
-  assert.ok(frontAgain.position[2]>9,'return to front seconds hand');
-  assert.ok(Math.hypot(...macro.position)<Math.hypot(...start.position)*.5,
-    'closeup must physically move camera towards the gear');
-  assert.deepEqual(cameraAtFrame(60*FPS).position,start.position,
-    '60s seamless mechanical timeline may repeat without camera teleport');
+test('camera concentrates screen time on explicit observation positions',()=>{
+  const hold=SHOTS.filter(s=>s.mode==='observe')
+    .reduce((sum,s)=>sum+s.end-s.start,0);
+  const travel=SHOTS.filter(s=>s.mode==='travel')
+    .reduce((sum,s)=>sum+s.end-s.start,0);
+  assert.ok(hold>travel*2,'close-up observation needs to dominate transitions');
+  assert.ok(SHOTS.every(s=>s.end>s.start),'all shots have positive durations');
+  assert.equal(SHOTS[0].start,0);
+  assert.equal(SHOTS.at(-1).end,60);
+  for(let i=1;i<SHOTS.length;i++){
+    const previous=SHOTS[i-1],current=SHOTS[i];
+    assert.equal(previous.end,current.start,'no timeline gaps');
+    assert.deepEqual(previous.positionTo,current.positionFrom,'no camera teleport');
+    assert.deepEqual(previous.targetTo,current.targetFrom,'no target teleport');
+    assert.equal(previous.fovTo,current.fovFrom,'no fov snap');
+  }
 });
 
-test('camera is smooth at every frame and seeking is deterministic',()=>{
+test('fixed readable front, rear, left and right pallet macro views',()=>{
+  const front=cameraAtFrame(0);
+  const rear=cameraAtFrame(8*FPS);
+  const entry=cameraAtFrame(18*FPS);
+  const exit=cameraAtFrame(27*FPS);
+  const proof=cameraAtFrame(47*FPS);
+  assert.equal(front.chapter,'front');
+  assert.equal(front.mode,'observe');
+  assert.ok(front.position[2]>12);
+  assert.equal(rear.chapter,'rear');
+  assert.equal(rear.mode,'observe');
+  assert.ok(rear.position[2]<-6);
+  assert.equal(entry.chapter,'entry');
+  assert.equal(entry.mode,'observe');
+  assert.ok(entry.position[2]<-3);
+  assert.ok(entry.target[0]<-.8,'entry pallet in frame');
+  assert.equal(exit.chapter,'exit');
+  assert.ok(exit.target[0]>.8,'exit pallet in frame');
+  assert.ok(Math.hypot(...entry.position)<Math.hypot(...front.position)*.5);
+  assert.equal(proof.chapter,'proof');
+  assert.ok(proof.position[2]>10);
+  assert.deepEqual(cameraAtFrame(60*FPS).position,front.position,
+    'first / last position exactly match for seamless camera loop');
+});
+
+test('camera moves smoothly within and across shots and is seek-deterministic',()=>{
   let prev=cameraAtFrame(0);
   for(let i=1;i<60*FPS;i++){
     const pose=cameraAtFrame(i);
     assert.deepEqual(pose,cameraAtFrame(i));
     for(const n of [...pose.position,...pose.target,pose.fov])
       assert.ok(Number.isFinite(n),'nonfinite camera value');
-    const move=Math.hypot(...pose.position.map((x,k)=>x-prev.position[k]));
-    assert.ok(move<.22,'camera jerks at frame '+i+': '+move);
+    const displacement=Math.hypot(...pose.position.map((x,k)=>x-prev.position[k]));
+    assert.ok(displacement<1.25,'unexpected camera teleport at frame '+i+': '+displacement);
     prev=pose;
   }
 });
@@ -118,7 +143,12 @@ test('all front, rear, and dial parts stay in one ThreeCanvas',()=>{
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
   assert.equal((src.match(/<ThreeCanvas/g)||[]).length,1,'one 3D world');
   assert.match(src,/<CinematicCamera frame={frame}/);
-  assert.match(src,/<Chassis\/>/);
+  assert.match(src,/<MinimalSupports\/>/);
+  assert.doesNotMatch(src,/const Chassis|<Chassis\/>/);
+  assert.match(src,/makePalletTooth/);
+  assert.match(src,/<PalletTooth/);
+  assert.doesNotMatch(src,/<boxGeometry/);
+  assert.match(src,/data-camera-mode={shot.mode}/);
   assert.match(src,/<Pendulum angle={state.pendulumAngle}\/>/);
   assert.match(src,/<EscapeWheel angle={state.wheelAngle}\/>/);
   assert.match(src,/<Anchor angle={state.anchorAngle}/);
