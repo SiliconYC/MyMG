@@ -47,10 +47,10 @@ try {
     return !!gl&&!gl.isContextLost()&&el.width>0&&el.height>0;
   }),'WebGL drawing context required');
   const samples={};
-  for (const f of [10,55,90,105,130,160,190,220,240,270,350,405]) {
+  for (const f of [10,55,90,105,130,160,190,225,255,305,360,405,480,570]) {
     await seek(f);
     samples[f]=await observe();
-    await page.getByTestId('steam-engine-scene').screenshot({path:resolve(out,'steam-'+f+'.png')});
+    if([55,90,160].includes(f)) await page.getByTestId('steam-engine-scene').screenshot({path:resolve(out,'steam-'+f+'.png')});
   }
   assert.equal(samples[10].cut,0);
   assert.ok(samples[55].cut>.30 && samples[55].cut<.95);
@@ -67,7 +67,7 @@ try {
     assert.equal(await chapter.count(),1,'Only one unobtrusive chapter title is allowed');
     assert.equal(await chapter.textContent(),title);
   }
-  for(const n of [110,418]){
+  for(const n of [110,595]){
     await seek(n);
     assert.equal(await chapter.count(),0,'Model must be alone on screen between chapters');
   }
@@ -85,23 +85,36 @@ try {
     sleeve:Number(el.getAttribute('data-governor-sleeve')),
     throttle:Number(el.getAttribute('data-governor-throttle')),
     camera:Number(el.getAttribute('data-camera-shift')),
+    zoom:Number(el.getAttribute('data-camera-zoom')),
   }));
   const govFrames={};
-  for (const n of [150,190,220,240,270,350]) {
+  for (const n of [150,190,225,255,270,305,360,405,480,555]) {
     await seek(n);
     govFrames[n]=await sampleGovernor();
-    await page.getByTestId('steam-engine-scene').screenshot({
+    if([225,305,360,480].includes(n)) await page.getByTestId('steam-engine-scene').screenshot({
       path:resolve(out,'governor-'+n+'.png'),
     });
   }
   assert.ok(govFrames[150].camera>.01 && govFrames[190].camera>.99,
-    'camera must finish its move to the governor in under a second');
-  assert.ok(govFrames[220].speed>govFrames[190].speed+.20);
-  assert.ok(govFrames[220].angle>govFrames[190].angle+.15);
-  assert.ok(govFrames[240].sleeve>govFrames[190].sleeve+.35);
-  assert.ok(govFrames[240].throttle<govFrames[190].throttle-.3);
-  assert.ok(Math.abs(govFrames[350].speed-1)<.03);
-  assert.ok(govFrames[350].throttle>govFrames[240].throttle+.35);
+    'the initial pan must finish early');
+  assert.ok(govFrames[225].zoom>185 && govFrames[225].zoom<195,
+    'governor must stay substantially closer during teaching');
+  assert.ok(govFrames[305].speed>govFrames[225].speed+.52,
+    'overspeed must be a large, obvious visual change');
+  assert.ok(govFrames[305].angle>govFrames[225].angle+.42,
+    'flyballs must open substantially');
+  assert.ok(govFrames[360].sleeve>govFrames[225].sleeve+.70,
+    'collar height needs substantial visible travel');
+  assert.ok(govFrames[360].throttle<govFrames[225].throttle-.38);
+  assert.ok(Math.abs(govFrames[480].speed-1)<.04,
+    'negative feedback returns speed toward nominal');
+  assert.ok(govFrames[480].throttle>govFrames[360].throttle+.38);
+  // Long on-screen teaching beats: every label lasts long enough to read.
+  // Timings are guaranteed by deterministic 30 fps frame seeking.
+  await seek(285);
+  assert.equal(await page.getByTestId('steam-callout').getAttribute('data-callout-part'),'balls');
+  await seek(330);
+  assert.equal(await page.getByTestId('steam-callout').getAttribute('data-callout-part'),'sleeve');
   const placement=await page.getByTestId('steam-engine-scene').evaluate(el=>({
     governor:Number(el.getAttribute('data-governor-x')),
     throttle:Number(el.getAttribute('data-throttle-x')),
@@ -118,13 +131,13 @@ try {
   assert.ok(layout.governorZ-layout.pipeZ>1.0,
     'flyballs must be mounted in front of the inlet pipe, not hidden behind it');
   const orbits={};
-  for(const n of [15,72,165,185,306]){
+  for(const n of [15,72,165,185,426]){
     await seek(n);
     orbits[n]=await page.getByTestId('steam-engine-scene').evaluate(el=>({
       yaw:Number(el.getAttribute('data-camera-azimuth')),
       pitch:Number(el.getAttribute('data-camera-elevation')),
     }));
-    await page.getByTestId('steam-engine-scene').screenshot({
+    if([185,426].includes(n)) await page.getByTestId('steam-engine-scene').screenshot({
       path:resolve(out,'orbit-'+n+'.png'),
     });
   }
@@ -133,15 +146,15 @@ try {
     'camera must orbit 45+ degrees around the governor, not just pan sideways');
   assert.ok(toDeg(Math.abs(orbits[185].pitch-orbits[15].pitch))>7,
     'camera must change elevation as well as azimuth');
-  assert.ok(toDeg(Math.abs(orbits[306].yaw-orbits[185].yaw))>12,
+  assert.ok(toDeg(Math.abs(orbits[426].yaw-orbits[185].yaw))>12,
     'second orbit should reveal the inlet throttle from another angle');
   // The viewer is guided to five meaningful REAL 3D parts, one at a time.
   const beats=[
-    [168,'belt','皮带'],
-    [215,'balls','重锤'],
-    [250,'sleeve','套筒'],
-    [298,'valve','节流阀'],
-    [369,'flywheel','负反馈'],
+    [179,'belt','皮带'],
+    [258,'balls','重锤'],
+    [334,'sleeve','套筒'],
+    [426,'valve','节流阀'],
+    [531,'flywheel','稳定'],
   ];
   const callout=page.getByTestId('steam-callout');
   for(const [n,part,keyword] of beats){
@@ -157,20 +170,25 @@ try {
       dots:el.querySelectorAll('svg circle').length,
     }));
     assert.ok(dot.x>0 && dot.x<1280 && dot.y>0 && dot.y<720,
-      'Leader line endpoint must point at a visible 3D part');
+      'Leader endpoint out of frame: '+part+' '+JSON.stringify(dot));
     assert.equal(dot.paths,1);
     assert.equal(dot.dots,2);
-    await page.getByTestId('steam-engine-scene').screenshot({
+    if(['balls','sleeve','valve'].includes(part)) await page.getByTestId('steam-engine-scene').screenshot({
       path:resolve(out,'annotated-'+part+'.png'),
     });
   }
-  await seek(215);
-  const movingAnchor=await callout.getAttribute('data-anchor-x');
-  await seek(230);
+  await seek(258);
+  const stationaryAnchor={
+    x:await callout.getAttribute('data-anchor-x'),
+    y:await callout.getAttribute('data-anchor-y'),
+  };
+  await seek(270);
   assert.equal(await callout.getAttribute('data-callout-part'),'balls');
-  assert.notEqual(await callout.getAttribute('data-anchor-x'),movingAnchor,
-    'Ball callout must follow the actual 3D flyweight');
-  for(const n of [110,418]){
+  assert.equal(await callout.getAttribute('data-anchor-x'),stationaryAnchor.x,
+    'NEVER attach a leader line to a rapidly spinning ball');
+  assert.equal(await callout.getAttribute('data-anchor-y'),stationaryAnchor.y,
+    'The leader must stay on the stationary governor bearing');
+  for(const n of [110,595]){
     await seek(n);
     assert.equal(await callout.count(),0,'No permanent HUD after explanation ends, frame '+n);
   }
@@ -187,7 +205,7 @@ try {
   await page.screenshot({path:resolve(out,'steam-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
   await writeFile(resolve(out,'metrics.json'),JSON.stringify(samples,null,2));
-  console.log('PASS: elbow pipes, front-most flyballs, real 3D yaw/pitch orbit, moving callouts and feedback.');
+  console.log('PASS: bright chest, separated pipes, steady governor leaders, 20s close-up and overspeed feedback.');
 } catch(e) {
   await writeFile(resolve(out,'failure.log'),(e.stack??String(e))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'failure.png'),fullPage:true});}catch{}

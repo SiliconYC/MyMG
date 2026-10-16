@@ -1,25 +1,32 @@
-/** Single deterministic orbit shared by the WebGL camera and the 3D leader lines. */
+/** Deterministic orbit shared by WebGL and all 3D-anchored leader lines.
+ *  Short camera transfers, then LONG stable, close views for reading and
+ *  comparing low/fast/recovering flyball governor states.
+ */
 import {smoothstep} from './steam-model.ts';
 export type CameraTriple = [number,number,number];
 export function cameraPose(t:number){
   const inspect=smoothstep((t-.78)/.43);
-  const governorView=smoothstep((t-4.80)/.60);
-  const valveView=smoothstep((t-8.85)/.53);
-  // Actual orbit around the point of interest, not a lateral camera slide.
-  // Almost 50° yaw turn toward the governor plus a modest pitch change.
-  const azimuth=.43-.19*inspect-.89*governorView+.32*valveView;
-  const elevation=.255+.065*inspect+.105*governorView-.035*valveView;
+  const governorView=smoothstep((t-4.72)/.80);
+  const close=smoothstep((t-5.65)/1.10);
+  const valveView=smoothstep((t-12.55)/.95);
+  const recovery=smoothstep((t-16.25)/.90);
+  const azimuth=.43-.19*inspect-.89*governorView+.25*valveView-.11*recovery;
+  const elevation=.255+.065*inspect+.105*governorView
+    -.045*valveView-.015*recovery;
   const focus:CameraTriple=[
-    -1.3*inspect+2.58*governorView-.14*valveView,
-    .06+.12*inspect+.93*governorView+.13*valveView,
-    -.22*governorView,
+    -1.3*inspect+2.90*governorView-.44*valveView+.12*recovery,
+    .06+.12*inspect+1.58*governorView+.16*valveView-.37*recovery,
+    -.22*governorView+.20*close,
   ];
-  const distance=14.2-.9*inspect-.7*governorView;
+  const distance=14.2-.9*inspect-.7*governorView-.15*close;
   const eye:CameraTriple=[
     focus[0]+distance*Math.cos(elevation)*Math.sin(azimuth),
     focus[1]+distance*Math.sin(elevation),
     focus[2]+distance*Math.cos(elevation)*Math.cos(azimuth),
   ];
-  return {eye,target:focus,zoom:85+25*inspect+15*governorView+7*valveView,
-    azimuth,elevation};
+  return {
+    eye,target:focus,
+    zoom:85+25*inspect+26*governorView+54*close-18*valveView-20*recovery,
+    azimuth,elevation,
+  };
 }

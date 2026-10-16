@@ -2,7 +2,7 @@
 import {governorAtFrame, GOVERNOR_START_FRAME, type GovernorState} from './governor-model.ts';
 
 export const FPS = 30;
-export const DURATION = 420;
+export const DURATION = 600;
 export const CRANK_X = 3.08;
 export const CRANK_RADIUS = 0.66;
 export const CONNECTING_ROD = 2.72;
