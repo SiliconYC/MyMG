@@ -380,11 +380,11 @@ test('both full fork arms stay flat in the escapement wheel working plane',()=>{
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
   const fork=src.split('const Anchor:')[1].split('/** Highlight only')[0];
-  assert.match(fork,/a=\\{\\[0,0,FORK_ARM_PLANE_Z\\]\\}/,
+  assert.match(fork,/a=\{\[0,0,FORK_ARM_PLANE_Z\]\}/,
     'both fork roots must be at the wheel plane, never z=-.33');
-  assert.match(fork,/b=\\{\\[\\.\\.\\.palletLocalBase\\(pose.side\\),PALLET_ARM_WELD_Z\\]\\}/);
-  assert.doesNotMatch(fork,/a=\\{\\[0,0,-\\.33\\]\\}/);
-  const coupling=src.match(/const COUPLING_CENTER_Z=(-?[\\d.]+);[\\s\\S]*?const COUPLING_LENGTH=([\\d.]+);/);
+  assert.match(fork,/b=\{\[\.\.\.palletLocalBase\(pose.side\),PALLET_ARM_WELD_Z\]\}/);
+  assert.doesNotMatch(fork,/a=\{\[0,0,-\.33\]\}/);
+  const coupling=src.match(/const COUPLING_CENTER_Z=(-?[\d.]+);[\s\S]*?const COUPLING_LENGTH=([\d.]+);/);
   assert.ok(coupling,'a single extended common shaft is required');
   const centre=Number(coupling[1]),half=Number(coupling[2])/2;
   assert.ok(centre+half>FORK_ARM_PLANE_Z+.04,
