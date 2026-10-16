@@ -4,7 +4,7 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
-import {palletPose, contactDistance, type Side, type PalletPose} from './escapement-contact';
+import {palletPose, contactDistance, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 
 /**
@@ -136,7 +136,7 @@ const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
       <meshStandardMaterial color={pose.engaged?GOLD:STEEL}
         metalness={.75} roughness={.24}
         emissive={pose.engaged?'#8b6033':'#000000'}
-        emissiveIntensity={pose.engaged?.12:0}/>
+        emissiveIntensity={pose.engaged?0.12:0}/>
     </mesh>
     {/* The visible edge of the actual short locking face. */}
     <Rod a={[0,0,-.118]} b={[.024,.029,-.118]}
