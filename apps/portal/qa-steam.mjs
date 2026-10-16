@@ -50,7 +50,7 @@ try {
   for (const f of [10,55,90,105,130,160,190,225,255,305,360,405,480,570]) {
     await seek(f);
     samples[f]=await observe();
-    await page.getByTestId('steam-engine-scene').screenshot({path:resolve(out,'steam-'+f+'.png')});
+    if([55,90,160].includes(f)) await page.getByTestId('steam-engine-scene').screenshot({path:resolve(out,'steam-'+f+'.png')});
   }
   assert.equal(samples[10].cut,0);
   assert.ok(samples[55].cut>.30 && samples[55].cut<.95);
@@ -91,7 +91,7 @@ try {
   for (const n of [150,190,225,255,270,305,360,405,480,555]) {
     await seek(n);
     govFrames[n]=await sampleGovernor();
-    await page.getByTestId('steam-engine-scene').screenshot({
+    if([225,305,360,480].includes(n)) await page.getByTestId('steam-engine-scene').screenshot({
       path:resolve(out,'governor-'+n+'.png'),
     });
   }
@@ -131,13 +131,13 @@ try {
   assert.ok(layout.governorZ-layout.pipeZ>1.0,
     'flyballs must be mounted in front of the inlet pipe, not hidden behind it');
   const orbits={};
-  for(const n of [15,72,165,185,306]){
+  for(const n of [15,72,165,185,426]){
     await seek(n);
     orbits[n]=await page.getByTestId('steam-engine-scene').evaluate(el=>({
       yaw:Number(el.getAttribute('data-camera-azimuth')),
       pitch:Number(el.getAttribute('data-camera-elevation')),
     }));
-    await page.getByTestId('steam-engine-scene').screenshot({
+    if([185,426].includes(n)) await page.getByTestId('steam-engine-scene').screenshot({
       path:resolve(out,'orbit-'+n+'.png'),
     });
   }
@@ -146,7 +146,7 @@ try {
     'camera must orbit 45+ degrees around the governor, not just pan sideways');
   assert.ok(toDeg(Math.abs(orbits[185].pitch-orbits[15].pitch))>7,
     'camera must change elevation as well as azimuth');
-  assert.ok(toDeg(Math.abs(orbits[306].yaw-orbits[185].yaw))>12,
+  assert.ok(toDeg(Math.abs(orbits[426].yaw-orbits[185].yaw))>12,
     'second orbit should reveal the inlet throttle from another angle');
   // The viewer is guided to five meaningful REAL 3D parts, one at a time.
   const beats=[
@@ -173,7 +173,7 @@ try {
       'Leader line endpoint must point at a visible 3D part');
     assert.equal(dot.paths,1);
     assert.equal(dot.dots,2);
-    await page.getByTestId('steam-engine-scene').screenshot({
+    if(['balls','sleeve','valve'].includes(part)) await page.getByTestId('steam-engine-scene').screenshot({
       path:resolve(out,'annotated-'+part+'.png'),
     });
   }
