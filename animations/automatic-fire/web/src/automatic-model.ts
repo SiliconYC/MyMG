@@ -37,15 +37,15 @@ export type CycleFrame={
  * composition before looping to avoid a jarring jump.
  */
 const SHOTS:ReadonlyArray<{frame:number;position:Point;target:Point;zoom:number}>=[
-  {frame:0,   position:[6.6,3.7,18.4], target:[.3,.05,0], zoom:77},
-  {frame:72,  position:[3.2,2.8,14.0], target:[.1,.25,0], zoom:89},
-  {frame:160, position:[2.9,2.35,8.5], target:[-.05,.68,.1],zoom:133},
-  {frame:248, position:[-.7,1.7,7.5],  target:[-.2,.70,.1],zoom:140},
-  {frame:342, position:[-2.6,2.8,7.3], target:[-.65,.77,.1],zoom:146},
-  {frame:439, position:[1.9,3.45,8.6], target:[.25,.78,.1],zoom:140},
-  {frame:535, position:[-.8,1.25,7.9], target:[-.1,.65,.1],zoom:151},
-  {frame:619, position:[3.7,2.75,12.0],target:[-.0,.36,0],zoom:99},
-  {frame:719, position:[6.6,3.7,18.4], target:[.3,.05,0],zoom:77},
+  {frame:0,   position:[10.4,4.6,16.6],target:[.3,.05,0],zoom:78},
+  {frame:72,  position:[5.6,3.0,12.9], target:[.1,.25,0],zoom:93},
+  {frame:160, position:[2.3,2.95,7.6],target:[-.05,.68,.1],zoom:140},
+  {frame:248, position:[-2.4,2.30,7.0],target:[-.2,.70,.1],zoom:145},
+  {frame:342, position:[-5.0,3.1,6.7],target:[-.65,.77,.1],zoom:152},
+  {frame:439, position:[1.8,4.4,7.4],target:[.25,.78,.1],zoom:144},
+  {frame:535, position:[4.7,2.6,6.0],target:[-.1,.65,.1],zoom:151},
+  {frame:619, position:[5.6,3.2,12.5],target:[-.0,.36,0],zoom:99},
+  {frame:719, position:[10.4,4.6,16.6],target:[.3,.05,0],zoom:78},
 ];
 const lerp=(a:number,b:number,t:number):number=>a+(b-a)*t;
 const lerpPoint=(a:Point,b:Point,t:number):Point=>[
@@ -61,7 +61,7 @@ export function cameraAt(frame:number):CameraPose{
         target:lerpPoint(a.target,b.target,t),zoom:lerp(a.zoom,b.zoom,t)};
     }
   }
-  return {position:[...SHOTS[0].position],target:[...SHOTS[0].target],zoom:77};
+  return {position:[...SHOTS[0].position],target:[...SHOTS[0].target],zoom:78};
 }
 
 /** Color and motion encode the logical steps, not real mechanism dimensions. */

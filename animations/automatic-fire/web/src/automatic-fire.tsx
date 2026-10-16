@@ -167,20 +167,26 @@ const Furniture:React.FC=()=>{
 const Receiver:React.FC<{s:CycleFrame}>=({s})=>{
   const lower:XY[]=[[-2.70,.08],[-2.65,1.48],[-1.72,1.59],
     [1.55,1.56],[1.86,1.24],[1.86,.36],[1.31,.02]];
+  // Open three-dimensional cavity: without a real hole, the bolt was invisible.
+  const window:XY[]=[[-2.22,.46],[1.20,.46],[1.31,.56],
+    [1.31,1.33],[-2.22,1.33]];
   const side:XY[]=[[-2.62,.31],[-2.62,1.46],[-1.7,1.53],
     [1.43,1.50],[1.76,1.23],[1.76,.38],[1.18,.31]];
   return <group>
-    <Silhouette outline={lower} depth={1.03} z={-.12} color={DARK}/>
+    <Silhouette outline={lower} holes={[window]} depth={1.03} z={-.12} color={DARK}/>
     {/* The machined opening remains exposed when the removable outer plate moves. */}
-    <Rounded pos={[-.19,.91,.485]} size={[3.51,.75,.11]}
+    <Rounded pos={[-.19,.91,-.43]} size={[3.51,.75,.08]}
       color="#142c32" radius={.13} metal={.45}/>
     <Rounded pos={[-.22,1.43,.40]} size={[3.84,.11,.31]} color={EDGE} radius={.035}/>
     <Rounded pos={[-.27,.34,.41]} size={[3.79,.11,.29]} color={EDGE} radius={.035}/>
     <Rounded pos={[1.60,.91,.42]} size={[.29,.92,.31]} color={RAIL}/>
     <Rounded pos={[-2.45,.91,.41]} size={[.22,.93,.32]} color={EDGE}/>
-    {/* Literal side skin lifts toward the lens, then fades; no transparent clutter. */}
-    <Silhouette outline={side} depth={.14} z={1.06} color={BODY}
-      metal={.53} opacity={s.shell} shiftZ={s.reveal*1.48}/>
+    {/* The removable solid side cover actually clears the sightline.
+        Moving only toward the camera failed in orthographic projection. */}
+    <group position={[.18*s.reveal,1.66*s.reveal,.38*s.reveal]}>
+      <Silhouette outline={side} depth={.14} z={1.06} color={BODY}
+        metal={.53} opacity={s.shell}/>
+    </group>
     <Rounded pos={[-1.6,1.64,-.1]} size={[1.56,.14,.56]} color={DARK} radius={.04}/>
     {[-1.75,-1.48,-1.21,-.94].map(x=><Rounded key={x}
       pos={[x,1.75,-.1]} size={[.11,.10,.52]} color={EDGE} radius={.023}/>)}
@@ -218,8 +224,10 @@ const Internals:React.FC<{s:CycleFrame}>=({s})=>{
       .90+1.70*s.ejection,
     ]} angle={[.28*s.ejection,1.8*s.ejection,2.1*s.ejection]}/>}
     {/* The magazine is given a narrow visual slot, not an exploded inventory. */}
-    {[0,1,2,3].map(i=><Round key={i}
-      pos={[.20+i*.08,-.52-i*.39,.44]} scale={.66}
+    {/* Magazine stack is visible only when the receiver is opened; the
+        original exterior had floating golden stripes on the magazine. */}
+    {s.reveal>.64&&[0,1,2].map(i=><Round key={i}
+      pos={[.17+i*.07,-.52-i*.38,.44]} scale={.56}
       angle={[0,0,-.10]}/>)}
     <group position={[-1.12,-.44,.55]} rotation={[0,0,s.trigger*.37]}>
       <Rounded pos={[0,-.26,0]} size={[.12,.58,.13]} radius={.05}
@@ -277,7 +285,7 @@ export const AutomaticFireScene:React.FC=()=>{
     style={{background:'radial-gradient(ellipse at 51% 45%, #f7f5ee 0%, #e8e5dc 62%, #dcdedc 100%)',
       overflow:'hidden',color:'#253b43'}}>
     <ThreeCanvas orthographic width={1280} height={720}
-      camera={{position:[6.6,3.7,18.4],zoom:77,near:.1,far:120}}
+      camera={{position:[10.4,4.6,16.6],zoom:78,near:.1,far:120}}
       gl={{alpha:true,antialias:true,preserveDrawingBuffer:true}}
       style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
       <Machine frame={frame} s={s}/>
