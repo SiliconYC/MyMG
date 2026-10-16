@@ -28,7 +28,7 @@ export const smooth=(n:number)=>{
   return t*t*(3-2*t);
 };
 export const stageAt=(frame:number):Stage=>
-  frame<108?'task':frame<308?'cpu':frame<404?'gpu':'compare';
+  frame<120?'task':frame<317?'cpu':frame<404?'gpu':'compare';
 
 /** Camera is one continuously moving observer; no scene or object teleport. */
 export const cameraAt=(frame:number)=>{
