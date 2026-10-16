@@ -8,7 +8,7 @@
  *
  * A deliberately simplified teaching escapement, not a collision solver.
  */
-import {TEETH, type ClockState} from './clock-model';
+import {TEETH, type ClockState} from './clock-model.ts';
 
 export type Side='entry'|'exit';
 export type Point=readonly [number,number];
@@ -59,14 +59,12 @@ const REFERENCE={
 /** During the lock the tooth flank recurs exactly after full tooth pitches. */
 export function nearestFlank(side:Side,wheelAngle:number):Flank {
   const ref=REFERENCE[side];
-  const phase=Math.atan2(ref.point[0],ref.point[1]);
   const referenceTooth=side==='entry'?-4:3;
   const referenceWheelAngle=side==='entry'?0:PITCH/2;
   const toothIndex=referenceTooth+Math.round(
     (referenceWheelAngle-wheelAngle)/PITCH);
   const f=flankAt(toothIndex,wheelAngle);
   // The nearest tooth can only deviate by half the 12° pitch during release.
-  void phase;
   return f;
 }
 
