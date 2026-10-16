@@ -26,10 +26,23 @@ const HbmArtwork: React.FC = () => (
   </div>
 );
 
+const SteamArtwork: React.FC = () => (
+  <div className="artwork artwork-steam" aria-hidden="true">
+    <div className="steam-cylinder"><span className="steam-heat"/></div>
+    <div className="steam-top-pipe"/>
+    <div className="steam-crosshead"/>
+    <div className="steam-conrod"/>
+    <div className="steam-flywheel"><span/><span/><span/><span/></div>
+    <div className="steam-cut-rim"/>
+    <span className="artwork-label">STEAM / KINEMATICS / CUTAWAY</span>
+  </div>
+);
+
 const ProjectCard: React.FC<{project: MgProject; index: number}> = ({project, index}) => (
   <a className="project-card" href={`#/${encodeURIComponent(project.id)}`} data-testid={`project-${project.id}`}>
     <div className="project-art">
       {project.cover?.type === 'hbm' ? <HbmArtwork /> :
+        project.cover?.type === 'steam' ? <SteamArtwork /> :
         project.cover?.type === 'image' ?
           <img className="artwork-cover" src={project.cover.src} alt={project.cover.alt} loading="lazy" /> :
           <div className="artwork artwork-placeholder" aria-hidden="true">
