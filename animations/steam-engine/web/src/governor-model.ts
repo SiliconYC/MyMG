@@ -40,7 +40,7 @@ const neutralTheta = GOVERNOR_START_FRAME / GOVERNOR_FPS * NOMINAL_OMEGA - Math.
 const neutral = (): GovernorState => ({
   theta:neutralTheta, omega:NOMINAL_OMEGA, relativeSpeed:1,
   angle:NOMINAL_ANGLE, sleeveY:2.36 - 1.84 * Math.cos(NOMINAL_ANGLE),
-  throttle:NOMINAL_THROTTLE, loadRelief:0, spindlePhase:0,
+  throttle:NOMINAL_THROTTLE, loadRelief:0, spindlePhase:neutralTheta*2.2,
 });
 
 /** Integrate once, then expose a read-only per-frame lookup table. */
@@ -72,6 +72,12 @@ for (let i=1; i<=GOVERNOR_END_FRAME-GOVERNOR_START_FRAME; i++) {
 }
 
 export function governorAtFrame(frame:number):GovernorState {
+  if(frame<GOVERNOR_START_FRAME) {
+    return {
+      ...states[0],
+      spindlePhase:(frame/GOVERNOR_FPS*NOMINAL_OMEGA-Math.PI/2)*2.2,
+    };
+  }
   const index=clamp(Math.round(frame)-GOVERNOR_START_FRAME,0,states.length-1);
   return states[index];
 }
