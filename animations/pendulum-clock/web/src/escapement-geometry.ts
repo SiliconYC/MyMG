@@ -10,7 +10,7 @@ export const PITCH=2*Math.PI/TEETH;
 export const HALF_PITCH=PITCH/2;
 export const TIP_FRACTION=.25;
 export const WHEEL_TIP_RADIUS=1.54;
-export const WHEEL_ROOT_RADIUS=1.30;
+export const WHEEL_ROOT_RADIUS=1.10;
 export const WHEEL_Y=.60;
 export const PIVOT_Y=2.56;
 export const CENTER_DISTANCE=PIVOT_Y-WHEEL_Y;
@@ -29,8 +29,8 @@ export const LOCK_POLAR=Math.atan2(
  * The .034 rad run-out is the anchor rotation at each unlock.
  */
 export const RELEASE_ANGLE=.034;
-export const LOCK_SWEEP=.19;
-export const PALLET_BAND=.045;
+export const LOCK_SWEEP=.15;
+export const PALLET_BAND=.020;
 export const PALLET_RANGES={
   entry:[-LOCK_POLAR+RELEASE_ANGLE,-LOCK_POLAR+LOCK_SWEEP],
   exit:[ LOCK_POLAR-LOCK_SWEEP, LOCK_POLAR-RELEASE_ANGLE],
@@ -62,7 +62,10 @@ export const faceContains=(side:Side,pendulumAngle:number):boolean=>{
   return a>=lo && a<=hi;
 };
 /** The tip profile below is also consumed by the THREE.ExtrudeGeometry mesh. */
+/** Swept-back asymmetric escape teeth. The two root shoulders trail
+ * the point, leaving room for the opposite locking shoe to clear.
+ */
 export const WHEEL_PROFILE:ReadonlyArray<readonly [number,number]>=[
-  [0,1.30],[.10,1.31],[.25,WHEEL_TIP_RADIUS],
-  [.35,1.48],[.61,1.35],[.87,1.30],
+  [0,WHEEL_ROOT_RADIUS],[.25,WHEEL_TIP_RADIUS],
+  [.03,WHEEL_ROOT_RADIUS],[.999,WHEEL_ROOT_RADIUS],
 ];
