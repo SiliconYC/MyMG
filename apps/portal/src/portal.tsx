@@ -139,6 +139,6 @@ export const App: React.FC = () => {
   return <div className="site-root">
     <header className="site-header"><div className="page-container nav-inner"><Brand/><a href="#/" className="nav-projects">全部项目 <span>↗</span></a></div></header>
     {route ? (project ? <ProjectPage project={project}/> : <main className="page-container not-found"><h1>没有找到该项目</h1><a href="#/">返回作品目录 →</a></main>) : <Home/>}
-    <footer className="site-footer"><div className="page-container footer-inner"><span>MYMG / MOTION GRAPHICS LAB</span><span>EXPERIMENTS, NOT PRODUCTS · © 2026</span></div></footer>
+    <footer className="site-footer"><div className="page-container footer-inner"><span>MYMG / MOTION GRAPHICS LAB</span><span data-testid="build-id">BUILD {(import.meta.env.VITE_MYMG_BUILD_ID || 'local').slice(0,12)} · © 2026</span></div></footer>
   </div>;
 };
