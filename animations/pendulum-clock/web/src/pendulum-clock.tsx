@@ -394,6 +394,7 @@ export const PendulumClockScene:React.FC=()=>{
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
     data-wheel-plane-z={WHEEL_PLANE_Z}
     data-pallet-plane-z={PALLET_PLANE_Z}
+    data-fork-arm-plane-z={FORK_ARM_PLANE_Z}
     data-wheel-bearing-axial-overlap={zOverlap(bearingZRange,spindleZRange).toFixed(5)}
     data-wheel-bearing-running-clearance={(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS).toFixed(5)}
     style={{overflow:'hidden',background:'#edece6',color:'#28383d',
