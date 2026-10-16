@@ -8,10 +8,6 @@ on:
       - '!apps/portal/README.md'
       - '!apps/portal/**/*.md'
       - 'animations/*/web/**'
-      - 'animations/hbm/src/**'
-      - 'animations/hbm/requirements.txt'
-      - 'tooling/render-hbm-master.sh'
-      - 'tooling/verify-hbm-master.py'
       - 'packages/mg/**'
       - 'pnpm-workspace.yaml'
       - 'pnpm-lock.yaml'
@@ -61,36 +57,6 @@ jobs:
         run: pnpm --filter @mymg/portal build
         env:
           MYMG_BASE_PATH: /MyMG/
-      - name: Restore cached canonical HBM film
-        id: hbm-cache
-        uses: actions/cache@v4
-        with:
-          path: apps/portal/dist/media
-          key: hbm-mustard03-v1-${{ hashFiles('animations/hbm/src/**/*.py', 'animations/hbm/requirements.txt', 'tooling/render-hbm-master.sh', 'tooling/verify-hbm-master.py') }}
-      - name: Python for canonical HBM render
-        if: steps.hbm-cache.outputs.cache-hit != 'true'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: pip
-          cache-dependency-path: animations/hbm/requirements.txt
-      - name: Install canonical film fonts and Python dependencies
-        if: steps.hbm-cache.outputs.cache-hit != 'true'
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y fonts-noto-cjk fonts-inter ffmpeg
-          python -m pip install -r animations/hbm/requirements.txt
-          test -f /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
-          test -f /usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc
-      - name: Render and verify HBM Mustard-03
-        if: steps.hbm-cache.outputs.cache-hit != 'true'
-        run: bash tooling/render-hbm-master.sh apps/portal/dist/media
-      - name: Require original, playable derivative and cover
-        run: |
-          test -s apps/portal/dist/media/hbm-python-original.mp4
-          test -s apps/portal/dist/media/hbm-mustard03.mp4
-          test -s apps/portal/dist/media/hbm-poster.jpg
-          test -s apps/portal/dist/media/hbm-master-sha256.txt
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:
@@ -110,12 +76,11 @@ jobs:
           done
           grep -q 'id="root"' /tmp/mymg-deployed.html
           grep -q '/MyMG/assets/' /tmp/mymg-deployed.html
-          for media in hbm-mustard03.mp4 hbm-python-original.mp4 hbm-poster.jpg hbm-master-sha256.txt; do
-            curl --location --fail --silent --show-error "${PAGE_URL%/}/media/$media" -o "/tmp/$media"
-            test -s "/tmp/$media"
-          done
-          ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,width,height,r_frame_rate -of json /tmp/hbm-mustard03.mp4 | grep -q '"codec_name": "h264"'
-          echo "Published HBM full film and source verified at $PAGE_URL"
+          # HBM now contains native React/Three.js only; no Python video artifacts.
+          if grep -r -E 'hbm-mustard03\\.mp4|hbm-python-original\\.mp4' apps/portal/dist/assets/*.js; then
+            echo "Forbidden HBM MP4 found in published JS"; exit 1
+          fi
+          echo "Published React/Three.js site HTML verified at $PAGE_URL"
           # HBM uses a hash route so the same static document is served.
           curl --location --fail --silent --show-error "${PAGE_URL%/}/#/hbm" -o /tmp/mymg-hbm-deployed.html
           cmp /tmp/mymg-deployed.html /tmp/mymg-hbm-deployed.html
