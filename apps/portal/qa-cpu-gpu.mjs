@@ -66,7 +66,7 @@ try{
   assert.equal(await scene.getAttribute('data-story-beat'),'round-one');
   assert.equal(await title.getAttribute('data-layout'),'chapter');
   await screenshot(22,'cpu-gpu-round-one-opening.png');
-  assert.match(await title.textContent(),/同质任务/);
+  assert.match(await title.textContent(),/第一轮/);
   assert.match(await title.textContent(),/16 个相同任务/);
   assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98);
   assert.equal(await num('data-original-task-meshes'),32);
@@ -113,7 +113,7 @@ try{
   assert.equal(await title.evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)',
     'winner must not be boxed over the 3D model');
   assert.match(await title.textContent(),/第一轮/);
-  assert.match(await title.textContent(),/GPU 胜出/);
+  assert.match(await title.textContent(),/GPU\s*胜出/);
   assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
     'GPU winner must be visibly legible, not only a DOM label');
   const priorLastVisible=await original(309,'compare',16,16,0,0);
@@ -183,7 +183,7 @@ try{
   assert.equal(await title.getAttribute('data-beat'),'cpu-wins');
   assert.equal(await title.getAttribute('data-layout'),'verdict');
   assert.match(await title.textContent(),/第二轮/);
-  assert.match(await title.textContent(),/CPU 胜出/);
+  assert.match(await title.textContent(),/CPU\s*胜出/);
   assert.ok(await title.evaluate(el=>Number(getComputedStyle(el).opacity))>.98,
     'CPU winner must remain visible during final two-chip shot');
   assert.notDeepEqual(gpuVictory,cpuVictory);
