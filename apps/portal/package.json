@@ -12,6 +12,7 @@
     "qa:react": "node qa-react.mjs"
   },
   "dependencies": {
+    "@mymg/cpu-gpu": "workspace:*",
     "@mymg/demo": "workspace:*",
     "@mymg/hbm": "workspace:*",
     "@mymg/mg": "workspace:*",
