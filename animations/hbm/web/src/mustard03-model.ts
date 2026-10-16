@@ -75,12 +75,16 @@ function dot(d:Draft,v:Point3,r:number,color:string,alpha=1){
   plane(d,pts,color,alpha);
 }
 function shadow(d:Draft,x:number,y:number,sx:number,sy:number,z:number,alpha:number){
-  // Broad soft ground contact shadow, 7 concentric translucent WebGL quads.
-  for(let j=6;j>=0;j--){
-    const e=j*(.035+5/d.cam.s);
-    const a=alpha*(j===0?.23:.11)/(j+1);
+  // Approximate Pillow GaussianBlur with 25 weighted shells; no stepped slabs.
+  const rings=25;
+  let norm=0;
+  const weights=Array.from({length:rings},(_,i)=>Math.exp(-.5*Math.pow(i/7.5,2)));
+  for(const w of weights)norm+=w;
+  for(let j=rings-1;j>=0;j--){
+    const e=j*(1.3/d.cam.s);
+    const strength=.32*alpha*weights[j]/norm;
     polygon(d,[[x-sx/2-e,y-sy/2-e,z],[x+sx/2+e,y-sy/2-e,z],
-      [x+sx/2+e,y+sy/2+e,z],[x-sx/2-e,y+sy/2+e,z]],'#152329',a);
+      [x+sx/2+e,y+sy/2+e,z],[x-sx/2-e,y+sy/2+e,z]],'#0f1b20',strength);
   }
 }
 function box(d:Draft,cx:number,cy:number,sx:number,sy:number,z:number,h:number,
@@ -186,13 +190,15 @@ function gpu(d:Draft,x:number,y:number,t:number,start:number){
   const land=easeout(p),alpha=smooth(p/.46);
   const z=.15-.28*(1-land);
   shadow(d,x,y,4.05,4.25,z-.05,.5*land*alpha);
-  box(d,x,y,4.05,4.25,z,.48,'#43586D','#25374A','#33485E',alpha,0,2);
-  const sx=4.05*.7,sy=4.25*.72,zt=z+.481;
-  path(d,[[x-sx/2,y-sy/2,zt],[x+sx/2,y-sy/2,zt],[x+sx/2,y+sy/2,zt],
-    [x-sx/2,y+sy/2,zt],[x-sx/2,y-sy/2,zt]],'#c1dce5',.46*alpha,1);
-  for(const yy of [-.85,-.42,0,.42,.85]){
-    path(d,[[x-1.15,y+yy,zt],[x-.94,y+yy,zt]],'#9bc1c8',.42*alpha,1);
-  }
+  // Python v6.gpu_new: three solid faces and an inset. No old v5 ticks.
+  const sx=4.05,sy=4.25,x0=x-sx/2,x1=x+sx/2,y0=y-sy/2,y1=y+sy/2,z1=z+.48;
+  polygon(d,[[x1,y0,z],[x1,y1,z],[x1,y1,z1],[x1,y0,z1]],'#25374A',alpha);
+  polygon(d,[[x0,y1,z],[x1,y1,z],[x1,y1,z1],[x0,y1,z1]],'#33485E',alpha);
+  polygon(d,[[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]],'#43586D',alpha);
+  const ix=4.05*.7,iy=4.25*.72,zt=z1+.001;
+  path(d,[[x-ix/2,y-iy/2,zt],[x+ix/2,y-iy/2,zt],
+    [x+ix/2,y+iy/2,zt],[x-ix/2,y+iy/2,zt],
+    [x-ix/2,y-iy/2,zt]],'#c1dce5',.46*alpha,1);
 }
 function support(d:Draft,t:number){
   const alpha=smooth((t-9.23)/.70);
