@@ -6,6 +6,7 @@ import {
   DURATION,ORIGINAL_FRAMES,FPS,TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,
   CENTER,CHIP_HALF,GRID_STEP,INPUT_X,SHAPES,
   stageAt,cameraAt,jobProgress,taskAt,taskPositions,
+  storyBeatAt,storyOpacityAt,handoverProgressAt,handoverOpacityAt,
   PERSPECTIVE_FOV,CAMERA_FRAMING_MARGIN,perspectiveDistance,
   completedCount,workingCount,corePosition,shapeAt,flowAt,
   mixedTaskAt,mixedCompletedCount,mixedWorkingCount,mixedIdleLanes,
@@ -156,6 +157,47 @@ test('38-degree perspective keeps first CPU, second GPU and all transitions in f
   }
 });
 
+
+test('winners appear only AFTER their full 16-job results, with a separate round-two transition',()=>{
+  assert.equal(storyBeatAt(0),'none');
+  assert.equal(storyBeatAt(200),'none');
+  assert.equal(storyBeatAt(275),'none');
+  for(const f of [276,289,309,319]){
+    assert.equal(storyBeatAt(f),'gpu-wins');
+    assert.equal(completedCount(f,'cpu'),16);
+    assert.equal(completedCount(f,'gpu'),16);
+  }
+  assert.equal(storyBeatAt(321),'none');
+  assert.equal(storyBeatAt(323),'none');
+  for(const f of [324,332,345,364,375]){
+    assert.equal(storyBeatAt(f),'round-two');
+    assert.equal(mixedCompletedCount(f,'cpu'),0);
+    assert.equal(mixedCompletedCount(f,'gpu'),0);
+  }
+  assert.equal(storyBeatAt(376),'none');
+  assert.equal(storyBeatAt(699),'none');
+  for(const f of [700,715,743]){
+    assert.equal(storyBeatAt(f),'cpu-wins');
+    assert.equal(mixedCompletedCount(f,'cpu'),16);
+    assert.equal(mixedCompletedCount(f,'gpu'),16);
+  }
+  assert.equal(storyOpacityAt(300)>0.99,true,'first winner stays legible');
+  assert.ok(storyOpacityAt(342)>.99,'second round header stays legible');
+  assert.ok(storyOpacityAt(726)>.99,'final CPU result persists on screen');
+  assert.ok(storyOpacityAt(320)===0&&storyOpacityAt(323)===0);
+  assert.ok(handoverOpacityAt(313)>0);
+  assert.ok(handoverOpacityAt(330)>.95);
+  assert.equal(handoverOpacityAt(360),0);
+  for(let f=0;f<DURATION;f++){
+    const beat=storyBeatAt(f);
+    const opacity=storyOpacityAt(f);
+    assert.ok(opacity>=0&&opacity<=1);
+    assert.ok(handoverOpacityAt(f)>=0&&handoverOpacityAt(f)<=1);
+    if(beat==='none')assert.equal(opacity,0);
+    if(f>0)assert.ok(handoverProgressAt(f)>=handoverProgressAt(f-1));
+  }
+});
+
 test('the entire previous workload is UNMOUNTED before second-shape rendering',()=>{
   const root=resolve(import.meta.dirname,'..');
   const source=readFileSync(resolve(root,'animations/cpu-gpu/web/src/cpu-gpu.tsx'),'utf8');
@@ -171,6 +213,13 @@ test('the entire previous workload is UNMOUNTED before second-shape rendering',(
   assert.match(source,/<tetrahedronGeometry/);
   assert.match(source,/<cylinderGeometry/);
   assert.match(source,/THREE\.PerspectiveCamera/);
+  assert.match(source,/GPU 胜出/);
+  assert.match(source,/CPU 胜出/);
+  assert.match(source,/第二轮 · 新的挑战/);
+  assert.match(source,/cpu-gpu-round-wipe/);
+  assert.match(source,/cpu-gpu-story-title/);
+  assert.match(source,/storyBeatAt\(frame\)/);
+
   assert.match(catalog,/id: 'cpu-gpu'/);
   assert.match(catalog,/durationInFrames: 744/);
   assert.match(readFileSync(resolve(root,'apps/studio/src/root.tsx'),'utf8'),/projects\.map/);
