@@ -1,137 +1,125 @@
-/** Browser QA: deterministic transport, actual WebGL and HBM keyframe image evidence. */
+/** Full canonical Mustard-03 browser QA, not the old WebGL smoke-test. */
 import assert from 'node:assert/strict';
 import {mkdir, writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {chromium} from 'playwright';
 
-const site = process.env.MYMG_QA_URL ?? 'http://127.0.0.1:4173/MyMG/';
-const out = resolve(process.env.MYMG_QA_OUTPUT ?? '../../output/qa-portal');
-const requireWebgl = process.env.MYMG_QA_REQUIRE_WEBGL !== '0';
-await mkdir(out, {recursive: true});
-const errors = [];
-const browser = await chromium.launch({headless: true, args: [
-  '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader',
-  '--disable-dev-shm-usage', '--no-sandbox',
-]});
-const page = await browser.newPage({viewport: {width:1440,height:900},deviceScaleFactor:1});
-page.on('pageerror', error=>errors.push('pageerror: '+error.message));
-page.on('console', message=>{if(message.type()==='error') errors.push('console: '+message.text());});
-
-const shell = page.getByTestId('player-shell');
-const readFrame = async () => Number(await page.getByTestId('frame-readout').textContent());
-const seek = async (frame) => {
-  const slider = page.getByTestId('frame-slider');
-  await slider.evaluate((el, next)=>{
-    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+const site=process.env.MYMG_QA_URL??'http://127.0.0.1:4173/MyMG/';
+const out=resolve(process.env.MYMG_QA_OUTPUT??'../../output/qa-portal');
+await mkdir(out,{recursive:true});
+const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+const page=await browser.newPage({viewport:{width:1440,height:900},deviceScaleFactor:1});
+const errors=[];
+page.on('pageerror',error=>errors.push('pageerror: '+error.message));
+page.on('response',res=>{if(res.status()>=400 && res.url().includes('/media/'))errors.push('media HTTP '+res.status()+': '+res.url());});
+const video=page.getByTestId('hbm-master-video');
+const readFrame=async()=>Number(await page.getByTestId('frame-readout').textContent());
+const seek=async target=>{
+  const slider=page.getByTestId('frame-slider');
+  await slider.evaluate((el,next)=>{
+    const setter=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
     setter.call(el,String(next));
     el.dispatchEvent(new Event('input',{bubbles:true}));
     el.dispatchEvent(new Event('change',{bubbles:true}));
-  },frame);
-  await page.waitForFunction(target=>Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)===target,frame);
-  await page.waitForTimeout(200);
+  },target);
+  await page.waitForFunction(frame=>Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)===frame,target);
+  await page.waitForFunction(frame=>{
+    const v=document.querySelector('[data-testid="hbm-master-video"]');
+    return v && v.readyState>=2 && Math.abs(v.currentTime-frame/30)<0.03 && !v.seeking;
+  },target,{timeout:20000});
 };
-
-// Decode the real screenshot in a 2D canvas, downsample, and read RGB.
-// No dependency on transient WebGL drawing buffers or unverified snapshots.
-const measure = async png => page.evaluate(async b64=>{
-  const img = new Image();
-  img.src='data:image/png;base64,'+b64;
+const metrics={site,canonical:'make_mustard03.py',frames:{},differences:{}};
+const visual=async buffer=>page.evaluate(async base64=>{
+  const img=new Image();
+  img.src='data:image/png;base64,'+base64;
   await img.decode();
-  const canvas=document.createElement('canvas');canvas.width=160;canvas.height=90;
-  const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  ctx.drawImage(img,0,0,160,90);
-  const data=ctx.getImageData(0,0,160,90).data;
-  const samples=[];let colored=0;
+  const c=document.createElement('canvas');c.width=160;c.height=90;
+  const ctx=c.getContext('2d',{willReadFrequently:true});
+  ctx.drawImage(img,0,0,c.width,c.height);
+  const pixels=ctx.getImageData(0,0,c.width,c.height).data;
+  const samples=[];
+  let contrast=0;
   for(let y=0;y<90;y++)for(let x=0;x<160;x++){
-    const k=(y*160+x)*4, r=data[k],g=data[k+1],b=data[k+2];
+    const i=(y*160+x)*4;
+    const r=pixels[i],g=pixels[i+1],b=pixels[i+2];
     samples.push(r,g,b);
-    // Only the center of the scene; captions alone cannot satisfy this.
-    if(x>30 && x<135 && y>20 && y<75 &&
-      (Math.abs(r-241)>35 || Math.abs(g-238)>35 || Math.abs(b-232)>35)) colored++;
+    if(x>20 && x<140 && y>15 && y<85 && (Math.abs(r-238)+Math.abs(g-232)+Math.abs(b-224))>90)contrast++;
   }
-  return {samples,colored};
-},png.toString('base64'));
-
+  return {samples,contrast};
+},buffer.toString('base64'));
 const difference=(a,b)=>{
-  assert.equal(a.samples.length,b.samples.length);
   let changed=0;
   for(let i=0;i<a.samples.length;i+=3){
-    if(Math.abs(a.samples[i]-b.samples[i])+
-       Math.abs(a.samples[i+1]-b.samples[i+1])+
-       Math.abs(a.samples[i+2]-b.samples[i+2])>48) changed++;
+    if(Math.abs(a.samples[i]-b.samples[i])+Math.abs(a.samples[i+1]-b.samples[i+1])+
+       Math.abs(a.samples[i+2]-b.samples[i+2])>48)changed++;
   }
   return changed/(a.samples.length/3);
 };
 try{
-  await page.goto(site,{waitUntil:'networkidle',timeout:60_000});
+  await page.goto(site,{waitUntil:'networkidle',timeout:60000});
   await page.getByRole('heading',{name:'作品目录'}).waitFor();
-  assert.ok(await page.locator('[data-testid^="project-"]').count()>=1);
   await page.screenshot({path:resolve(out,'portal-desktop.png'),fullPage:true});
   await page.getByTestId('project-hbm').click();
   await page.getByTestId('project-player-page').waitFor();
   assert.equal(new URL(page.url()).hash,'#/hbm');
+  await video.waitFor();
+  await page.waitForFunction(()=>{
+    const v=document.querySelector('[data-testid="hbm-master-video"]');
+    return v && v.readyState>=2 && v.videoWidth===1280 && v.videoHeight===720;
+  },null,{timeout:60000});
+  const media=await video.evaluate(v=>({
+    width:v.videoWidth,height:v.videoHeight,duration:v.duration,
+    readyState:v.readyState,seekable:v.seekable.length,
+    error:v.error?.message??null,source:v.currentSrc
+  }));
+  assert.equal(media.width,1280);
+  assert.equal(media.height,720);
+  assert.ok(Math.abs(media.duration-11.5)<0.07,JSON.stringify(media));
+  assert.ok(media.seekable>0,'Video must support seeking');
+  assert.equal(media.error,null);
+  assert.ok(media.source.endsWith('/media/hbm-mustard03.mp4'));
+  metrics.media=media;
   assert.equal(await readFrame(),0);
-  const canvas=page.locator('canvas').first();
-  if(requireWebgl){
-    await canvas.waitFor({timeout:30_000});
-    const gl=await canvas.evaluate(el=>{
-      const context=el.getContext('webgl2')||el.getContext('webgl');
-      return {width:el.width,height:el.height,
-        valid:!!context && !context.isContextLost(),
-        version:context?.getParameter(context.VERSION)??null};
-    });
-    assert.ok(gl.valid && gl.width>0 && gl.height>0,'Actual active WebGL context required');
-    await writeFile(resolve(out,'webgl.json'),JSON.stringify(gl,null,2));
+
+  const captures=new Map();
+  const keyframes=[0,30,67,129,165,224,273,316,344];
+  for(const frame of keyframes){
+    await seek(frame);
+    const screenshot=await page.getByTestId('player-shell').screenshot({path:resolve(out,'hbm-frame-'+frame+'.png')});
+    const measured=await visual(screenshot);
+    if(frame>0)assert.ok(measured.contrast>100,'Blank/undecoded frame '+frame);
+    captures.set(frame,measured);
+    metrics.frames[frame]={contrast:measured.contrast};
   }
-  await page.getByTestId('play-toggle').click();
-  await page.waitForFunction(()=>Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)>0,
-    null,{timeout:6_000});
-  await page.getByTestId('play-toggle').click();
-  const paused=await readFrame();
-  await page.waitForTimeout(350);
-  assert.equal(await readFrame(),paused,'Pause must freeze playback frame');
+  for(const [a,b] of [[0,67],[67,129],[129,165],[165,224],[224,273],[273,316]]){
+    const d=difference(captures.get(a),captures.get(b));
+    metrics.differences[a+'-'+b]=d;
+    assert.ok(d>0.005,'Missing distinct Mustard-03 scene imagery '+a+'→'+b);
+  }
   await seek(20);
   await page.getByRole('button',{name:'前进一帧'}).click();
   assert.equal(await readFrame(),21);
   await page.getByRole('button',{name:'后退一帧'}).click();
   assert.equal(await readFrame(),20);
-  const metrics={site,webglRequired:requireWebgl,frames:{},changes:{}};
-  const keyframes=[0,30,60,90,120,149], captures=new Map();
-  for(const frame of keyframes){
-    await seek(frame);
-    const png=await shell.screenshot({path:resolve(out,'hbm-frame-'+frame+'.png')});
-    if(requireWebgl){
-      const value=await measure(png);
-      assert.ok(value.colored>140,'Scene has too few non-background center pixels at '+frame);
-      metrics.frames[frame]={colored:value.colored};
-      captures.set(frame,value);
-    }
-  }
-  if(requireWebgl){
-    for(const [before,after] of [[0,30],[30,60],[60,90],[90,120],[120,149]]){
-      metrics.changes[before+'-'+after]=difference(captures.get(before),captures.get(after));
-    }
-    // All four HBM layers arrive by frame ~74: later frames should be stable.
-    for(const pair of ['0-30','30-60','60-90']){
-      assert.ok(metrics.changes[pair]>0.0005,'Missing HBM animation change: '+pair);
-    }
-    for(const pair of ['90-120','120-149']){
-      assert.ok(metrics.changes[pair]<0.03,'Unexpected motion after HBM settles: '+pair);
-    }
-  }
-  await writeFile(resolve(out,'metrics.json'),JSON.stringify(metrics,null,2));
-  await page.reload({waitUntil:'networkidle'});
+  await seek(0);
+  await page.getByTestId('play-toggle').click();
+  await page.waitForFunction(()=>Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)>4,
+    null,{timeout:8000});
+  await page.getByTestId('play-toggle').click();
+  await page.waitForTimeout(150);
+  const paused=await readFrame();
+  await page.waitForTimeout(450);
+  assert.equal(await readFrame(),paused,'Paused film must remain frozen');
+  await page.reload({waitUntil:'networkidle',timeout:60000});
   await page.getByTestId('project-player-page').waitFor();
   assert.equal(new URL(page.url()).hash,'#/hbm');
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:resolve(out,'hbm-mobile.png'),fullPage:true});
-  // WebGL shader warnings are kept as evidence but uncaught errors always fail.
-  assert.equal(errors.filter(x=>x.startsWith('pageerror:')).length,0,errors.join('\n'));
-  await writeFile(resolve(out,'browser-console.log'),errors.join('\n')+'\n');
-  console.log('Browser QA passed: transport, routing, WebGL '+requireWebgl+', 6 frames, pixels, mobile; '+site);
+  assert.deepEqual(errors,[]);
+  await writeFile(resolve(out,'metrics.json'),JSON.stringify(metrics,null,2));
+  console.log('HBM canonical film QA PASSED: real MP4 decode, 345 frame timeline, nine pixel captures, controls, mobile.');
 }catch(error){
-  errors.push('TEST FAILURE: '+(error?.stack??String(error)));
-  await writeFile(resolve(out,'qa-failure.log'),errors.join('\n')+'\n');
+  await writeFile(resolve(out,'qa-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'qa-failure.png'),fullPage:true});}catch{}
   throw error;
 }finally{await browser.close();}
