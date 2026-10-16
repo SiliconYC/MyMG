@@ -181,15 +181,13 @@ const ValveAssembly: React.FC<{s: SteamFrame; plane: THREE.Plane}> = ({s, plane}
     </group>)}
     <Pipe points={[[-2.12, 2.44, -.10], [-2.12, 2.08, -.10],
       [-1.65, 1.86, -.10], [-1.65, 1.62, -.10]]} color="#c88b4e" radius={.125}/>
+    {/* Exhaust is one continuous riser, ending in a visibly open flanged vent. */}
     <Pipe points={[[-1.16, 1.65, -.13], [-1.16, 2.13, -.13],
-      [-.45, 2.17, -.13], [-.38, 2.43, -.13]]} color="#5d9eb1" radius={.108}/>
-    <mesh position={[-2.12, 2.43, -.10]}>
-      <sphereGeometry args={[.16, 16, 12]}/>
-      <meshStandardMaterial color="#f2ab5d" emissive="#e37824" emissiveIntensity={.9}/>
-    </mesh>
-    <mesh position={[-.38, 2.43, -.13]}>
-      <sphereGeometry args={[.14, 16, 12]}/>
-      <meshStandardMaterial color="#7ecad7" emissive="#2a8294" emissiveIntensity={.8}/>
+      [-.45, 2.17, -.13], [-.38, 2.43, -.13], [-.38, 3.12, -.13]]}
+      color="#5d9eb1" radius={.108}/>
+    <mesh position={[-.38, 3.12, -.13]} rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[.116,.043,12,32]}/>
+      <meshStandardMaterial color="#a4c7d0" metalness={.75} roughness={.29}/>
     </mesh>
   </group>;
 };
@@ -356,22 +354,36 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
 /** The throttle is INLINE in the boiler-to-valve-chest steam supply pipe. */
 const GovernorThrottle: React.FC<{s:SteamFrame}> = ({s}) => {
   const a=governorValveAngle(s);
+  const left=THROTTLE_X-.28, right=THROTTLE_X+.28;
   return <group>
-    {/* Steam enters from the right-hand external boiler connection, passes
-        through the plate at x=.12, and travels left into the steam chest. */}
-    <Pipe points={[[1.19,THROTTLE_Y,THROTTLE_Z],
-      [.47,THROTTLE_Y,THROTTLE_Z]]} color="#c68a57" radius={.12}/>
-    <Pipe points={[[-2.12,2.44,-.10],[-1.86,THROTTLE_Y,THROTTLE_Z],
-      [-.22,THROTTLE_Y,THROTTLE_Z]]} color="#c68a57" radius={.12}/>
+    {/* One uninterrupted steam path: boiler-side downcomer -> transparent
+        valve chamber -> steam-chest inlet. Pipes reach BOTH chamber flanges. */}
+    <Pipe points={[[2.52,4.95,-.75],[2.52,3.48,-.75],
+      [2.20,2.81,-.53],[1.48,THROTTLE_Y,THROTTLE_Z],
+      [right,THROTTLE_Y,THROTTLE_Z]]} color="#c68a57" radius={.12}/>
+    <Pipe points={[[left,THROTTLE_Y,THROTTLE_Z],
+      [-1.86,THROTTLE_Y,THROTTLE_Z],[-2.12,2.44,-.10]]}
+      color="#c68a57" radius={.12}/>
+    {/* The tube through the valve is transparent, NOT an omitted section.
+        This makes the rotating butterfly readable without a broken pipe. */}
     <mesh position={[THROTTLE_X,THROTTLE_Y,THROTTLE_Z]}
-      rotation={[0,Math.PI/2,0]}>
-      <torusGeometry args={[.235,.055,12,36]}/>
-      <meshStandardMaterial color="#7d939e" metalness={.77} roughness={.32}/>
+      rotation={[0,0,Math.PI/2]}>
+      <cylinderGeometry args={[.175,.175,.56,36,1,true]}/>
+      <meshStandardMaterial color="#8faab1" metalness={.39} roughness={.27}
+        transparent opacity={.28} side={THREE.DoubleSide} depthWrite={false}/>
     </mesh>
+    {[left,right].map(x=>
+      <mesh key={x} position={[x,THROTTLE_Y,THROTTLE_Z]}
+        rotation={[0,Math.PI/2,0]}>
+        <torusGeometry args={[.181,.061,12,40]}/>
+        <meshStandardMaterial color="#bdc8ca" metalness={.83} roughness={.27}/>
+      </mesh>
+    )}
+    {/* A visible butterfly disc remains inside a closed, fully connected body. */}
     <group position={[THROTTLE_X,THROTTLE_Y,THROTTLE_Z]}
       rotation={[0,a,0]}>
       <mesh>
-        <boxGeometry args={[.045,.34,.36]}/>
+        <boxGeometry args={[.045,.32,.32]}/>
         <meshStandardMaterial color="#e6b878" metalness={.79}
           roughness={.27} side={THREE.DoubleSide}/>
       </mesh>
