@@ -82,7 +82,7 @@ test('scene places governor beside flywheel and valve inline in feed, never isol
   assert.match(src,/const GovernorDrive/);
   assert.match(src,/const valveLinkEnd/);
   assert.match(src,/const GovernorThrottle/);
-  assert.match(src,/\[\[1\.19,THROTTLE_Y,THROTTLE_Z\]/);
+  assert.match(src,/\[\[2\.52,4\.95,\-\.75\]/);
   assert.doesNotMatch(src,/const GOV_X = 4\.82/);
   assert.doesNotMatch(src,/18\.2\)\/2\.1/);
 });
