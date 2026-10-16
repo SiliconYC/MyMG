@@ -15,6 +15,10 @@ export type Stage='task'|'cpu'|'gpu'|'compare'|
 export type Shape='cube'|'sphere'|'tetrahedron'|'cylinder';
 export type TaskPhase='waiting'|'entering'|'processing'|'leaving'|'done';
 export type Point=readonly [number,number,number];
+export type CameraState={
+  focusX:number;zoom:number;distance:number;
+  yaw:number;pitch:number;targetY:number;
+};
 
 export const GENERIC_X=-26.5;
 export const CENTER:Record<Kind,number>={cpu:-8.4,gpu:8.4};
@@ -48,7 +52,7 @@ export const stageAt=(frame:number):Stage=>
  * CPU -> GPU at 237..266 (0.97s), with a brief pullback and an actual orbit
  * GPU -> both at 332..377 (1.5s). Three dimensional yaw AND pitch change.
  */
-export const cameraAt=(frame:number)=>{
+export const cameraAt=(frame:number):CameraState=>{
   if(frame>=ORIGINAL_FRAMES)return mixedCameraAt(frame);
   const cpu=smooth((frame-60)/35);
   const gpu=smooth((frame-237)/29);
@@ -228,7 +232,7 @@ export const mixedIdleLanes=(frame:number)=>
     .filter(Boolean).length;
 
 /** A direct continuation of the last frame in Act I, never a new camera cut. */
-export const mixedCameraAt=(frame:number)=>{
+export const mixedCameraAt=(frame:number):CameraState=>{
   const end=cameraAt(ORIGINAL_FRAMES-1);
   const cpu=smooth((frame-443)/40);
   const gpu=smooth((frame-615)/42);
