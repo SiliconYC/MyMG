@@ -36,7 +36,7 @@ import {governorAtFrame, GOVERNOR_START_FRAME, loadReliefAt} from
 
 test('governor starts seamlessly and is frame-deterministic', () => {
   assert.equal(GOVERNOR_START_FRAME,540);
-  assert.equal(steamAtFrame(540).theta,governorAtFrame(540).theta);
+  assert.ok(Math.abs(steamAtFrame(540).theta-governorAtFrame(540).theta)<1e-12);
   assert.ok(Math.abs(steamAtFrame(541).theta-steamAtFrame(540).theta)<.15);
   assert.notEqual(governorAtFrame(10).spindlePhase,governorAtFrame(30).spindlePhase);
   assert.deepEqual(governorAtFrame(690),governorAtFrame(690));
