@@ -622,6 +622,7 @@ export const SteamEngineScene: React.FC = () => {
     data-governor-x={GOV_X.toFixed(2)}
     data-governor-z={GOV_Z.toFixed(2)}
     data-pipe-z={THROTTLE_Z.toFixed(2)}
+    data-camera-zoom={cameraPose(s.time).zoom.toFixed(2)}
     data-camera-azimuth={cameraPose(s.time).azimuth.toFixed(5)}
     data-camera-elevation={cameraPose(s.time).elevation.toFixed(5)}
     data-throttle-x={THROTTLE_X.toFixed(2)}
