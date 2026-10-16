@@ -62,13 +62,12 @@ try {
   assert.equal(samples[160].cut,0);
   // Less is more: only one fleeting chapter title, never persistent technical HUD.
   const chapter=page.getByTestId('steam-stage-caption');
-  for(const [n,title] of [[20,'蒸汽机'],[60,'气缸剖面'],
-    [148,'飞轮带动调速器'],[180,'离心调速器']]){
+  for(const [n,title] of [[20,'蒸汽机'],[60,'气缸剖面']]){
     await seek(n);
     assert.equal(await chapter.count(),1,'Only one unobtrusive chapter title is allowed');
     assert.equal(await chapter.textContent(),title);
   }
-  for(const n of [110,405]){
+  for(const n of [110,418]){
     await seek(n);
     assert.equal(await chapter.count(),0,'Model must be alone on screen between chapters');
   }
@@ -111,14 +110,44 @@ try {
     'governor must be positioned above and next to the flywheel, not off on the right');
   assert.ok(placement.throttle<placement.governor,
     'intake throttle must lie upstream toward the steam chest');
-  for (const [n,title] of [[229,'转快，重锤张开'],
-    [292,'关小进汽，转速回落']]) {
+  // The viewer is guided to five meaningful REAL 3D parts, one at a time.
+  const beats=[
+    [168,'belt','皮带'],
+    [215,'balls','重锤'],
+    [250,'sleeve','套筒'],
+    [298,'valve','节流阀'],
+    [369,'flywheel','负反馈'],
+  ];
+  const callout=page.getByTestId('steam-callout');
+  for(const [n,part,keyword] of beats){
     await seek(n);
-    assert.equal(await chapter.textContent(),title);
+    assert.equal(await chapter.count(),0,'No chapter title may crowd the annotation');
+    assert.equal(await callout.count(),1,'Exactly one callout at each teaching beat');
+    assert.equal(await callout.getAttribute('data-callout-part'),part);
+    assert.match(await callout.textContent(),new RegExp(keyword));
+    const dot=await callout.evaluate(el=>({
+      x:Number(el.getAttribute('data-anchor-x')),
+      y:Number(el.getAttribute('data-anchor-y')),
+      paths:el.querySelectorAll('svg path').length,
+      dots:el.querySelectorAll('svg circle').length,
+    }));
+    assert.ok(dot.x>0 && dot.x<1280 && dot.y>0 && dot.y<720,
+      'Leader line endpoint must point at a visible 3D part');
+    assert.equal(dot.paths,1);
+    assert.equal(dot.dots,2);
+    await page.getByTestId('steam-engine-scene').screenshot({
+      path:resolve(out,'annotated-'+part+'.png'),
+    });
   }
-  for (const n of [370,405]) {
+  await seek(215);
+  const movingAnchor=await callout.getAttribute('data-anchor-x');
+  await seek(230);
+  assert.equal(await callout.getAttribute('data-callout-part'),'balls');
+  assert.notEqual(await callout.getAttribute('data-anchor-x'),movingAnchor,
+    'Ball callout must follow the actual 3D flyweight');
+  for(const n of [110,418]){
     await seek(n);
-    assert.equal(await chapter.count(),0,'No persistent annotation in final segment');
+    assert.equal(await callout.count(),0,'No permanent HUD after explanation ends, frame '+n);
   }
   await seek(100);
   await page.getByTestId('play-toggle').click();

@@ -28,3 +28,10 @@ The operating model `web/src/governor-model.ts` integrates the rotor speed from 
 The cylinder's outer shell is actually clipped by Three.js; piston/steam internals never freeze. Browser QA covers moving section geometry, governor mounting position, live feedback, brief camera transition, labels and mobile controls.
 
 Viewer: https://siliconyc.github.io/MyMG/#/steam-engine
+
+## Connected piping and focused teaching pointers
+
+- The boiler steam supply stays connected through a visible flanged, transparent butterfly-valve housing and directly into the steam chest; the upper exhaust reaches a proper open vent. No isolated rounded caps or gaps posing as pipes.
+- Five brief, one-at-a-time annotations point to the belt, a moving centrifugal ball, the sliding sleeve, the inlet throttle and the recovering flywheel. A thin leader line and small marker follow each part in projected screen coordinates.
+- Both the labels and engine use exactly the same camera track, so the pointers survive true 3D movement, pause and frame seeking. The first cylinder sequence keeps its sparse chapter titles; the governor segment uses explanatory pointers instead of stacked titles.
+- No new project, UI dashboard or prerecorded sequence is introduced.
