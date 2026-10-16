@@ -7,7 +7,7 @@ import {
   taskAt,taskPositions,completedCount,workingCount,sampleAt,
 } from '../animations/cpu-gpu/web/src/model.ts';
 
-test('one concrete 16-task workload with a purposeful camera timeline',()=>{
+test('one concrete 16-task workload with a purposeful camera timeline',async()=>{
   assert.equal(FPS,30);assert.equal(DURATION,600);
   assert.equal(TASKS,16);assert.equal(CPU_CORES,4);assert.equal(GPU_LANES,16);
   assert.equal(stageAt(40),'task');
@@ -20,6 +20,15 @@ test('one concrete 16-task workload with a purposeful camera timeline',()=>{
   assert.equal(cameraAt(475).focusX,0);
   assert.ok(cameraAt(540).zoom<cameraAt(170).zoom);
   assert.ok(sampleAt(15).dyed<sampleAt(61).dyed);
+  const {corePosition,lidOpening}=await import('../animations/cpu-gpu/web/src/model.ts');
+  assert.equal(corePosition('cpu',0)[0],corePosition('cpu',2)[0]);
+  assert.notEqual(corePosition('cpu',0)[0],corePosition('cpu',1)[0]);
+  assert.notEqual(corePosition('cpu',0)[2],corePosition('cpu',2)[2]);
+  assert.ok(corePosition('gpu',0)[0]<corePosition('gpu',1)[0]);
+  assert.equal(lidOpening(80,'cpu'),0);
+  assert.equal(lidOpening(130,'cpu'),1);
+  assert.equal(lidOpening(293,'gpu'),0);
+  assert.equal(lidOpening(334,'gpu'),1);
 });
 
 test('every task has a physical source -> processor -> destination',()=>{
@@ -69,6 +78,13 @@ test('native WebGL scene has actual moving input and output task cubes, no media
   assert.match(src,/useCurrentFrame/);
   assert.match(src,/data-renderer="react-threejs-webgl"/);
   assert.match(src,/<TaskCube/);
+  assert.match(src,/<Package kind=\{kind\}/);
+  assert.match(src,/<CpuDie frame=\{frame\}/);
+  assert.match(src,/<GpuDie frame=\{frame\}/);
+  assert.match(src,/<Lid kind=\{kind\}/);
+  assert.match(src,/data-chip-design="package-with-exposed-silicon"/);
+  assert.doesNotMatch(src,/pos=\{\[-2\.9,-\.453,0\]\}/,
+    'old three conveyor plates must not return');
   assert.match(src,/taskAt\(frame,kind,index\)/);
   assert.match(src,/data-cpu-done/);
   assert.match(src,/data-gpu-done/);
