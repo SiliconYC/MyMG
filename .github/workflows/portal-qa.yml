@@ -54,6 +54,12 @@ jobs:
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
+          MYMG_QA_REQUIRE_WEBGL: '1'
+      - name: Preserve preview startup log
+        if: always()
+        run: |
+          mkdir -p output/qa-portal
+          if test -f /tmp/mymg-vite-preview.log; then cp /tmp/mymg-vite-preview.log output/qa-portal/vite-preview.log; fi
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4

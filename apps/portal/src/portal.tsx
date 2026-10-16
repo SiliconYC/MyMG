@@ -60,11 +60,39 @@ const Home: React.FC = () => (
 
 const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
   const playerRef = useRef<PlayerRef>(null);
-  const step = (delta: number) => {
+  const [frame, setFrame] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
+    const onFrame = (event: {detail: {frame: number}}) => setFrame(event.detail.frame);
+    const onPlay = () => setPlaying(true);
+    const onPause = () => setPlaying(false);
+    player.addEventListener('frameupdate', onFrame);
+    player.addEventListener('play', onPlay);
+    player.addEventListener('pause', onPause);
+    return () => {
+      player.removeEventListener('frameupdate', onFrame);
+      player.removeEventListener('play', onPlay);
+      player.removeEventListener('pause', onPause);
+    };
+  }, [project.id]);
+  const seek = (target: number) => {
+    const player = playerRef.current;
+    if (!player) return;
+    const next = Math.max(0, Math.min(project.durationInFrames - 1, Math.round(target)));
     player.pause();
-    player.seekTo(Math.max(0, Math.min(project.durationInFrames - 1, player.getCurrentFrame() + delta)));
+    player.seekTo(next);
+    setFrame(next);
+    setPlaying(false);
+  };
+  const step = (delta: number) => seek((playerRef.current?.getCurrentFrame() ?? frame) + delta);
+  const togglePlayback = () => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (playing) player.pause();
+    else player.play();
+    setPlaying(!playing);
   };
   return (
     <main className="project-page page-container" data-testid="project-player-page">
@@ -74,10 +102,19 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
         <Player ref={playerRef} key={project.id} component={project.component}
           compositionWidth={project.width} compositionHeight={project.height}
           fps={project.fps} durationInFrames={project.durationInFrames}
-          controls initiallyShowControls loop
+          loop
           style={{width: '100%', aspectRatio: `${project.width} / ${project.height}`, display:'block'}}
           errorFallback={({error}) => <div className="player-error" role="alert">播放器运行出错：{error.message}</div>}
         />
+      </div>
+      <div className="transport" data-testid="transport">
+        <button type="button" data-testid="play-toggle" onClick={togglePlayback}
+          aria-label={playing ? '暂停播放' : '开始播放'}>{playing ? '暂停' : '播放'}</button>
+        <input type="range" min={0} max={project.durationInFrames-1} step={1}
+          value={frame} onChange={event=>seek(Number(event.currentTarget.value))}
+          aria-label="播放进度" data-testid="frame-slider" />
+        <output data-testid="frame-readout" aria-live="off">{frame}</output>
+        <span>/ {project.durationInFrames-1} 帧</span>
       </div>
       <div className="playbar"><div className="frame-actions"><button type="button" onClick={()=>step(-1)} aria-label="后退一帧">← 前一帧</button><button type="button" onClick={()=>step(1)} aria-label="前进一帧">后一帧 →</button></div><span>{project.width} × {project.height} · {project.fps} FPS · {(project.durationInFrames/project.fps).toFixed(1)}S</span></div>
       <div className="project-notes"><div className="notes-title">关于这项实验</div>{project.notes.map(note=><p key={note}>{note}</p>)}</div>
