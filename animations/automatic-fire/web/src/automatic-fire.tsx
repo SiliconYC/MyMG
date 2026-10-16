@@ -36,7 +36,7 @@ const Silhouette:React.FC<{
       bevelSegments:3,curveSegments:10,
     });
     geo.computeVertexNormals();return geo;
-  },[outline,holes,depth]);
+  },[JSON.stringify(outline),JSON.stringify(holes),depth]);
   return <mesh geometry={geometry} position={[0,0,z-depth/2+shiftZ]}
     castShadow receiveShadow>
     <meshStandardMaterial color={color} metalness={metal} roughness={.38}
@@ -148,7 +148,7 @@ const Furniture:React.FC=()=>{
   const guardCurve=useMemo(()=>{
     const points:THREE.Vector3[]=[[-1.56,-.37,.46],[-1.48,-.95,.46],
       [-1.13,-1.06,.46],[-.56,-1.00,.46],[-.33,-.31,.46]]
-      .map(v=>new THREE.Vector3(...v));
+      .map(v=>new THREE.Vector3(v[0],v[1],v[2]));
     return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points),32,.056,8,false);
   },[]);
   return <group>
@@ -179,7 +179,7 @@ const Receiver:React.FC<{s:CycleFrame}>=({s})=>{
     <Rounded pos={[1.60,.91,.42]} size={[.29,.92,.31]} color={RAIL}/>
     <Rounded pos={[-2.45,.91,.41]} size={[.22,.93,.32]} color={EDGE}/>
     {/* Literal side skin lifts toward the lens, then fades; no transparent clutter. */}
-    <Silhouette outline={side} depth={.14} z={.66} color={BODY}
+    <Silhouette outline={side} depth={.14} z={1.06} color={BODY}
       metal={.53} opacity={s.shell} shiftZ={s.reveal*1.48}/>
     <Rounded pos={[-1.6,1.64,-.1]} size={[1.56,.14,.56]} color={DARK} radius={.04}/>
     {[-1.75,-1.48,-1.21,-.94].map(x=><Rounded key={x}
