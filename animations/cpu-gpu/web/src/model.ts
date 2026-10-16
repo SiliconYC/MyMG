@@ -29,7 +29,7 @@ export const cameraAt = (frame:number) => {
   const both = smooth((frame - 400) / 65);
   return {
     focusX: -6.5 * cpu + 13 * gpu - 6.5 * both,
-    zoom: 114 - 24 * cpu - 35 * both,
+    zoom: 114 - 28 * cpu - 36 * both,
     angle: .11 * smooth((frame-104)/45) - .11 * both,
   };
 };
@@ -53,22 +53,35 @@ export const jobProgress = (frame:number,kind:Kind,index:number) => {
 export const taskPhase = (p:number):TaskPhase =>
   p<=0?'waiting':p<.34?'entering':p<.66?'processing':p<1?'leaving':'done';
 
+/** The task leaves the scene's margin, passes inside a real silicon die,
+ * and reappears outside its opposite edge. Neither side is a conveyor belt. */
+export const corePosition = (kind:Kind,index:number):Point => {
+  if(kind==='cpu')return [
+    index%2===0?-1.1:1.1,
+    .58,
+    index<2?-1.15:1.15,
+  ];
+  return [
+    ((index%4)-1.5)*1.02,
+    .58,
+    (Math.floor(index/4)-1.5)*1.15,
+  ];
+};
 export const taskPositions = (kind:Kind,index:number): {
   input:Point; processor:Point; output:Point;
 } => {
   const wave=Math.floor(index/4),lane=index%4;
-  const z=(lane-1.5)*1.43;
-  if(kind==='cpu')return {
-    input:[-3.60+wave*.52,.45,z],
-    processor:[-.15,.58,z],
-    output:[2.05+wave*.52,.45,z],
-  };
+  const z=(kind==='cpu'?lane:wave)-1.5;
   return {
-    input:[-3.60+lane*.52,.45,(wave-1.5)*1.43],
-    processor:[(lane-1.5)*.52,.58,(wave-1.5)*1.43],
-    output:[2.05+lane*.52,.45,(wave-1.5)*1.43],
+    input:[-4.85+(kind==='cpu'?wave:lane)*.5,.45,z*1.43],
+    processor:corePosition(kind,kind==='cpu'?lane:index),
+    output:[3.35+(kind==='cpu'?wave:lane)*.5,.45,z*1.43],
   };
 };
+/** A raised package cover briefly slides away, revealing the real die layout. */
+export const lidOpening = (frame:number,kind:Kind) =>
+  smooth((frame-(kind==='cpu'?99:303))/30);
+
 const lerp = (a:number,b:number,k:number) => a+(b-a)*k;
 export const taskAt = (frame:number,kind:Kind,index:number) => {
   const progress=jobProgress(frame,kind,index);
