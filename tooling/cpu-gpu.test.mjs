@@ -29,6 +29,8 @@ test('a standalone generic arithmetic unit exists BEFORE any CPU/GPU story',()=>
   assert.ok(exampleAt(30).dyed>.2);
   assert.equal(exampleAt(60).dyed,1);
   assert.equal(exampleAt(100).phase,'done');
+  assert.ok(Math.abs(exampleAt(100).point[1]-.16)<1e-9,
+    'generic result cube must settle onto its finished pad');
   assert.equal(completedCount(80,'cpu'),0,'example is NOT a CPU task');
   assert.equal(completedCount(80,'gpu'),0,'example is NOT a GPU task');
   assert.ok(CENTER.cpu-GENERIC_X>9,'intro must not be geometrically inside CPU');
@@ -64,6 +66,8 @@ test('both 4x4 input AND output grids stand distinctly outside silicon',()=>{
     assert.ok(lastIn[0]<-CHIP_HALF-1.5,'last input still on chip');
     assert.ok(lastOut[0]>CHIP_HALF+3.8,'last output still on chip');
     assert.ok(lastOut[0]-firstOut[0]>2*GRID_STEP);
+    assert.equal(firstIn[1],.10,'input cubes should rest on input mat');
+    assert.equal(firstOut[1],.10,'blue results should rest on output mat');
     assert.ok(lastOut[2]-firstOut[2]>2*GRID_STEP);
     const points=Array.from({length:TASKS},(_,i)=>taskPositions(kind,i));
     assert.equal(new Set(points.map(p=>p.input.join(','))).size,16);
