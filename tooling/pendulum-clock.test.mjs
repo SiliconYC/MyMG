@@ -11,6 +11,14 @@ import {palletPose, palletLocalTip, palletWorldTip, contactDistance,
   flankAt, PITCH, PALLET_CLEARANCE, PIVOT_Y,
   palletLocalBase, palletWorldBase, palletOrientation, PALLET_BASE_HEIGHT} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
 
+import {
+  WHEEL_PLANE_Z,WHEEL_THICKNESS,PALLET_PLANE_Z,PALLET_THICKNESS,
+  PALLET_ARM_WELD_Z,WHEEL_SPINDLE_RADIUS,WHEEL_SPINDLE_REAR_Z,
+  WHEEL_SPINDLE_FRONT_Z,BEARING_CENTER_Z,BEARING_DEPTH,
+  BEARING_INNER_RADIUS,BEARING_OUTER_RADIUS,
+  wheelZRange,palletZRange,bearingZRange,spindleZRange,zOverlap,
+} from '../animations/pendulum-clock/web/src/escapement-axial.ts';
+
 const frame=(seconds)=>Math.round(seconds*FPS);
 
 test('a two-second pendulum reverses at its endpoints and returns exactly',()=>{
@@ -190,7 +198,7 @@ test('wheel progress is a function of oscillator crossing angles, not independen
 test('fork rods terminate at shoe BASE not tooth-catching nose',()=>{
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  assert.match(src,/b=\{\[\.\.\.palletLocalBase\(pose\.side\),-\.13\]\}/,
+  assert.match(src,/b=\{\[\.\.\.palletLocalBase\(pose\.side\),PALLET_ARM_WELD_Z\]\}/,
     'connecting rod should end at pallet base');
   assert.doesNotMatch(src,/b=\{\[\.\.\.palletLocalTip\(pose\.side\),-\.13\]\}/,
     'old bug: rod attached to sharp tooth tip');
@@ -291,7 +299,7 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
   const anchor=src.split('const Anchor:')[1].split('/** Highlight only')[0];
-  const pendulum=src.split('const Pendulum:')[1].split('/** Only the wheel bearing')[0];
+  const pendulum=src.split('const Pendulum:')[1].split('/** A fixed cylindrical JOURNAL SLEEVE')[0];
   const coupling=src.split('function makeCouplingGeometry()')[1]
     .split('const Ring:')[0];
   const movingJoint=src.split('ONE pivot, ONE angle')[1].split('<ContactHighlights')[0];
@@ -327,9 +335,57 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
     'no old flush-ended axle or decorative collars at the joint');
   assert.doesNotMatch(anchor,/<Axle /);
   assert.doesNotMatch(pendulum,/<Axle /);
-  assert.equal((support.match(/<Axle /g)||[]).length,1,
-    'only the unrelated wheel bearing is retained');
+  assert.equal((support.match(/<WheelBearing\/>/g)||[]).length,1,
+    'the wheel has exactly one fixed bearing sleeve');
+  assert.doesNotMatch(support,/<Axle /,
+    'the rear support must no longer be an opaque floating cylinder');
   assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-6\.28,0\]\}/);
   assert.match(anchor,/a=\{\[0,0,-\.33\]\}/,
     'both fork arms begin inside the front of the coupling');
+});
+
+test('visible pallet shoes and escapement wheel occupy the same axial contact plane',()=>{
+  assert.equal(PALLET_PLANE_Z,WHEEL_PLANE_Z,
+    'working face centers may not be offset along the shaft axis');
+  assert.equal(PALLET_ARM_WELD_Z,PALLET_PLANE_Z,
+    'fork arm end is embedded inside its pallet instead of stopping behind it');
+  assert.ok(zOverlap(wheelZRange,palletZRange)>=PALLET_THICKNESS-1e-10,
+    'the full axial extent of both pallet shoes must overlap wheel teeth');
+  assert.ok(wheelZRange[0]<=palletZRange[0] &&
+    wheelZRange[1]>=palletZRange[1]);
+  assert.equal(WHEEL_THICKNESS,.18);
+  assert.equal(PALLET_THICKNESS,.12);
+  const scene=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  assert.match(scene,/depth:WHEEL_THICKNESS/);
+  assert.match(scene,/geo.translate\(0,0,WHEEL_PLANE_Z-WHEEL_THICKNESS\/2\)/);
+  assert.match(scene,/depth:PALLET_THICKNESS/);
+  assert.match(scene,/geometry.translate\(0,0,-PALLET_THICKNESS\/2\)/);
+  assert.match(scene,/position=\{\[\.\.\.palletLocalTip\(pose.side\),PALLET_PLANE_Z\]\}/);
+  assert.match(scene,/b=\{\[\.\.\.palletLocalBase\(pose.side\),PALLET_ARM_WELD_Z\]\}/);
+});
+
+test('bearing has a real rotating shaft through its entire bored sleeve',()=>{
+  assert.ok(BEARING_OUTER_RADIUS>BEARING_INNER_RADIUS);
+  assert.ok(BEARING_INNER_RADIUS>WHEEL_SPINDLE_RADIUS);
+  assert.ok(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS>.005);
+  assert.ok(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS<.03);
+  assert.ok(zOverlap(bearingZRange,spindleZRange)>=BEARING_DEPTH-1e-10,
+    'rotating shaft must pass all the way through the bearing');
+  assert.ok(spindleZRange[1]>wheelZRange[1],
+    'shaft must embed into the wheel hub');
+  assert.ok(spindleZRange[0]<bearingZRange[0],
+    'shaft must emerge from the back face of the bearing');
+  assert.equal(spindleZRange[0],WHEEL_SPINDLE_REAR_Z);
+  assert.equal(spindleZRange[1],WHEEL_SPINDLE_FRONT_Z);
+  assert.ok(Math.abs((bearingZRange[0]+bearingZRange[1])/2-BEARING_CENTER_Z)<1e-12);
+  const scene=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  assert.match(scene,/ring.holes.push\(bore\)/,
+    'fixed support must be a drilled sleeve and not an overlapping solid cap');
+  assert.match(scene,/bore.absarc\(0,0,BEARING_INNER_RADIUS/);
+  assert.match(scene,/radius=\{WHEEL_SPINDLE_RADIUS\}/);
+  assert.match(scene,/depth=\{WHEEL_SPINDLE_FRONT_Z-WHEEL_SPINDLE_REAR_Z\}/);
+  assert.match(scene,/data-wheel-bearing-running-clearance=/);
+  assert.doesNotMatch(scene,/<Axle position=\{\[0,\.60,-\.42\]\}/);
 });

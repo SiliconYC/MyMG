@@ -7,6 +7,12 @@ import {clockAtFrame, TEETH, type ClockState} from './clock-model';
 import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
   contactDistance, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
+import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
+  PALLET_THICKNESS, PALLET_ARM_WELD_Z,
+  WHEEL_SPINDLE_RADIUS, WHEEL_SPINDLE_REAR_Z, WHEEL_SPINDLE_FRONT_Z,
+  BEARING_CENTER_Z, BEARING_DEPTH, BEARING_INNER_RADIUS,
+  BEARING_OUTER_RADIUS, bearingZRange, spindleZRange, zOverlap}
+  from './escapement-axial';
 
 /**
  * ONE spatially coherent mechanism. The camera starts at the FRONT of the
@@ -15,8 +21,9 @@ import {cameraAtFrame, type Vec3} from './camera-path';
  *
  * Layout, back -> front along z:
  *   pendulum and steel chassis  z=-0.98
- *   anchor and pallets         z=-0.34
- *   escapement and steel axle  z=0
+ *   anchor arms                z=-0.33..pallet plane
+ *   BOTH pallets and wheel    same z=-0.02 working plane
+ *   rotating escape spindle   z=-0.55..0.16 through the rear bearing
  *   dial support / dial        z=1.65..2.15
  *   red seconds hand           z=2.37
  *
@@ -125,10 +132,10 @@ function makeEscapeWheel():THREE.ExtrudeGeometry {
   hole.absarc(0,0,.55,0,Math.PI*2,true);
   shape.holes.push(hole);
   const geo=new THREE.ExtrudeGeometry(shape,{
-    depth:.18,steps:1,bevelEnabled:true,bevelSize:.018,
+    depth:WHEEL_THICKNESS,steps:1,bevelEnabled:true,bevelSize:.018,
     bevelThickness:.012,bevelSegments:2,curveSegments:48,
   });
-  geo.translate(0,0,-.11);
+  geo.translate(0,0,WHEEL_PLANE_Z-WHEEL_THICKNESS/2);
   return geo;
 }
 
@@ -140,6 +147,11 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
       <meshStandardMaterial color={BRASS} metalness={.78} roughness={.26}
         side={THREE.DoubleSide}/>
     </mesh>
+    {/* ONE rotating shaft: welded into the front wheel hub, passes through
+        the wheel's center and the stationary hollow rear bearing. */}
+    <Axle position={[0,0,(WHEEL_SPINDLE_REAR_Z+WHEEL_SPINDLE_FRONT_Z)/2]}
+      radius={WHEEL_SPINDLE_RADIUS}
+      depth={WHEEL_SPINDLE_FRONT_Z-WHEEL_SPINDLE_REAR_Z} color={BRASS}/>
     {Array.from({length:6},(_,i)=>{
       const a=i*Math.PI/3;
       return <Rod key={i}
@@ -168,17 +180,17 @@ function makeSlimPallet():THREE.ExtrudeGeometry {
   profile.lineTo(-.010,.023);
   profile.closePath();
   const geometry=new THREE.ExtrudeGeometry(profile,{
-    depth:.12,steps:1,bevelEnabled:true,
+    depth:PALLET_THICKNESS,steps:1,bevelEnabled:true,
     bevelSize:.004,bevelThickness:.006,bevelSegments:2,
   });
-  geometry.translate(0,0,-.10);
+  geometry.translate(0,0,-PALLET_THICKNESS/2);
   return geometry;
 }
 
 const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
   const geometry=useMemo(makeSlimPallet,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
-  return <group position={[...palletLocalTip(pose.side),-.06]}
+  return <group position={[...palletLocalTip(pose.side),PALLET_PLANE_Z]}
     rotation={[0,0,palletOrientation(pose.side)]}>
     <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial color={pose.engaged?GOLD:STEEL}
@@ -187,10 +199,10 @@ const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
         emissiveIntensity={pose.engaged?0.12:0}/>
     </mesh>
     {/* The visible edge of the actual short locking face. */}
-    <Rod a={[0,0,-.118]} b={[.017,.027,-.118]}
+    <Rod a={[0,0,-PALLET_THICKNESS/2-.004]} b={[.017,.027,-PALLET_THICKNESS/2-.004]}
       radius={.008} color="#f3dbb0"/>
     {/* The angled impulse face is much longer than the locking land. */}
-    <Rod a={[.017,.027,-.118]} b={[.023,.080,-.118]}
+    <Rod a={[.017,.027,-PALLET_THICKNESS/2-.004]} b={[.023,.080,-PALLET_THICKNESS/2-.004]}
       radius={.008} color={BRASS}/>
   </group>;
 };
@@ -208,7 +220,7 @@ const Anchor:React.FC<{state:ClockState}>=({state})=>{
       <group key={pose.side}>
         {/* Fork-to-pallet weld lives on the wide BASE, not the tooth tip. */}
         <Rod a={[0,0,-.33]}
-          b={[...palletLocalBase(pose.side),-.13]}
+          b={[...palletLocalBase(pose.side),PALLET_ARM_WELD_Z]}
           radius={.036} color={STEEL}/>
         <PalletTooth pose={pose}/>
       </group>
@@ -241,9 +253,34 @@ const Pendulum:React.FC=()=>
     </mesh>
   </group>;
 
-/** Only the wheel bearing remains; the pendulum-to-anchor joint is bare. */
+/** A fixed cylindrical JOURNAL SLEEVE with a real central bore.
+ * It must not be a solid floating plug: the rotating shaft runs through it
+ * with a small radial running clearance.
+ */
+function makeWheelBearing():THREE.ExtrudeGeometry {
+  const ring=new THREE.Shape();
+  ring.absarc(0,0,BEARING_OUTER_RADIUS,0,Math.PI*2,false);
+  const bore=new THREE.Path();
+  bore.absarc(0,0,BEARING_INNER_RADIUS,0,Math.PI*2,true);
+  ring.holes.push(bore);
+  const geo=new THREE.ExtrudeGeometry(ring,{
+    depth:BEARING_DEPTH,steps:1,bevelEnabled:false,curveSegments:64,
+  });
+  geo.translate(0,0,-BEARING_DEPTH/2);
+  return geo;
+}
+const WheelBearing:React.FC=()=>{
+  const geometry=useMemo(makeWheelBearing,[]);
+  useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
+  return <mesh geometry={geometry} position={[0,.60,BEARING_CENTER_Z]}
+    castShadow receiveShadow>
+    <meshStandardMaterial color={METAL} metalness={.69} roughness={.28}
+      side={THREE.DoubleSide}/>
+  </mesh>;
+};
+/** Other static supports are not part of this edit. */
 const MinimalSupports:React.FC=()=> <group>
-  <Axle position={[0,.60,-.42]} radius={.23} depth={.22} color={METAL}/>
+  <WheelBearing/>
 </group>;
 
 /** Porcelain seconds dial is ON THE SAME COAXIAL SHAFT as the escape wheel. */
@@ -354,6 +391,10 @@ export const PendulumClockScene:React.FC=()=>{
     data-contact-side={entry.engaged?'entry':exit.engaged?'exit':'free'}
     data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
+    data-wheel-plane-z={WHEEL_PLANE_Z}
+    data-pallet-plane-z={PALLET_PLANE_Z}
+    data-wheel-bearing-axial-overlap={zOverlap(bearingZRange,spindleZRange).toFixed(5)}
+    data-wheel-bearing-running-clearance={(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS).toFixed(5)}
     style={{overflow:'hidden',background:'#edece6',color:'#28383d',
       fontFamily:'"Noto Sans SC","Microsoft YaHei",sans-serif'}}>
     <Movement frame={frame}/>
