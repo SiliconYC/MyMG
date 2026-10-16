@@ -29,7 +29,7 @@ export const laneBranch = (index: number) => index % 2;
 export const laneActive = (frame: number, index: number) => {
   const stage = stageAt(frame);
   if (stage === 'reveal') return false;
-  if (stage === 'uniform') return frame >= 106 && frame < 286;
+  if (stage === 'uniform') return frame >= 106 && frame < 190;
   if (stage === 'branch') {
     if (frame < 324) return false;
     return Math.floor((frame - 324) / 22) % 2 === laneBranch(index);
