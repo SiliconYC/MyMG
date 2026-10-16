@@ -88,7 +88,7 @@ test('steam piston and governor spindle use shared integrated crank phase',()=>{
 test('bare cylinder has exactly two embedded side ports and no valve chest',()=>{
   const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
   assert.match(src,/const CylinderPorts/);
-  assert.match(src,/<CylinderPorts\/>/);
+  assert.match(src,/<CylinderPorts s=\{s\}\/>/);
   assert.doesNotMatch(src,/ValveAssembly|spoolX|valveLinkEnd|rockerAngle/);
   assert.match(src,/const GovernorThrottle/);
   assert.match(src,/const GovernorDrive/);
@@ -131,7 +131,7 @@ test('flyball governor is raised directly over the brass throttle',()=>{
     assert.deepEqual([valvePin[0],valvePin[2]],[THROTTLE_X,THROTTLE_Z]);
     assert.equal(collarPin[1],g.sleeveY+GOV_LIFT);
     assert.ok(Math.abs(gateTop[1]-gateBottom[1]-.70)<1e-12);
-    assert.ok(Math.abs(gateCenter[1]-g.sleeveY-.52)<1e-12);
+    assert.ok(Math.abs(gateCenter[1]-g.sleeveY-.32)<1e-12);
     const d=Math.hypot(...collarPin.map((v,i)=>v-valvePin[i]));
     if(stemLength===null)stemLength=d;
     assert.ok(Math.abs(d-stemLength)<1e-12,'straight stem may never telescope');
