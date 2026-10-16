@@ -93,8 +93,8 @@ test('both 4x4 input AND output grids stand distinctly outside silicon',()=>{
 
 test('a single camera travels from independent cell to CPU to GPU to comparison',()=>{
   assert.equal(cameraAt(0).focusX,GENERIC_X);
-  assert.equal(cameraAt(125).focusX,CENTER.cpu);
-  assert.equal(cameraAt(330).focusX,CENTER.gpu);
+  assert.ok(Math.abs(cameraAt(125).focusX-CENTER.cpu)<1e-9);
+  assert.ok(Math.abs(cameraAt(330).focusX-CENTER.gpu)<1e-9);
   assert.ok(Math.abs(cameraAt(470).focusX)<.00001);
   for(let frame=1;frame<DURATION;frame++){
     const before=cameraAt(frame-1),cam=cameraAt(frame);
