@@ -147,7 +147,7 @@ const SteamParticles: React.FC<{s: SteamFrame}> = ({s}) => {
     {dots.map((p, i) =>
       <mesh key={i} position={[p.x, p.y, p.z]} scale={.024 + p.pressure * .018}>
         <sphereGeometry args={[1, 8, 6]}/>
-        <meshBasicMaterial color={p.left ? '#ffbd70' : '#69d9e4'} transparent
+        <meshBasicMaterial color={p.left === (s.motion === 'right') ? '#ffbd70' : '#69d9e4'} transparent
           opacity={Math.min(.9, .4 + .5 * p.pressure)} depthWrite={false}/>
       </mesh>
     )}
@@ -175,8 +175,8 @@ const ValveAssembly: React.FC<{s: SteamFrame; plane: THREE.Plane}> = ({s, plane}
     {[-2.53, -.77].map((x, i) => <group key={i}>
       <mesh position={[x, 1.02, -.26]}>
         <boxGeometry args={[.20, .45, .21]}/>
-        <meshStandardMaterial color={i === 0 ? '#d67d3a' : '#4eb9c9'}
-          emissive={i === 0 ? '#9a3a14' : '#145a68'} emissiveIntensity={.38}/>
+        <meshStandardMaterial color={(i === 0) === (s.motion === 'right') ? '#d67d3a' : '#4eb9c9'}
+          emissive={(i === 0) === (s.motion === 'right') ? '#9a3a14' : '#145a68'} emissiveIntensity={.38}/>
       </mesh>
     </group>)}
     <Pipe points={[[-2.12, 2.44, -.10], [-2.12, 2.08, -.10],
@@ -237,9 +237,9 @@ const Flywheel: React.FC<{s: SteamFrame}> = ({s}) => {
 
 const EngineMechanics: React.FC<{s: SteamFrame}> = ({s}) => <group>
   <PressureChamber start={CYLINDER_LEFT + .07} end={s.pistonX - .15}
-    color="#ef924d" pressure={s.leftPressure}/>
+    color={s.motion === 'right' ? '#ef924d' : '#67c3db'} pressure={s.leftPressure}/>
   <PressureChamber start={s.pistonX + .15} end={CYLINDER_RIGHT - .08}
-    color="#67c3db" pressure={s.rightPressure}/>
+    color={s.motion === 'left' ? '#ef924d' : '#67c3db'} pressure={s.rightPressure}/>
   <SteamParticles s={s}/>
   {/* Piston runs inside the bore and remains visible after the hull is cut. */}
   <mesh position={[s.pistonX, 0, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
