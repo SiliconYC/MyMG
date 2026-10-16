@@ -17,6 +17,10 @@ on:
       - '.github/workflows/portal-qa.yml'
   workflow_dispatch:
 
+concurrency:
+  group: mymg-portal-qa-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -58,6 +62,11 @@ jobs:
           exit 1
       - name: Check native HBM WebGL 345 frames and nine screenshots
         run: pnpm --filter @mymg/portal qa
+        env:
+          MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
+          MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
+      - name: Verify CPU/GPU #22 native WebGL and four motion stages
+        run: pnpm --filter @mymg/portal qa:cpu-gpu
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
