@@ -145,9 +145,9 @@ try {
   assert.equal(await callout.getAttribute('data-callout-part'),'balls');
   assert.notEqual(await callout.getAttribute('data-anchor-x'),movingAnchor,
     'Ball callout must follow the actual 3D flyweight');
-  for(const n of [110,405]){
+  for(const n of [110,418]){
     await seek(n);
-    assert.equal(await callout.count(),0,'No permanent HUD between annotations');
+    assert.equal(await callout.count(),0,'No permanent HUD after explanation ends, frame '+n);
   }
   await seek(100);
   await page.getByTestId('play-toggle').click();
