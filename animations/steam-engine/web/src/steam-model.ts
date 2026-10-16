@@ -2,7 +2,7 @@
 import {governorAtFrame, GOVERNOR_START_FRAME, type GovernorState} from './governor-model.ts';
 
 export const FPS = 30;
-export const DURATION = 960;
+export const DURATION = 420;
 export const CRANK_X = 3.08;
 export const CRANK_RADIUS = 0.66;
 export const CONNECTING_ROD = 2.72;
@@ -41,7 +41,7 @@ export function steamAtFrame(frame: number): SteamFrame {
   const crossheadX = pinX - Math.sqrt(CONNECTING_ROD ** 2 - pinY ** 2);
   const pistonX = crossheadX - PISTON_OFFSET;
   // A moving clipping plane approaches from the viewer side, holds, then retracts.
-  const cut = smoothstep((frame - 40) / 112) * (1 - smoothstep((frame - 365) / 110));
+  const cut = smoothstep((frame - 23) / 59) * (1 - smoothstep((frame - 119) / 26));
   const cutZ = 1.42 - cut * 1.49;
   const velocity = -Math.sin(theta);
   return {
