@@ -81,6 +81,39 @@ try {
       if(content.includes(forbidden))throw new Error('Redundant HUD text: '+forbidden);
     }
   });
+  // Governor is part of the SAME real-time 3D scene, not a second clip.
+  const sampleGovernor=async()=>page.getByTestId('steam-engine-scene').evaluate(el=>({
+    speed:Number(el.getAttribute('data-governor-speed')),
+    angle:Number(el.getAttribute('data-governor-angle')),
+    sleeve:Number(el.getAttribute('data-governor-sleeve')),
+    throttle:Number(el.getAttribute('data-governor-throttle')),
+    camera:Number(el.getAttribute('data-camera-shift')),
+  }));
+  const govFrames={};
+  for (const n of [600,660,680,750,870]) {
+    await seek(n);
+    govFrames[n]=await sampleGovernor();
+    await page.getByTestId('steam-engine-scene').screenshot({
+      path:resolve(out,'governor-'+n+'.png'),
+    });
+  }
+  assert.ok(govFrames[600].camera>.20 && govFrames[660].camera>.99,
+    'camera must move closer to the governor, not remain static');
+  assert.ok(govFrames[660].speed>govFrames[600].speed+.20);
+  assert.ok(govFrames[660].angle>govFrames[600].angle+.15);
+  assert.ok(govFrames[680].sleeve>govFrames[600].sleeve+.20);
+  assert.ok(govFrames[680].throttle<govFrames[600].throttle-.22);
+  assert.ok(Math.abs(govFrames[870].speed-1)<.04);
+  assert.ok(govFrames[870].throttle>govFrames[680].throttle+.20);
+  for (const [n,title] of [[580,'离心调速器'],
+    [665,'转快，重锤张开'],[740,'节流，恢复转速']]) {
+    await seek(n);
+    assert.equal(await chapter.textContent(),title);
+  }
+  for (const n of [880,940]) {
+    await seek(n);
+    assert.equal(await chapter.count(),0,'No persistent annotation in final segment');
+  }
   await seek(170);
   await page.getByTestId('play-toggle').click();
   await page.waitForFunction(()=>Number(document.querySelector('[data-testid="frame-readout"]')
