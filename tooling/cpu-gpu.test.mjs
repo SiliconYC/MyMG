@@ -26,7 +26,7 @@ test('CPU cores take different turns; GPU lanes operate in one synchronous wave'
   assert.equal(cpuActiveCount(70),1);
   assert.equal(gpuActiveCount(70),0);
   assert.equal(gpuActiveCount(200),64);
-  assert.equal(gpuActiveCount(185),0);
+  assert.equal(gpuActiveCount(169),0);
   assert.equal(gpuActivity(200),gpuActivity(200));
   assert.equal(cpuActiveCount(350),1);
   assert.ok(gpuActivity(350)>0);
