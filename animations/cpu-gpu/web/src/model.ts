@@ -54,7 +54,7 @@ export const exampleAt=(frame:number)=>{
   const outT=smooth((progress-.65)/.35);
   const point:Point=[
     (-2.55)*(1-inT)+2.55*outT,
-    .52+.25*Math.sin(Math.PI*clamp(progress/.34))+
+    .16+.25*Math.sin(Math.PI*clamp(progress/.34))+
       .18*Math.sin(Math.PI*clamp((progress-.65)/.35)),
     0,
   ];
@@ -71,7 +71,7 @@ export const queuePosition=(kind:Kind,index:number,side:'input'|'output'):Point=
   const col=index%4,row=Math.floor(index/4);
   return [
     (side==='input'?INPUT_X:OUTPUT_X)+col*GRID_STEP,
-    .45,
+    .10,
     (row-1.5)*GRID_STEP,
   ];
 };
