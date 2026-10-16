@@ -37,9 +37,9 @@ const interpolateVec = (a:Vec3,b:Vec3,u:number):Vec3 => [
 /** At 30 FPS, final frame is 59.966s and seam loops to first shot. */
 export function cameraAtFrame(frame:number):CameraPose {
   const t = Math.max(0,Math.min(60,frame/30));
-  const index = Math.min(CAMERA_KEYS.length-2,
-    Math.max(0,CAMERA_KEYS.findIndex((k,i)=>i<CAMERA_KEYS.length-1 &&
-      t>=k.time && t<CAMERA_KEYS[i+1].time)));
+  const segment=CAMERA_KEYS.findIndex((k,i)=>i<CAMERA_KEYS.length-1 &&
+    t>=k.time && t<CAMERA_KEYS[i+1].time);
+  const index=segment===-1 ? CAMERA_KEYS.length-2 : segment;
   const from=CAMERA_KEYS[index], to=CAMERA_KEYS[index+1];
   const phase=smooth(Math.max(0,Math.min(1,(t-from.time)/(to.time-from.time))));
   return {
