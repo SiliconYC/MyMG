@@ -8,6 +8,7 @@
 export const FPS = 30;
 export const DURATION = 600;
 export const TASKS = 16;
+export const TASK_CUBE_SIZE = .40;
 export const CPU_CORES = 4;
 export const GPU_LANES = 16;
 export type Stage = 'task' | 'cpu' | 'gpu' | 'compare';
@@ -73,9 +74,9 @@ export const taskPositions = (kind:Kind,index:number): {
   const wave=Math.floor(index/4),lane=index%4;
   const z=(kind==='cpu'?lane:wave)-1.5;
   return {
-    input:[-4.85+(kind==='cpu'?wave:lane)*.5,.45,z*1.43],
+    input:[-5.15+(kind==='cpu'?wave:lane)*.50,.45,z*1.43],
     processor:corePosition(kind,kind==='cpu'?lane:index),
-    output:[3.35+(kind==='cpu'?wave:lane)*.5,.45,z*1.43],
+    output:[3.40+(kind==='cpu'?wave:lane)*.60,.45,z*1.43],
   };
 };
 /** A raised package cover briefly slides away, revealing the real die layout. */
