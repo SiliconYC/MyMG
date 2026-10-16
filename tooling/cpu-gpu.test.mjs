@@ -5,7 +5,7 @@ import {resolve} from 'node:path';
 import {
   DURATION,FPS,TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,
   stageAt,cameraAt,jobProgress,taskAt,taskPositions,
-  completedCount,workingCount,corePosition,lidOpening,
+  completedCount,workingCount,corePosition,lidOpening,lidScale,
 } from '../animations/cpu-gpu/web/src/model.ts';
 
 test('a single 16-second camera move never teleports, refocuses or over-zooms',()=>{
@@ -15,9 +15,9 @@ test('a single 16-second camera move never teleports, refocuses or over-zooms',(
   assert.equal(stageAt(190),'cpu');
   assert.equal(stageAt(356),'gpu');
   assert.equal(stageAt(435),'compare');
-  assert.equal(cameraAt(0).focusX,-6.5);
-  assert.equal(cameraAt(190).focusX,-6.5);
-  assert.equal(cameraAt(350).focusX,6.5);
+  assert.equal(cameraAt(0).focusX,-8.4);
+  assert.equal(cameraAt(190).focusX,-8.4);
+  assert.equal(cameraAt(350).focusX,8.4);
   assert.ok(Math.abs(cameraAt(479).focusX)<.00001);
   // 720px / 67zoom >= 10.7 world units: chip side is only 6.55.
   for(let frame=0;frame<DURATION;frame++){
@@ -45,6 +45,9 @@ test('silicon packages and raised lids remain continuous',()=>{
   assert.equal(lidOpening(291,'gpu'),0);
   assert.ok(lidOpening(314,'gpu')>0&&lidOpening(314,'gpu')<1);
   assert.equal(lidOpening(334,'gpu'),1);
+  assert.equal(lidScale(120,'cpu'),0,'CPU metal lid must be gone when processing starts');
+  assert.equal(lidScale(352,'gpu'),0,'GPU metal lid must be gone when processing starts');
+  assert.ok(lidScale(79,'cpu')>0&&lidScale(79,'cpu')<1);
   for(let f=1;f<DURATION;f++)
     for(const kind of ['cpu','gpu'])
       assert.ok(lidOpening(f,kind)>=lidOpening(f-1,kind),
@@ -100,6 +103,9 @@ test('native scene stays mounted and does not pop, clear or use prerecorded medi
   assert.match(src,/data-renderer="react-threejs-webgl"/);
   assert.match(src,/data-chip-design="package-with-exposed-silicon"/);
   assert.match(src,/data-camera-zoom/);
+  assert.match(src,/data-cpu-lid-scale/);
+  assert.match(src,/data-gpu-lid-scale/);
+  assert.match(src,/scale=\{shrink\}/,'lid must physically clear the chip');
   assert.match(src,/<TaskCube/);
   assert.match(src,/<Package kind=\{kind\}/);
   assert.match(src,/<CpuDie frame=\{frame\}/);
