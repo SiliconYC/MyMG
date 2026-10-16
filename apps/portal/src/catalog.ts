@@ -2,6 +2,7 @@ import type {ComponentType} from 'react';
 import {HbmMustard03Native} from '@mymg/hbm';
 import {DemoScene} from '@mymg/demo';
 import {PendulumClockScene} from '@mymg/pendulum-clock';
+import {SteamEngineScene} from '@mymg/steam-engine';
 import {CpuGpuScene} from '@mymg/cpu-gpu';
 // @mymg-generator-imports
 
@@ -9,7 +10,7 @@ import {CpuGpuScene} from '@mymg/cpu-gpu';
 export type MgProject = {
   id: string;
   compositionId: string;
-  cover?: {type: 'hbm'} | {type: 'clock'} | {type: 'cpu-gpu'} | {type: 'image'; src: string; alt: string};
+  cover?: {type: 'hbm'} | {type: 'clock'} | {type: 'steam'} | {type: 'cpu-gpu'} | {type: 'image'; src: string; alt: string};
   title: string;
   titleEn: string;
   category: string;
@@ -79,6 +80,27 @@ export const projects: readonly MgProject[] = [
       '秒针与擒纵轮共用同一角度，经过 60 次节拍恰好转一整圈；暂停、拖动与逐帧状态完全一致。',
       '擒纵轮、擒纵叉、摆杆、摆锤、钟面和指针全部由浏览器 Three.js 几何绘制，不使用 MP4 或逐帧图像。',
       '为便于观察，齿形、摆幅及释放动作均是教学示意；并非可直接加工的物理仿真机芯。',
+    ],
+  },
+  {
+    id: 'steam-engine',
+    compositionId: 'SteamEngineScene',
+    cover: {type: 'steam'},
+    title: '蒸汽机 · 动态剖切',
+    titleEn: 'STEAM ENGINE / 3D CUTAWAY',
+    category: '机械 / 三维剖面',
+    description: '一面看不见的剖切平面逐渐揭开气缸；内部活塞、蒸汽、连杆曲轴与飞轮始终连续运转。',
+    status: 'React / Three.js 实时剖切',
+    component: SteamEngineScene,
+    durationInFrames: 540,
+    fps: 30,
+    width: 1280,
+    height: 720,
+    notes: [
+      '真实 Three.js 空间裁切：外壳截面随平面推进而显露，活塞与内部蒸汽不停止。',
+      '解析滑块曲柄运动学：活塞、十字头、连杆、曲柄和飞轮严格联动。',
+      '双作用气缸：橙色为高压蒸汽，蓝色为排汽侧；锅炉外供蒸汽，气缸不燃烧。',
+      '18 秒循环可暂停、逐帧、拖动至剖切保持段；全程原生浏览器 3D，无影片或序列帧。',
     ],
   },
   {

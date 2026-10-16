@@ -37,6 +37,18 @@ const ClockArtwork: React.FC = () => (
   </div>
 );
 
+const SteamArtwork: React.FC = () => (
+  <div className="artwork artwork-steam" aria-hidden="true">
+    <div className="steam-cylinder"><span className="steam-heat"/></div>
+    <div className="steam-top-pipe"/>
+    <div className="steam-crosshead"/>
+    <div className="steam-conrod"/>
+    <div className="steam-flywheel"><span/><span/><span/><span/></div>
+    <div className="steam-cut-rim"/>
+    <span className="artwork-label">STEAM / KINEMATICS / CUTAWAY</span>
+  </div>
+);
+
 const CpuGpuArtwork: React.FC = () => (
   <div className="artwork artwork-cpu-gpu" aria-hidden="true">
     <div className="mini-die mini-cpu">
@@ -56,6 +68,7 @@ const ProjectCard: React.FC<{project: MgProject; index: number}> = ({project, in
     <div className="project-art">
       {project.cover?.type === 'hbm' ? <HbmArtwork /> :
         project.cover?.type === 'clock' ? <ClockArtwork /> :
+        project.cover?.type === 'steam' ? <SteamArtwork /> :
         project.cover?.type === 'cpu-gpu' ? <CpuGpuArtwork /> :
         project.cover?.type === 'image' ?
           <img className="artwork-cover" src={project.cover.src} alt={project.cover.alt} loading="lazy" /> :
