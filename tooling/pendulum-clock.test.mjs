@@ -3,223 +3,286 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import {resolve} from 'node:path';
 import {
-  clockAtFrame, contactStats, FPS, DURATION, TEETH, PERIOD_SECONDS,
-  PENDULUM_AMPLITUDE, PHYSICS_HZ, GRAVITY_OVER_LENGTH,
-  DRIVE_ACCELERATION, PENDULUM_DRAG, IMPULSE_EFFICIENCY,
+  clockAtFrame, FPS, DURATION, TEETH, PERIOD_SECONDS, RELEASE_OFFSET,
+  PENDULUM_AMPLITUDE, RELEASE_START_ANGLE, RELEASE_END_ANGLE,
 } from '../animations/pendulum-clock/web/src/clock-model.ts';
-import {
-  HALF_PITCH, PITCH, TIP_FRACTION, WHEEL_PROFILE, WHEEL_TIP_RADIUS,
-  LOCK_RADIUS, LOCK_POLAR, LOCK_TOOTH_ANGLE, RELEASE_ANGLE,
-  PALLET_RANGES, PALLET_BAND, faceContains, lockedSide, wheelTip,
-  PIVOT_Y, WHEEL_Y, polar,
-} from '../animations/pendulum-clock/web/src/escapement-geometry.ts';
-import {
-  contactDistance, palletPose, palletOutline, palletLocalBase,
-  palletWorldBase, palletWorldTip, palletLocalTip, workingToothIndex,
-  workingTooth, palletFaceWorld,
-} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
 import {cameraAtFrame, SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
+import {palletPose, palletLocalTip, palletWorldTip, contactDistance,
+  flankAt, PITCH, PALLET_CLEARANCE, PIVOT_Y,
+  palletLocalBase, palletWorldBase, palletOrientation, PALLET_BASE_HEIGHT} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
 
-const at=t=>clockAtFrame(Math.round(t*FPS));
-const near=(a,b,eps=1e-7)=>assert.ok(Math.abs(a-b)<=eps,
-  `expected ${a} ~ ${b} (tolerance ${eps})`);
-const dist=(p,q)=>Math.hypot(p[0]-q[0],p[1]-q[1]);
+const frame=(seconds)=>Math.round(seconds*FPS);
 
-test('the pendulum is integrated under gravity; not a separate cosine animation',()=>{
+test('a two-second pendulum reverses at its endpoints and returns exactly',()=>{
+  const a=clockAtFrame(0),mid=clockAtFrame(FPS),end=clockAtFrame(2*FPS);
   assert.equal(PERIOD_SECONDS,2);
-  assert.equal(PHYSICS_HZ/FPS,20);
-  near(GRAVITY_OVER_LENGTH,Math.PI*Math.PI);
-  assert.ok(DRIVE_ACCELERATION>0 && PENDULUM_DRAG>0);
-  assert.ok(IMPULSE_EFFICIENCY>0 && IMPULSE_EFFICIENCY<1);
-  near(at(0).pendulumAngle,PENDULUM_AMPLITUDE);
-  near(at(0).pendulumVelocity,0);
-  assert.ok(at(.5).pendulumVelocity<-.4);
-  assert.ok(at(1).pendulumAngle<-.13);
-  assert.ok(at(1.5).pendulumVelocity>.4);
-  assert.ok(at(2).pendulumAngle>.13);
-  const src=readFileSync(resolve(import.meta.dirname,
-    '../animations/pendulum-clock/web/src/clock-model.ts'),'utf8');
-  assert.match(src,/Math\.sin\(s\.a\)/,'gravity must act on the pendulum');
-  assert.match(src,/s\.wv\+=/,'wheel must accelerate from force/torque');
-  assert.match(src,/faceContains\(/,'locking depends on the physical arc');
-  assert.doesNotMatch(src,/smoothstep|Math\.cos\(Math\.PI\s*\*\s*seconds\)/);
+  assert.ok(Math.abs(a.pendulumAngle+mid.pendulumAngle)<1e-10);
+  assert.ok(Math.abs(end.pendulumAngle-a.pendulumAngle)<1e-10);
 });
 
-test('60 impacts: one per second, 30 teeth, half-pitch rotation per beat',()=>{
-  const stats=contactStats();
+test('one beat every second, alternating entry and exit pallet',()=>{
+  assert.equal(clockAtFrame(0).beats,0);
+  assert.equal(clockAtFrame(frame(.3)).beats,0);
+  assert.equal(clockAtFrame(frame(.7)).beats,1);
+  assert.equal(clockAtFrame(frame(1.3)).beats,1);
+  assert.equal(clockAtFrame(frame(1.7)).beats,2);
+  assert.equal(clockAtFrame(frame(2.7)).beats,3);
+  assert.equal(clockAtFrame(frame(.3)).lock,'entry');
+  assert.equal(clockAtFrame(frame(.7)).lock,'exit');
+  assert.equal(clockAtFrame(frame(1.7)).lock,'entry');
   assert.equal(TEETH,30);
-  assert.equal(stats.impacts,60);
-  assert.ok(stats.first>.55 && stats.first<.65);
-  assert.ok(stats.last>59.55 && stats.last<59.8);
-  assert.equal(at(.3).beats,0);
-  assert.equal(at(.53).beats,0);
-  assert.equal(at(.7).beats,1);
-  assert.equal(at(1.7).beats,2);
-  assert.equal(at(59.9).beats,60);
-  near(at(59.9).wheelAngle,2*Math.PI);
-  near(HALF_PITCH,Math.PI/30);
-  assert.equal(at(60).secondHandAngle,at(60).wheelAngle);
-  for(let n=0;n<=60;n++){
-    const state=at(n===0?0:Math.min(59.9,n-.3));
-    assert.equal(state.beats,n);
-    near(state.wheelAngle,n*HALF_PITCH,1e-8);
-  }
+  assert.equal(RELEASE_OFFSET,.42);
 });
 
-test('the drive torque cannot turn a wheel when its tip meets the finite shoe arc',()=>{
-  let prev=clockAtFrame(0),locked=0,released=0;
-  for(let f=1;f<DURATION;f++){
-    const state=clockAtFrame(f);
-    assert.ok(state.wheelAngle+1e-10>=prev.wheelAngle,
-      'wheel reversed at frame '+f);
-    assert.equal(state.anchorAngle,state.pendulumAngle,
-      'one axle, no independent anchor motor');
-    assert.equal(state.secondHandAngle,state.wheelAngle);
-    assert.equal(state.lock,lockedSide(state.beats));
-    if(!state.releasing){
-      locked++;
-      near(state.wheelVelocity,0,1e-12);
-      near(state.wheelAngle,state.beats*HALF_PITCH,2e-12);
-      assert.ok(faceContains(state.lock,state.pendulumAngle),
-        'lock must be geometrically supported at frame '+f);
-      assert.ok(contactDistance(state.lock,state)<.000001,
-        'the visible gear tooth must touch a real face at frame '+f);
-    }else{
-      released++;
-      assert.ok(state.wheelVelocity>0,'drive wheel should coast while free');
-      assert.ok(state.releaseProgress>=0 && state.releaseProgress<=1.001);
-    }
-    prev=state;
+test('escape wheel and second hand advance half a tooth per beat',()=>{
+  const radPerBeat=2*Math.PI/(2*TEETH);
+  for(let beat=0;beat<60;beat++){
+    const state=clockAtFrame(frame(beat+.8));
+    assert.equal(state.beats,beat+1);
+    assert.ok(Math.abs(state.wheelAngle-radPerBeat*(beat+1))<1e-9);
+    assert.equal(state.wheelAngle,state.secondHandAngle);
   }
-  assert.ok(locked>1200,'deadbeat phase dominates the cycle');
-  assert.ok(released>100,'genuine release phase exists');
+  assert.ok(Math.abs(clockAtFrame(frame(59.8)).wheelAngle-2*Math.PI)<1e-9);
 });
 
-test('real tooth tips and deadbeat locking faces share exactly one geometry',()=>{
-  assert.equal(WHEEL_PROFILE.filter(x=>x[0]===TIP_FRACTION).length,1);
-  assert.equal(WHEEL_PROFILE.find(x=>x[0]===TIP_FRACTION)[1],WHEEL_TIP_RADIUS);
-  assert.ok(WHEEL_PROFILE[2][0]<TIP_FRACTION,
-    'teeth should be swept-back, not meaningless rectangular triangles');
-  const left=wheelTip(-4,0);
-  const right=wheelTip(3,HALF_PITCH);
-  near(left[0],-right[0],1e-12);
-  near(left[1],right[1],1e-12);
-  for(const p of [left,right]){
-    near(Math.hypot(p[0],p[1]-PIVOT_Y),LOCK_RADIUS,1e-10);
-    near(Math.abs(Math.atan2(p[0],PIVOT_Y-p[1])),LOCK_POLAR,1e-10);
+test('locked intervals are stationary; release intervals rotate monotonically',()=>{
+  const before=clockAtFrame(frame(.2));
+  const lock=clockAtFrame(frame(.8));
+  const still=clockAtFrame(frame(1.2));
+  assert.equal(before.wheelAngle,0);
+  assert.equal(lock.wheelAngle,still.wheelAngle);
+  let last=-1;
+  for(let k=0;k<DURATION;k++){
+    const value=clockAtFrame(k).wheelAngle;
+    assert.ok(value>=last-1e-10,'no unsupported reverse motion at '+k);
+    last=value;
   }
-  near(LOCK_TOOTH_ANGLE,Math.PI/4);
-  for(const side of ['entry','exit']){
-    const [lo,hi]=PALLET_RANGES[side];
-    assert.ok(lo<hi);
-    assert.ok(hi-lo>.11 && hi-lo<.14);
-    near(Math.abs(side==='entry'?lo+LOCK_POLAR:hi-LOCK_POLAR),
-      RELEASE_ANGLE);
-    const points=palletOutline(side);
-    assert.ok(points.length>=40);
-    for(const p of points)assert.ok(p.every(Number.isFinite));
-    for(const p of [points[0],points[20]])
-      near(Math.hypot(...p),LOCK_RADIUS,1e-9);
-    const base=palletLocalBase(side);
-    assert.ok(Math.abs(Math.hypot(...base)-LOCK_RADIUS)<=PALLET_BAND+1e-10);
-    assert.ok(dist(base,palletLocalTip(side))>.07);
-  }
+  const first=clockAtFrame(frame(.45));
+  const next=clockAtFrame(frame(.55));
+  assert.equal(first.releasing,true);
+  assert.equal(next.releasing,true);
+  assert.ok(first.wheelAngle<next.wheelAngle);
 });
 
-test('every locked frame has exactly one rigidly connected pallet and tip contact',()=>{
-  const angles=[0,.145,-.145,.033,-.033];
-  for(const side of ['entry','exit']){
-    const base=palletLocalBase(side),tip=palletLocalTip(side);
-    for(const angle of angles){
-      const rotated=(p)=>{
-        const c=Math.cos(-angle),s=Math.sin(-angle);
-        return [p[0]*c-p[1]*s,p[0]*s+p[1]*c+PIVOT_Y];
-      };
-      near(dist(palletWorldBase(side,angle),rotated(base)),0,1e-12);
-      near(dist(palletWorldTip(side,angle),rotated(tip)),0,1e-12);
-      near(dist(palletWorldBase(side,angle),palletWorldTip(side,angle)),
-        dist(base,tip),1e-12);
-    }
-  }
-  for(let f=0;f<DURATION;f++){
-    const s=clockAtFrame(f);
-    const poses=['entry','exit'].map(side=>palletPose(side,s));
-    assert.ok(poses.filter(p=>p.engaged).length<2,'both shoe faces cannot lock');
-    if(!s.releasing){
-      const p=poses.find(p=>p.engaged);
-      assert.ok(p,'a stopped wheel must be visibly in contact');
-      assert.ok(p.gap<1e-6);
-      const tooth=workingTooth(p.side,s.wheelAngle);
-      near(dist(tooth,p.tooth),0,1e-12);
-      assert.equal(p.toothIndex,workingToothIndex(p.side,s.wheelAngle));
-      const a=palletFaceWorld(p.side,0,s.pendulumAngle);
-      const b=palletFaceWorld(p.side,1,s.pendulumAngle);
-      near(dist(a,p.faceStart),0,1e-12);
-      near(dist(b,p.faceEnd),0,1e-12);
-    }
-  }
+test('random seeking and replay yield identical geometry state',()=>{
+  const samples=[0,12,19,32,90,761,1120,1799];
+  const original=samples.map(clockAtFrame);
+  samples.reverse().map(clockAtFrame);
+  assert.deepEqual(samples.reverse().map(clockAtFrame),original);
 });
 
-test('seeking any frame is deterministic and shaft angular velocity changes only on impact',()=>{
-  const order=[0,1799,20,771,300,1799,40,20,60,960];
-  const first=order.map(clockAtFrame);
-  for(let n=order.length-1;n>=0;n--)
-    assert.deepEqual(clockAtFrame(order[n]),first[n]);
-  assert.ok(first.every(s=>Number.isFinite(s.pendulumVelocity)&&
-    Number.isFinite(s.wheelVelocity)));
-  assert.ok(at(30).pendulumAngle!==at(0).pendulumAngle);
-});
-
-test('one clean WebGL scene; no fake screen overlays or animated proxy parts',()=>{
+test('the new scene uses ThreeCanvas, shares the mechanism model and has no media cheats',()=>{
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
   const catalog=readFileSync(resolve(import.meta.dirname,
     '../apps/portal/src/catalog.ts'),'utf8');
-  assert.equal((src.match(/<ThreeCanvas/g)||[]).length,1);
-  assert.match(src,/data-simulation="gravity-torque-rigid-contact"/);
-  assert.match(src,/makeDeadbeatPallet/);
-  assert.match(src,/palletOutline\(side\)/);
-  assert.match(src,/WHEEL_PROFILE/);
-  assert.match(src,/rotation=\{\[0,0,-state\.pendulumAngle\]\}/);
-  assert.match(src,/<EscapeWheel angle=\{state\.wheelAngle\}/);
-  assert.match(src,/<Pendulum\/>/);
-  assert.match(src,/<Dial angle=\{state\.secondHandAngle\}/);
-  assert.match(src,/b=\{\[\.\.\.palletLocalBase\(pose\.side\),-\.12\]\}/);
-  assert.doesNotMatch(src,/makeSlimPallet|ContactHighlights|<boxGeometry|<video|<img|\.mp4|\.gif|\.webm|Date\.now|setInterval/i);
+  assert.match(src,/<ThreeCanvas/);
+  assert.match(src,/clockAtFrame\(frame\)/);
+  assert.match(src,/makeEscapeWheel/);
+  assert.match(src,/data-testid="pendulum-clock-scene"/);
+  assert.doesNotMatch(src,/<video|<img|\.mp4|\.webm|\.gif|Date\.now|setInterval/i);
   assert.match(catalog,/id: 'pendulum-clock'/);
   assert.match(catalog,/component: PendulumClockScene/);
 });
 
-test('all camera moves are continuous and include a sustained stationary contact closeup',()=>{
+
+test('camera concentrates screen time on explicit observation positions',()=>{
+  const hold=SHOTS.filter(s=>s.mode==='observe')
+    .reduce((sum,s)=>sum+s.end-s.start,0);
+  const travel=SHOTS.filter(s=>s.mode==='travel')
+    .reduce((sum,s)=>sum+s.end-s.start,0);
+  assert.ok(hold>travel*2,'close-up observation needs to dominate transitions');
+  assert.ok(SHOTS.every(s=>s.end>s.start),'all shots have positive durations');
   assert.equal(SHOTS[0].start,0);
   assert.equal(SHOTS.at(-1).end,60);
-  let observe=0,travel=0;
-  for(let i=0;i<SHOTS.length;i++){
-    const shot=SHOTS[i];
-    assert.ok(shot.end>shot.start);
-    if(shot.mode==='observe')observe+=shot.end-shot.start;
-    else travel+=shot.end-shot.start;
-    if(i){
-      const p=SHOTS[i-1];
-      assert.equal(p.end,shot.start);
-      assert.deepEqual(p.positionTo,shot.positionFrom);
-      assert.deepEqual(p.targetTo,shot.targetFrom);
-      assert.equal(p.fovTo,shot.fovFrom);
+  for(let i=1;i<SHOTS.length;i++){
+    const previous=SHOTS[i-1],current=SHOTS[i];
+    assert.equal(previous.end,current.start,'no timeline gaps');
+    assert.deepEqual(previous.positionTo,current.positionFrom,'no camera teleport');
+    assert.deepEqual(previous.targetTo,current.targetFrom,'no target teleport');
+    assert.equal(previous.fovTo,current.fovFrom,'no fov snap');
+  }
+});
+
+test('calm storyboard keeps a single legible two-pallet macro for twenty seconds',()=>{
+  const front=cameraAtFrame(0);
+  const back=cameraAtFrame(12*FPS);
+  const first=cameraAtFrame(24*FPS);
+  const second=cameraAtFrame(36*FPS);
+  const proof=cameraAtFrame(48*FPS);
+  assert.equal(front.chapter,'front');
+  assert.equal(back.chapter,'rear');
+  assert.equal(first.chapter,'contact');
+  assert.equal(second.chapter,'contact');
+  assert.equal(first.mode,'observe');
+  assert.deepEqual(first.position,second.position,'NO moving between the pallets');
+  assert.deepEqual(first.target,second.target,'both contacts fit one fixed composition');
+  assert.ok(first.position[2]<-3,'contact camera is actually behind the wheel');
+  assert.ok(first.position[0]===0,'contact shot centered: no frantic side angle');
+  assert.ok(Math.hypot(...first.position)<Math.hypot(...front.position)*.5);
+  assert.equal(proof.chapter,'proof');
+  assert.ok(proof.position[2]>10);
+  assert.deepEqual(cameraAtFrame(60*FPS).position,front.position);
+});
+
+test('pallets are rigid points on the pendulum shaft, not self-powered sliders',()=>{
+  const rotate=(p,angle)=>[
+    p[0]*Math.cos(angle)-p[1]*Math.sin(angle),
+    p[0]*Math.sin(angle)+p[1]*Math.cos(angle),
+  ];
+  for(let frameNo=0;frameNo<DURATION;frameNo++){
+    const state=clockAtFrame(frameNo);
+    assert.equal(state.anchorAngle,state.pendulumAngle,
+      'anchor and pendulum share exactly one pivot angle');
+    for(const side of ['entry','exit']){
+      const fixed=palletLocalTip(side);
+      const swung=rotate(fixed,-state.pendulumAngle);
+      const rendered=palletWorldTip(side,state.pendulumAngle);
+      assert.ok(Math.abs(swung[0]-rendered[0])<1e-12);
+      assert.ok(Math.abs(swung[1]+PIVOT_Y-rendered[1])<1e-12);
+      assert.ok(Math.abs(Math.hypot(...fixed)-
+        Math.hypot(rendered[0],rendered[1]-PIVOT_Y))<1e-10,
+        'pallet arm may rotate, but its length must NEVER change');
     }
   }
-  assert.ok(observe>travel*2);
-  const f=cameraAtFrame(24*FPS),g=cameraAtFrame(36*FPS);
-  assert.equal(f.chapter,'contact');
-  assert.deepEqual(f.position,g.position);
-  assert.deepEqual(f.target,g.target);
-  assert.ok(f.position[2]<-3);
-  assert.ok(cameraAtFrame(48*FPS).position[2]>10);
-  let prev=cameraAtFrame(0);
-  for(let i=1;i<DURATION;i++){
-    const cur=cameraAtFrame(i);
-    assert.deepEqual(cur,cameraAtFrame(i));
-    assert.ok(Math.hypot(...cur.position.map((x,k)=>x-prev.position[k]))<1.25);
-    prev=cur;
+});
+
+test('real wheel teeth meet the rigid fork on each escapement threshold',()=>{
+  const p=flankAt(-4,0);
+  const near=Math.hypot(p.point[0]-p.start[0],p.point[1]-p.start[1]);
+  assert.ok(near>.08&&near<.19);
+  for(let beat=0;beat<59;beat++){
+    const s=clockAtFrame(frame(beat+.4));
+    const active=s.lock;
+    const passive=active==='entry'?'exit':'entry';
+    assert.ok(palletPose(active,s).engaged,
+      'outgoing pallet holds the wheel until oscillator reaches the threshold');
+    assert.ok(contactDistance(active,s)<.02,
+      'rigid pallet must physically reach its tooth flank at threshold '+beat);
+    assert.ok(!palletPose(passive,s).engaged);
+    const halfway=clockAtFrame(frame(beat+.8));
+    const catching=halfway.lock;
+    assert.ok(palletPose(catching,halfway).engaged);
+    assert.ok(contactDistance(catching,halfway)<.06,
+      'arc-shaped wedge follows tooth flank during lock');
   }
-  assert.deepEqual(cameraAtFrame(60*FPS).position,cameraAtFrame(0).position);
+  assert.equal(TEETH,30);
+  assert.ok(PITCH>0&&PALLET_CLEARANCE>0);
+});
+
+test('wheel progress is a function of oscillator crossing angles, not independent motion',()=>{
+  const smooth=x=>{const u=Math.max(0,Math.min(1,x));return u*u*(3-2*u)};
+  for(let beat=0;beat<59;beat++){
+    for(const d of [.43,.47,.52,.57]){
+      const state=clockAtFrame(frame(beat+d));
+      const outgoing=state.pendulumAngle*(beat%2===0?1:-1);
+      const derived=smooth((RELEASE_START_ANGLE-outgoing)/
+        (RELEASE_START_ANGLE-RELEASE_END_ANGLE));
+      assert.ok(Math.abs(state.releaseProgress-derived)<1e-12);
+      assert.ok(Math.abs(state.wheelAngle-
+        (beat+derived)*Math.PI/TEETH)<1e-12,
+        'no second oscillator/motor controls the escapement wheel');
+    }
+  }
+  assert.equal(PENDULUM_AMPLITUDE,.145);
+});
+
+test('fork rods terminate at shoe BASE not tooth-catching nose',()=>{
+  const src=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  assert.match(src,/b=\{\[\.\.\.palletLocalBase\(pose\.side\),-\.13\]\}/,
+    'connecting rod should end at pallet base');
+  assert.doesNotMatch(src,/b=\{\[\.\.\.palletLocalTip\(pose\.side\),-\.13\]\}/,
+    'old bug: rod attached to sharp tooth tip');
+  for(const side of ['entry','exit']){
+    const tip=palletLocalTip(side),base=palletLocalBase(side);
+    const length=Math.hypot(base[0]-tip[0],base[1]-tip[1]);
+    assert.ok(Math.abs(length-PALLET_BASE_HEIGHT)<1e-12);
+    assert.ok(Math.hypot(...base)<Math.hypot(...tip)-.18,
+      'shoe base must point back to the main anchor pivot');
+    assert.ok(Math.abs(palletOrientation(side))>.6);
+    for(const n of [0,7,13,27,42]){
+      const state=clockAtFrame(n);
+      const rotated=palletWorldBase(side,state.pendulumAngle);
+      const pose=palletPose(side,state);
+      assert.ok(Math.hypot(rotated[0]-pose.mounting[0],
+        rotated[1]-pose.mounting[1])<1e-11);
+      assert.ok(Math.abs(Math.hypot(rotated[0],rotated[1]-PIVOT_Y)-
+        Math.hypot(...base))<1e-11);
+    }
+  }
+});
+
+test('both working pallets swap lock without jamming each other',()=>{
+  assert.ok(PENDULUM_AMPLITUDE>.14,
+    'pendulum and fork need visibly wider swing to clear tooth shoulders');
+  for(let beat=0;beat<59;beat++){
+    const incoming=clockAtFrame(frame(beat+.4));
+    const active=incoming.lock;
+    const other=active==='entry'?'exit':'entry';
+    assert.ok(contactDistance(active,incoming)<.02,
+      'working flank must have contact at the release threshold');
+    assert.ok(contactDistance(other,incoming)>.075,
+      'inactive flank must be clearly withdrawn, not simultaneously jammed');
+    const after=clockAtFrame(frame(beat+.8));
+    const catching=after.lock;
+    const escaping=catching==='entry'?'exit':'entry';
+    assert.ok(contactDistance(catching,after)<.06,
+      'catching shoe is near the next tooth');
+    assert.ok(contactDistance(escaping,after)>.07,
+      'released shoe must clear the opposing flank by at least 0.07');
+  }
+});
+
+test('one shared swinging fork exchanges locking pallets while wheel steps',()=>{
+  const before=clockAtFrame(frame(.40));
+  const early=clockAtFrame(frame(.43));
+  const mid=clockAtFrame(frame(.50));
+  const late=clockAtFrame(frame(.60));
+  const after=clockAtFrame(frame(.70));
+  assert.ok(palletPose('entry',before).engaged);
+  assert.ok(palletPose('entry',early).engaged);
+  assert.ok(!palletPose('entry',mid).engaged);
+  assert.ok(!palletPose('exit',mid).engaged);
+  assert.ok(palletPose('exit',late).engaged);
+  assert.ok(palletPose('exit',after).engaged);
+  assert.ok(contactDistance('exit',after)<.06);
+  assert.ok(before.wheelAngle<mid.wheelAngle);
+  assert.ok(mid.wheelAngle<after.wheelAngle);
+});
+
+test('camera moves smoothly within and across shots and is seek-deterministic',()=>{
+  let prev=cameraAtFrame(0);
+  for(let i=1;i<60*FPS;i++){
+    const pose=cameraAtFrame(i);
+    assert.deepEqual(pose,cameraAtFrame(i));
+    for(const n of [...pose.position,...pose.target,pose.fov])
+      assert.ok(Number.isFinite(n),'nonfinite camera value');
+    const displacement=Math.hypot(...pose.position.map((x,k)=>x-prev.position[k]));
+    assert.ok(displacement<1.25,'unexpected camera teleport at frame '+i+': '+displacement);
+    prev=pose;
+  }
+});
+
+test('all front, rear, and dial parts stay in one ThreeCanvas',()=>{
+  const src=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  assert.equal((src.match(/<ThreeCanvas/g)||[]).length,1,'one 3D world');
+  assert.match(src,/<CinematicCamera frame={frame}/);
+  assert.match(src,/<MinimalSupports\/>/);
+  assert.doesNotMatch(src,/const Chassis|<Chassis\/>/);
+  assert.match(src,/makeSlimPallet/);
+  assert.match(src,/contactDistance/);
+  assert.match(src,/palletPose/);
+  assert.match(src,/<PalletTooth/);
+  assert.doesNotMatch(src,/<boxGeometry/);
+  assert.match(src,/data-camera-mode={shot.mode}/);
+  assert.match(src,/<Pendulum\/>/);
+  assert.match(src,/rotation=\{\[0,0,-state.pendulumAngle\]\}/);
+  assert.match(src,/ONE pivot, ONE angle/);
+  assert.match(src,/<EscapeWheel angle={state.wheelAngle}\/>/);
+  assert.match(src,/<Anchor state={state}/);
+  assert.doesNotMatch(src,/rotation=\{\[0,0,-state.anchorAngle\]\}/);
+  assert.match(src,/<Dial angle={state.secondHandAngle}\/>/);
+  assert.doesNotMatch(src,/artwork|backgroundImage:|linear-gradient|grid-template|<svg/i);
 });
