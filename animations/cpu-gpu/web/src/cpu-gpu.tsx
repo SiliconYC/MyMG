@@ -5,7 +5,7 @@ import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   TASKS, TASK_CUBE_SIZE, CPU_CORES, GPU_LANES, cameraAt, completedCount, workingCount,
-  taskAt, sampleAt, stageAt, smooth, corePosition, lidOpening,
+  taskAt, stageAt, smooth, corePosition, lidOpening, lidScale,
   type Kind,
 } from './model';
 
@@ -26,16 +26,17 @@ const Box:React.FC<BoxProps>=({
     <boxGeometry args={size}/>
     <meshStandardMaterial color={color} metalness={metal} roughness={.51}
       emissive={glow} emissiveIntensity={power}
-      transparent={opacity<1} opacity={opacity}/>
+      transparent={opacity<1} opacity={opacity}
+      depthWrite={opacity>=.999}/>
   </mesh>
 );
 
 const Camera:React.FC<{frame:number}>=({frame})=>{
   const {camera}=useThree();
   useLayoutEffect(()=>{
-    const {focusX,zoom,angle}=cameraAt(frame);
-    camera.position.set(focusX+4.5+angle*5,11.5,19-angle*9);
-    camera.lookAt(focusX,0,0);
+    const {focusX,zoom,angle,targetY}=cameraAt(frame);
+    camera.position.set(focusX+4.5+angle*5,12,19-angle*9);
+    camera.lookAt(focusX,targetY,0);
     if(camera instanceof THREE.OrthographicCamera)camera.zoom=zoom;
     camera.updateProjectionMatrix();
   },[camera,frame]);
@@ -108,12 +109,18 @@ const GpuDie:React.FC<{frame:number}>=({frame})=><group>
 /** Brief packaging reveal makes it immediately read as a semiconductor chip. */
 const Lid:React.FC<{frame:number;kind:Kind}>=({frame,kind})=>{
   const open=lidOpening(frame,kind);
-  if(open>=.998)return null;
   const tone=kind==='cpu'?'#c5c4bc':'#9cbbc2';
-  return <group position={[0,2.1*open,-4.6*open]}>
-    <Box pos={[0,.58,0]} size={[5.50,.29,5.50]} color={tone} metal={.73}/>
+  // Keep the same mesh through the whole film. The former return-null at
+  // open>=.998 created an unmistakable one-frame disappearance.
+  // Raise and slide backwards inside the camera framing, then fade softly.
+  const alpha=1-smooth((open-.61)/.39);
+  const shrink=Math.max(.00001,lidScale(frame,kind));
+  return <group position={[0,1.26*open,-2.10*open]} scale={shrink}>
+    <Box pos={[0,.58,0]} size={[5.50,.29,5.50]} color={tone} metal={.73}
+      opacity={alpha}/>
     <Box pos={[0,.734,0]} size={[4.55,.027,4.55]}
-      color={kind==='cpu'?'#dad7cf':'#acc5c9'} metal={.52}/>
+      color={kind==='cpu'?'#dad7cf':'#acc5c9'} metal={.52}
+      opacity={alpha}/>
   </group>;
 };
 
@@ -135,33 +142,18 @@ const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
     rotation={[0,state.rotation,0]}/>;
 };
 
-const Chip:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>{
-  const appear=smooth((frame-(kind==='cpu'?81:291))/30);
-  return <group>
-    <group position={[CENTER[kind],0,0]} scale={Math.max(.001,appear)}>
+const Chip:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>
+  <group>
+    {/* Both packages stay mounted at constant scale and position. No pop-in. */}
+    <group position={[CENTER[kind],0,0]}>
       <Package kind={kind}/>
       {kind==='cpu'?<CpuDie frame={frame}/>:<GpuDie frame={frame}/>}
       <Lid kind={kind} frame={frame}/>
     </group>
     {Array.from({length:TASKS},(_,i)=>(
-      <group key={i} scale={Math.max(.001,appear)}>
-        <TaskCube kind={kind} index={i} frame={frame}/>
-      </group>
+      <TaskCube key={i} kind={kind} index={i} frame={frame}/>
     ))}
   </group>;
-};
-
-const Intro:React.FC<{frame:number}>=({frame})=>{
-  if(frame>=80)return null;
-  const alpha=1-smooth((frame-65)/14);
-  const {x,y,dyed}=sampleAt(frame);
-  const c=new THREE.Color(QUEUED).lerp(new THREE.Color(FINISHED),dyed);
-  return <group>
-    <Box pos={[-1.8,-.31,0]} size={[1.45,.15,1.45]} color="#aaa9a4" opacity={alpha}/>
-    <Box pos={[1.8,-.31,0]} size={[1.45,.15,1.45]} color="#b1c5c8" opacity={alpha}/>
-    <Box pos={[x,y,0]} size={[.99,.99,.99]} color={'#'+c.getHexString()} opacity={alpha}/>
-  </group>;
-};
 
 const Scene:React.FC<{frame:number}>=({frame})=>(
   <>
@@ -169,7 +161,6 @@ const Scene:React.FC<{frame:number}>=({frame})=>(
     <ambientLight intensity={1.55}/>
     <directionalLight position={[-7,16,12]} intensity={2.55} color="#fff7eb"/>
     <directionalLight position={[11,8,-7]} intensity={.78} color="#e4eff2"/>
-    <Intro frame={frame}/>
     <Chip kind="cpu" frame={frame}/>
     <Chip kind="gpu" frame={frame}/>
   </>
@@ -178,7 +169,7 @@ const Scene:React.FC<{frame:number}>=({frame})=>(
 const Caption:React.FC<{frame:number}>=({frame})=>{
   const stage=stageAt(frame);
   const label={
-    task:'任務：把灰色方塊變成藍色',
+    task:'灰色任務即將進入 CPU 晶片',
     cpu:'CPU · 4 個大型核心，分批運算',
     gpu:'GPU · 16 條運算通道，同步處理',
     compare:'兩顆晶片，處理相同的 16 個任務',
@@ -198,6 +189,9 @@ export const CpuGpuScene:React.FC=()=>{
     data-renderer="react-threejs-webgl"
     data-chip-design="package-with-exposed-silicon"
     data-workload={stageAt(frame)}
+    data-camera-zoom={cameraAt(frame).zoom}
+    data-cpu-lid-scale={lidScale(frame,'cpu')}
+    data-gpu-lid-scale={lidScale(frame,'gpu')}
     data-task-count={TASKS}
     data-cpu-done={completedCount(frame,'cpu')}
     data-gpu-done={completedCount(frame,'gpu')}
@@ -205,7 +199,7 @@ export const CpuGpuScene:React.FC=()=>{
     data-gpu-working={workingCount(frame,'gpu')}
     style={{background:'linear-gradient(#f4f0e7,#e8e2d9)',overflow:'hidden'}}>
     <ThreeCanvas orthographic width={1280} height={720}
-      camera={{position:[4.5,11.5,19],zoom:114,near:.1,far:160}}
+      camera={{position:[-2,12,19],zoom:67,near:.1,far:160}}
       gl={{alpha:true,antialias:true,preserveDrawingBuffer:true}}
       style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
       <Scene frame={frame}/>
