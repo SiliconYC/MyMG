@@ -1,43 +1,48 @@
-/** Shared physical attachment points. One shape source for pipe meshes, ports,
- * valve actuator and regression tests: do not independently hand-place ends. */
+/** All visible steam pipes, governor and throttle share physical endpoints.
+ * The governor is mounted DIRECTLY above the inline copper inlet valve. */
 import type {PipePoint} from './pipe-path.ts';
-export const GOV_X = 1.72;
-export const GOV_Z = 1.20;
-export const GOV_PIVOT_Y = 2.73;
+export const GOV_X = .45;
+export const GOV_Z = -.28;
+export const GOV_LIFT = 1.60; // visual height above the frame-indexed governor model
+export const GOV_PIVOT_Y = 2.73 + GOV_LIFT;
 export const GOV_ARM = .88;
-export const THROTTLE_X = .12;
+export const THROTTLE_X = GOV_X;
 export const THROTTLE_Y = 2.33;
-export const THROTTLE_Z = -.28;
+export const THROTTLE_Z = GOV_Z;
 export const THROTTLE_LEFT = THROTTLE_X - .28;
 export const THROTTLE_RIGHT = THROTTLE_X + .28;
 
-// Two short end ports pass through the cylinder's upper-rear flank, without
-// a bulky exposed steam-chest box. Their radius matches the cast cylinder.
+// Both round cast ports slightly enter the outside of the cylinder shell.
 export const INLET_PORT:PipePoint = [-2.72,.58,-.94];
 export const EXHAUST_PORT:PipePoint = [-.56,.58,-.94];
+
+// The brass supply crosses a single INLINE valve directly below the weights,
+// then runs into the cylinder. The blue tube vents independently.
 export const BOILER_TO_VALVE:PipePoint[] = [
-  [.78,4.28,-.78],[.78,2.70,-.78],
-  [.78,THROTTLE_Y,THROTTLE_Z],[THROTTLE_RIGHT,THROTTLE_Y,THROTTLE_Z],
+  [1.85,4.28,-.78],[1.85,2.72,-.78],
+  [1.85,THROTTLE_Y,THROTTLE_Z],
+  [THROTTLE_RIGHT,THROTTLE_Y,THROTTLE_Z],
 ];
 export const VALVE_TO_CYLINDER:PipePoint[] = [
   [THROTTLE_LEFT,THROTTLE_Y,THROTTLE_Z],
-  [-2.72,THROTTLE_Y,THROTTLE_Z],INLET_PORT,
+  [-2.72,THROTTLE_Y,THROTTLE_Z],
+  [-2.72,1.55,-.94],INLET_PORT,
 ];
 export const CYLINDER_TO_EXHAUST:PipePoint[] = [
   EXHAUST_PORT,[-.56,1.50,-1.30],
   [-3.42,1.50,-1.30],[-3.42,3.10,-1.30],
 ];
 
-/** The governor's *nonrotating* sleeve and sliding steam gate form a rigid
- * translating yoke. Its two pins have fixed X/Z positions and the SAME Y at
- * every frame: no telescoping connecting rods or free-floating rocker.
- * The gate closes upwards into the horizontal steam bore as the sleeve rises.
- */
+/** Single straight nonrotating valve stem, coaxial with the spindle and
+ * copper inlet. The metal stem is fixed-length: it is carried down by the
+ * sliding sleeve, rather than using floating or telescoping side linkages.
+ * Keeping the earlier gate height preserves the feedback demonstration. */
 export function throttleLinkage(sleeveY:number){
-  const collarPin:PipePoint=[GOV_X-.21,sleeveY,GOV_Z];
-  const valvePin:PipePoint=[THROTTLE_X,sleeveY,THROTTLE_Z];
-  const gateBottom:PipePoint=[THROTTLE_X,sleeveY-.05,THROTTLE_Z];
-  const gateTop:PipePoint=[THROTTLE_X,sleeveY+.65,THROTTLE_Z];
-  const gateCenter:PipePoint=[THROTTLE_X,sleeveY+.30,THROTTLE_Z];
+  const x=THROTTLE_X,z=THROTTLE_Z;
+  const collarPin:PipePoint=[x,sleeveY+GOV_LIFT,z];
+  const gateCenter:PipePoint=[x,sleeveY+.52,z];
+  const gateBottom:PipePoint=[x,sleeveY+.17,z];
+  const gateTop:PipePoint=[x,sleeveY+.87,z];
+  const valvePin:PipePoint=[...gateTop];
   return {collarPin,valvePin,gateBottom,gateTop,gateCenter};
 }
