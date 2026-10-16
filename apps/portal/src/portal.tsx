@@ -45,7 +45,6 @@ const SteamArtwork: React.FC = () => (
     <div className="steam-conrod"/>
     <div className="steam-flywheel"><span/><span/><span/><span/></div>
     <div className="steam-cut-rim"/>
-    <span className="artwork-label">STEAM / KINEMATICS / CUTAWAY</span>
   </div>
 );
 
