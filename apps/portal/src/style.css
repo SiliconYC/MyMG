@@ -52,3 +52,15 @@
 .mini-labels b:first-child{color:#ffc183}.mini-labels b:last-child{color:#6aefea}
 .artwork-cpu-gpu .artwork-label{bottom:18px;font-size:10px}
 @media(max-width:480px){.mini-die{scale:.75;margin:-15px}.artwork-cpu-gpu{gap:0}}
+
+/* CPU/GPU visual revision: warmer HBM-style palette; no neon/glow or spare labels. */
+.artwork-cpu-gpu-minimal{background:linear-gradient(155deg,#f4f0e7,#e3dcd1);gap:65px}
+.artwork-cpu-gpu-minimal .mini-die{box-shadow:12px 14px 0 #b9b0a2;border-color:#5d6464;transform:rotateX(24deg) rotateZ(-12deg)}
+.artwork-cpu-gpu-minimal .mini-cpu{background:#605d5a}
+.artwork-cpu-gpu-minimal .mini-gpu{background:#535f64;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)}
+.artwork-cpu-gpu-minimal .mini-cpu i{background:#c9926e;box-shadow:none}
+.artwork-cpu-gpu-minimal .mini-gpu i,
+.artwork-cpu-gpu-minimal .mini-gpu i:nth-child(3n){background:#82b0b3;box-shadow:none}
+.artwork-cpu-gpu-minimal .mini-labels b:first-child{color:#af6448}
+.artwork-cpu-gpu-minimal .mini-labels b:last-child{color:#477f83}
+@media(max-width:480px){.artwork-cpu-gpu-minimal{gap:27px}}

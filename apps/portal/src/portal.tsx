@@ -49,16 +49,14 @@ const SteamArtwork: React.FC = () => (
 );
 
 const CpuGpuArtwork: React.FC = () => (
-  <div className="artwork artwork-cpu-gpu" aria-hidden="true">
+  <div className="artwork artwork-cpu-gpu artwork-cpu-gpu-minimal" aria-hidden="true">
     <div className="mini-die mini-cpu">
       {Array.from({length:4},(_,i)=><i key={i}/>)}
     </div>
-    <div className="mini-vs">/</div>
     <div className="mini-die mini-gpu">
-      {Array.from({length:80},(_,i)=><i key={i}/>)}
+      {Array.from({length:64},(_,i)=><i key={i}/>)}
     </div>
     <div className="mini-labels"><b>CPU</b><b>GPU</b></div>
-    <span className="artwork-label">CONTROL / THROUGHPUT</span>
   </div>
 );
 
