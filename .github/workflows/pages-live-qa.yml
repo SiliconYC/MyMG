@@ -42,6 +42,21 @@ jobs:
           test -s /tmp/mymg-live.html
           grep -q 'id="root"' /tmp/mymg-live.html
           grep -q '/MyMG/assets/' /tmp/mymg-live.html
+      - name: Verify latest canonical and tracked HTML entry points
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            curl -LfsS 'https://siliconyc.github.io/MyMG/' -o /tmp/mymg-clean.html
+            curl -LfsS 'https://siliconyc.github.io/MyMG/?utm_source=chatgpt.com' -o /tmp/mymg-tracked.html
+            if grep -q 'Normalize marketing/tracking query variants' /tmp/mymg-clean.html &&
+              grep -q 'Normalize marketing/tracking query variants' /tmp/mymg-tracked.html; then break; fi
+            sleep 5
+          done
+          grep -q 'Normalize marketing/tracking query variants' /tmp/mymg-clean.html
+          grep -q 'Normalize marketing/tracking query variants' /tmp/mymg-tracked.html
+          # Both URLs must point at the same Vite hashed JS bundle.
+          diff -u <(grep -o '/MyMG/assets/[^"]*\.js' /tmp/mymg-clean.html) \
+            <(grep -o '/MyMG/assets/[^"]*\.js' /tmp/mymg-tracked.html)
       - name: Live native React Three.js WebGL, 9 frames, transport and mobile QA
         run: pnpm --filter @mymg/portal qa
         env:
