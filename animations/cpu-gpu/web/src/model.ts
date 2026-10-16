@@ -28,8 +28,8 @@ export const cameraAt = (frame:number) => {
   const gpu = smooth((frame - 278) / 56);
   const both = smooth((frame - 400) / 65);
   return {
-    focusX: -8 * cpu + 16 * gpu - 8 * both,
-    zoom: 114 - 24 * cpu - 42 * both,
+    focusX: -6.5 * cpu + 13 * gpu - 6.5 * both,
+    zoom: 114 - 24 * cpu - 35 * both,
     angle: .11 * smooth((frame-104)/45) - .11 * both,
   };
 };
@@ -59,14 +59,14 @@ export const taskPositions = (kind:Kind,index:number): {
   const wave=Math.floor(index/4),lane=index%4;
   const z=(lane-1.5)*1.43;
   if(kind==='cpu')return {
-    input:[-3.47+wave*.34,.45,z],
+    input:[-3.60+wave*.52,.45,z],
     processor:[-.15,.58,z],
-    output:[2.26+wave*.34,.45,z],
+    output:[2.05+wave*.52,.45,z],
   };
   return {
-    input:[-3.47+lane*.34,.45,(wave-1.5)*1.43],
+    input:[-3.60+lane*.52,.45,(wave-1.5)*1.43],
     processor:[(lane-1.5)*.52,.58,(wave-1.5)*1.43],
-    output:[2.26+lane*.34,.45,(wave-1.5)*1.43],
+    output:[2.05+lane*.52,.45,(wave-1.5)*1.43],
   };
 };
 const lerp = (a:number,b:number,k:number) => a+(b-a)*k;
