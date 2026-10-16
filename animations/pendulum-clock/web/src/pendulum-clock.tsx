@@ -4,7 +4,7 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
-import {palletPose, contactDistance, type PalletPose} from './escapement-contact';
+import {palletPose, palletLocalTip, contactDistance, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 
 /**
@@ -130,7 +130,7 @@ function makeSlimPallet():THREE.ExtrudeGeometry {
 const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
   const geometry=useMemo(makeSlimPallet,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
-  return <group position={[pose.tip[0],pose.tip[1],-.06]}
+  return <group position={[...palletLocalTip(pose.side),-.06]}
     rotation={[0,0,-pose.radialAngle]}>
     <mesh geometry={geometry} castShadow receiveShadow>
       <meshStandardMaterial color={pose.engaged?GOLD:STEEL}
@@ -147,34 +147,46 @@ const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
   </group>;
 };
 
-/** Geometrically registered with REAL tooth flanks, not an independent V art.
- * Each pallet sits at a reference flank point; during release it retracts
- * outwards as the wheel advances the half pitch to the opposite flank.
+/** An anchor is an EXTENSION of the pendulum's own rigid shaft.
+ * It has no independent rotation, time base, positional interpolation, or
+ * animated piston. Geometry here is in PIVOT-LOCAL coordinates; the only
+ * group rotation exists in EscapementPendulumAssembly below.
  */
-const Anchor:React.FC<{state:ClockState;showDetail:boolean}>=({state,showDetail})=>{
+const Anchor:React.FC<{state:ClockState}>=({state})=>{
   const entry=palletPose('entry',state);
   const exit=palletPose('exit',state);
   return <group>
     {([entry,exit] as PalletPose[]).map(pose=>
       <group key={pose.side}>
-        <Rod a={[0,2.56,-.33]}
-          b={[pose.mounting[0],pose.mounting[1],-.13]}
+        <Rod a={[0,0,-.33]}
+          b={[...palletLocalTip(pose.side),-.13]}
           radius={.043} color={STEEL}/>
         <PalletTooth pose={pose}/>
-        {pose.engaged&&showDetail&&
-          <Rod a={[pose.flankStart[0],pose.flankStart[1],-.155]}
-            b={[pose.flankEnd[0],pose.flankEnd[1],-.155]}
-            radius={.018} color="#fff0c4"/>}
       </group>
     )}
-    <Axle position={[0,2.56,-.34]} radius={.16} depth={.18} color={DARK}/>
-    <Axle position={[0,2.56,-.47]} radius={.078} depth={.11} color={GOLD}/>
+    <Axle position={[0,0,-.34]} radius={.16} depth={.18} color={DARK}/>
+    <Axle position={[0,0,-.47]} radius={.078} depth={.11} color={GOLD}/>
+  </group>;
+};
+
+/** Highlight only the REAL rotating tooth flank, never fabricate a bridge. */
+const ContactHighlights:React.FC<{state:ClockState;showDetail:boolean}>=
+({state,showDetail})=>{
+  if(!showDetail)return null;
+  return <group>
+    {(['entry','exit'] as const).map(side=>{
+      const p=palletPose(side,state);
+      return p.engaged?<Rod key={side}
+        a={[p.flankStart[0],p.flankStart[1],-.155]}
+        b={[p.flankEnd[0],p.flankEnd[1],-.155]}
+        radius={.018} color="#fff0c4"/>:null;
+    })}
   </group>;
 };
 
 /** One pendulum physically hangs from the same anchor pivot behind the wheel. */
-const Pendulum:React.FC<{angle:number}>=({angle})=>
-  <group position={[0,2.56,-.91]} rotation={[0,0,-angle]}>
+const Pendulum:React.FC=()=>
+  <group position={[0,0,-.91]}>
     <Rod a={[0,-.12,0]} b={[0,-6.28,0]} radius={.044} color={STEEL}/>
     <Axle position={[0,-5.98,-.015]} radius={.14} depth={.18} color={METAL}/>
     <mesh position={[0,-6.28,0]} scale={[1,1.18,.33]} castShadow>
@@ -254,9 +266,17 @@ const Movement:React.FC<{frame:number}>=({frame})=>{
     <CinematicCamera frame={frame}/>
     <group>
       <MinimalSupports/>
-      <Pendulum angle={state.pendulumAngle}/>
       <EscapeWheel angle={state.wheelAngle}/>
-      <Anchor state={state} showDetail={shot.chapter==='contact'||shot.chapter==='rear'}/>
+      {/* ONE pivot, ONE angle: pendulum rod, pendulum bob and both pallets
+          form a single physically connected rotating Three.js assembly. */}
+      <group position={[0,2.56,0]} rotation={[0,0,-state.pendulumAngle]}>
+        <Rod a={[0,0,-.91]} b={[0,0,-.33]}
+          radius={.085} color={STEEL}/>
+        <Pendulum/>
+        <Anchor state={state}/>
+      </group>
+      <ContactHighlights state={state}
+        showDetail={shot.chapter==='contact'||shot.chapter==='rear'}/>
       <Dial angle={state.secondHandAngle}/>
     </group>
   </ThreeCanvas>;
@@ -278,6 +298,8 @@ export const PendulumClockScene:React.FC=()=>{
   return <AbsoluteFill
     data-testid="pendulum-clock-scene" data-renderer="react-threejs-webgl"
     data-beats={state.beats} data-lock={state.lock}
+    data-pendulum-angle={state.pendulumAngle.toFixed(7)}
+    data-anchor-angle={state.anchorAngle.toFixed(7)}
     data-wheel-angle={state.wheelAngle.toFixed(7)}
     data-second-hand-angle={state.secondHandAngle.toFixed(7)}
     data-camera-x={shot.position[0].toFixed(4)}

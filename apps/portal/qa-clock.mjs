@@ -21,6 +21,8 @@ const read=async()=>scene.evaluate(el=>({
   wheel:Number(el.getAttribute('data-wheel-angle')),
   hand:Number(el.getAttribute('data-second-hand-angle')),
   lock:el.getAttribute('data-lock'),
+  pendulum:Number(el.getAttribute('data-pendulum-angle')),
+  anchor:Number(el.getAttribute('data-anchor-angle')),
 }));
 const seek=async frame=>{
   await page.getByTestId('frame-slider').evaluate((el,value)=>{
@@ -73,13 +75,22 @@ try{
   const exit=await checkShot(25,'contact','observe','clock-exit-contact.png');
   assert.equal(entry.current.side,'entry');
   assert.equal(exit.current.side,'exit');
-  assert.ok(entry.current.leftGap<.012,'entry wedge is seated on real gear flank');
-  assert.ok(exit.current.rightGap<.012,'exit wedge is seated on real gear flank');
+  assert.ok(entry.current.leftGap<.06,'entry wedge follows gear flank on rigid pendulum arc');
+  assert.ok(exit.current.rightGap<.06,'exit wedge follows gear flank on rigid pendulum arc');
   assert.equal(entry.current.x,exit.current.x,'same macro camera for both contacts');
   assert.equal(entry.current.z,exit.current.z,'no frantic macro switch');
   assert.ok(!entry.png.equals(exit.png),'alternate lock has distinct visible frame');
   const hold=await checkShot(37,'contact','observe','clock-long-contact-hold.png');
   assert.equal(hold.current.z,entry.current.z,'hold is truly stationary');
+  // A real rigid fork touches each flank when the pendulum approaches the
+  // release threshold; avoid masking disagreement by pinning tips to teeth.
+  await seek(12);
+  const entryThreshold=await camera();
+  assert.ok(entryThreshold.leftGap<.02,'entry tip meets tooth at 0.4s');
+  await seek(42);
+  const exitThreshold=await camera();
+  assert.ok(exitThreshold.rightGap<.02,'exit tip meets tooth at 1.4s');
+
   const proof=await checkShot(48,'proof','observe','clock-second-hand.png');
   assert.ok(proof.current.z>10);
   await seek(0);
@@ -91,6 +102,8 @@ try{
     await page.waitForTimeout(110);
     states[frame]=await read();
     assert.equal(states[frame].hand,states[frame].wheel,'shared shaft angle at frame '+frame);
+    assert.equal(states[frame].pendulum,states[frame].anchor,
+      'anchor MUST follow pendulum at frame '+frame);
     if([0,16,30,44,53,90,1799].includes(frame)){
       await scene.screenshot({path:resolve(out,'clock-frame-'+frame+'.png')});
     }

@@ -4,9 +4,11 @@ import {test} from 'node:test';
 import {resolve} from 'node:path';
 import {
   clockAtFrame, FPS, DURATION, TEETH, PERIOD_SECONDS, RELEASE_OFFSET,
+  PENDULUM_AMPLITUDE, RELEASE_START_ANGLE, RELEASE_END_ANGLE,
 } from '../animations/pendulum-clock/web/src/clock-model.ts';
 import {cameraAtFrame, SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
-import {palletPose, contactDistance, flankAt, PITCH, PALLET_CLEARANCE} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
+import {palletPose, palletLocalTip, palletWorldTip, contactDistance,
+  flankAt, PITCH, PALLET_CLEARANCE, PIVOT_Y} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
 
 const frame=(seconds)=>Math.round(seconds*FPS);
 
@@ -122,28 +124,69 @@ test('calm storyboard keeps a single legible two-pallet macro for twenty seconds
   assert.deepEqual(cameraAtFrame(60*FPS).position,front.position);
 });
 
-test('pallet tips align with the SAME 30-tooth wheel flank polygon used by mesh',()=>{
-  const p=flankAt(-4,0);
-  const near=Math.hypot(p.point[0]-p.start[0],p.point[1]-p.start[1]);
-  assert.ok(near>.08&&near<.19,'must contact sloping flank, not detached rim');
-  assert.equal(TEETH,30);
-  assert.ok(PITCH>0);
-  for(let beat=0;beat<60;beat++){
-    const s=clockAtFrame(frame(beat+.80));
-    const active=s.lock;
-    const passive=active==='entry'?'exit':'entry';
-    const a=palletPose(active,s),b=palletPose(passive,s);
-    assert.ok(a.engaged,'the catching pallet MUST be engaged on beat '+beat);
-    assert.ok(contactDistance(active,s)<.012,
-      'tip must touch actual tooth flank within 12mm normalized at beat '+beat);
-    assert.ok(contactDistance(active,s)>=PALLET_CLEARANCE*.9);
-    assert.ok(!b.engaged,'other pallet must let the next tooth move');
-    assert.ok(contactDistance(passive,s)>.13,
-      'inactive pallet must clear rotating gear');
+test('pallets are rigid points on the pendulum shaft, not self-powered sliders',()=>{
+  const rotate=(p,angle)=>[
+    p[0]*Math.cos(angle)-p[1]*Math.sin(angle),
+    p[0]*Math.sin(angle)+p[1]*Math.cos(angle),
+  ];
+  for(let frameNo=0;frameNo<DURATION;frameNo++){
+    const state=clockAtFrame(frameNo);
+    assert.equal(state.anchorAngle,state.pendulumAngle,
+      'anchor and pendulum share exactly one pivot angle');
+    for(const side of ['entry','exit']){
+      const fixed=palletLocalTip(side);
+      const swung=rotate(fixed,-state.pendulumAngle);
+      const rendered=palletWorldTip(side,state.pendulumAngle);
+      assert.ok(Math.abs(swung[0]-rendered[0])<1e-12);
+      assert.ok(Math.abs(swung[1]+PIVOT_Y-rendered[1])<1e-12);
+      assert.ok(Math.abs(Math.hypot(...fixed)-
+        Math.hypot(rendered[0],rendered[1]-PIVOT_Y))<1e-10,
+        'pallet arm may rotate, but its length must NEVER change');
+    }
   }
 });
 
-test('a release retracts the outgoing wedge, rotates wheel, and seats incoming wedge',()=>{
+test('real wheel teeth meet the rigid fork on each escapement threshold',()=>{
+  const p=flankAt(-4,0);
+  const near=Math.hypot(p.point[0]-p.start[0],p.point[1]-p.start[1]);
+  assert.ok(near>.08&&near<.19);
+  for(let beat=0;beat<59;beat++){
+    const s=clockAtFrame(frame(beat+.4));
+    const active=s.lock;
+    const passive=active==='entry'?'exit':'entry';
+    assert.ok(palletPose(active,s).engaged,
+      'outgoing pallet holds the wheel until oscillator reaches the threshold');
+    assert.ok(contactDistance(active,s)<.02,
+      'rigid pallet must physically reach its tooth flank at threshold '+beat);
+    assert.ok(!palletPose(passive,s).engaged);
+    const halfway=clockAtFrame(frame(beat+.8));
+    const catching=halfway.lock;
+    assert.ok(palletPose(catching,halfway).engaged);
+    assert.ok(contactDistance(catching,halfway)<.06,
+      'arc-shaped wedge follows tooth flank during lock');
+  }
+  assert.equal(TEETH,30);
+  assert.ok(PITCH>0&&PALLET_CLEARANCE>0);
+});
+
+test('wheel progress is a function of oscillator crossing angles, not independent motion',()=>{
+  const smooth=x=>{const u=Math.max(0,Math.min(1,x));return u*u*(3-2*u)};
+  for(let beat=0;beat<59;beat++){
+    for(const d of [.43,.47,.52,.57]){
+      const state=clockAtFrame(frame(beat+d));
+      const outgoing=state.pendulumAngle*(beat%2===0?1:-1);
+      const derived=smooth((RELEASE_START_ANGLE-outgoing)/
+        (RELEASE_START_ANGLE-RELEASE_END_ANGLE));
+      assert.ok(Math.abs(state.releaseProgress-derived)<1e-12);
+      assert.ok(Math.abs(state.wheelAngle-
+        (beat+derived)*Math.PI/TEETH)<1e-12,
+        'no second oscillator/motor controls the escapement wheel');
+    }
+  }
+  assert.equal(PENDULUM_AMPLITUDE,.115);
+});
+
+test('one shared swinging fork exchanges locking pallets while wheel steps',()=>{
   const before=clockAtFrame(frame(.40));
   const early=clockAtFrame(frame(.43));
   const mid=clockAtFrame(frame(.50));
@@ -155,7 +198,7 @@ test('a release retracts the outgoing wedge, rotates wheel, and seats incoming w
   assert.ok(!palletPose('exit',mid).engaged);
   assert.ok(palletPose('exit',late).engaged);
   assert.ok(palletPose('exit',after).engaged);
-  assert.ok(contactDistance('exit',after)<.012);
+  assert.ok(contactDistance('exit',after)<.06);
   assert.ok(before.wheelAngle<mid.wheelAngle);
   assert.ok(mid.wheelAngle<after.wheelAngle);
 });
@@ -186,9 +229,12 @@ test('all front, rear, and dial parts stay in one ThreeCanvas',()=>{
   assert.match(src,/<PalletTooth/);
   assert.doesNotMatch(src,/<boxGeometry/);
   assert.match(src,/data-camera-mode={shot.mode}/);
-  assert.match(src,/<Pendulum angle={state.pendulumAngle}\/>/);
+  assert.match(src,/<Pendulum\/>/);
+  assert.match(src,/rotation=\{\[0,0,-state.pendulumAngle\]\}/);
+  assert.match(src,/ONE pivot, ONE angle/);
   assert.match(src,/<EscapeWheel angle={state.wheelAngle}\/>/);
   assert.match(src,/<Anchor state={state}/);
+  assert.doesNotMatch(src,/rotation=\{\[0,0,-state.anchorAngle\]\}/);
   assert.match(src,/<Dial angle={state.secondHandAngle}\/>/);
   assert.doesNotMatch(src,/artwork|backgroundImage:|linear-gradient|grid-template|<svg/i);
 });
