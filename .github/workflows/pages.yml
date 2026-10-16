@@ -32,10 +32,10 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - name: Configure Pages (fail fast if not enabled)
+      # Pages must be initialized once by a repository administrator.
+      # Do not try enablement:true with the restricted workflow token.
+      - name: Configure existing Pages site
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - name: Checkout dev
         uses: actions/checkout@v4
       - name: Enable pnpm
@@ -62,3 +62,19 @@ jobs:
       - name: Deploy Pages
         id: deploy
         uses: actions/deploy-pages@v4
+      - name: Verify published HTML and assets
+        env:
+          PAGE_URL: ${{ steps.deploy.outputs.page_url }}
+        run: |
+          set -euo pipefail
+          test -n "$PAGE_URL"
+          for attempt in $(seq 1 12); do
+            if curl --location --fail --silent --show-error "$PAGE_URL" -o /tmp/mymg-deployed.html; then break; fi
+            sleep 5
+          done
+          grep -q 'id="root"' /tmp/mymg-deployed.html
+          grep -q '/MyMG/assets/' /tmp/mymg-deployed.html
+          echo "Published HTML verified at $PAGE_URL"
+          # HBM uses a hash route so the same static document is served.
+          curl --location --fail --silent --show-error "${PAGE_URL%/}/#/hbm" -o /tmp/mymg-hbm-deployed.html
+          cmp /tmp/mymg-deployed.html /tmp/mymg-hbm-deployed.html
