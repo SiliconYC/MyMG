@@ -43,6 +43,35 @@ try{
     return !!gl && !gl.isContextLost() && el.width>0 && el.height>0;
   });
   assert.ok(webgl,'Working Three.js WebGL canvas required');
+  const front=await scene.screenshot({path:resolve(out,'cinematic-front.png')});
+  const camera=async()=>scene.evaluate(el=>({
+    x:Number(el.getAttribute('data-camera-x')),
+    z:Number(el.getAttribute('data-camera-z')),
+    distance:Number(el.getAttribute('data-camera-distance')),
+    chapter:el.getAttribute('data-camera-chapter')
+  }));
+  const startCamera=await camera();
+  assert.ok(startCamera.z>18,'front hero camera must be positioned IN FRONT');
+  await seek(11*30);
+  const sideCamera=await camera();
+  assert.ok(sideCamera.x>8,'camera must make an actual side orbit');
+  await scene.screenshot({path:resolve(out,'cinematic-side.png')});
+  await seek(23*30);
+  const rearCamera=await camera();
+  assert.ok(rearCamera.z< -6,'3D camera must pass BEHIND the escapement');
+  assert.equal(rearCamera.chapter,'escapement');
+  const rear=await scene.screenshot({path:resolve(out,'cinematic-rear.png')});
+  assert.ok(!front.equals(rear),'front and rear views must be visually different');
+  await seek(31*30);
+  const macro=await camera();
+  assert.ok(macro.distance < startCamera.distance*.5,
+    'real camera dolly/zoom must move close to the anchor pallets');
+  await scene.screenshot({path:resolve(out,'cinematic-tooth-closeup.png')});
+  await seek(50*30);
+  assert.ok((await camera()).z>9,'final dial reveal must come back to the front');
+  await scene.screenshot({path:resolve(out,'cinematic-dial.png')});
+  await seek(0);
+
   const frames=[0,10,16,24,30,44,53,60,90,600,1799];
   const states={};
   for(const frame of frames){
