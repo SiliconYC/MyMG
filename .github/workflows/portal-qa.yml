@@ -55,6 +55,11 @@ jobs:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
           MYMG_QA_REQUIRE_WEBGL: '1'
+      - name: Verify GPU-independent demo in Chromium
+        run: pnpm --filter @mymg/portal qa:react
+        env:
+          MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
+          MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
       - name: Preserve preview startup log
         if: always()
         run: |

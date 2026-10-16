@@ -20,4 +20,4 @@ for i in $(seq 1 40); do
   sleep 1
 done
 test "$READY" = 1 || { cat "$LOGDIR/vite.log"; exit 1; }
-MYMG_QA_URL=http://127.0.0.1:4173/MyMG/ MYMG_QA_OUTPUT="$LOGDIR" pnpm --filter @mymg/portal qa
+MYMG_QA_URL=http://127.0.0.1:4173/MyMG/ MYMG_QA_OUTPUT="$LOGDIR" pnpm --filter @mymg/portal qa:react

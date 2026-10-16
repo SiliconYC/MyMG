@@ -56,3 +56,11 @@ pnpm check
 初次部署可能需要在 GitHub `Settings → Pages → Build and deployment` 选择 **GitHub Actions**。私有仓库的 Pages 可用性取决于 GitHub 计划；即使仓库私有，通常访问者也可以公开访问已发布站点。勿将内部机密或授权受限素材引入静态网站。详情见 [门户说明](apps/portal/README.md)。
 
 **Pages 首次开通需要管理员一次性操作：** `Settings → Pages → Source → GitHub Actions`。首次 Runner 构建已成功，但 GitHub App 的 `GITHUB_TOKEN` 缺少创建 Pages 站点的权限（`Resource not accessible by integration`）。此操作不影响 `main` 的代码。
+
+## 新作品接入（单注册表）
+
+`node tooling/new-mg.mjs sample-title "我的动画"` 自动创建 `animations/sample-title/web/src/sample-title.tsx` 并在 `apps/portal/src/catalog.ts` 登记。门户与 Studio **共用同一份 catalog**；无须第二次手工登记，也不用复制门户。轻量模板暂不创建独立 workspace package，故新增简单 MG 不改 pnpm 锁文件；需要第三方依赖时再建立包并重新生成 lock/离线 Release。
+
+可参考非 HBM 的 `animations/demo/web/src/demo.tsx`。每个作品支持 `/#/<id>`、暂停/播放、时间轴及逐帧。封面按项目的 `cover` 字段显示专属图片或 HBM 插画；未配置时自动使用通用封面。图片需是已授权的仓库内相对路径，不提交字体或未经授权素材。
+
+沙盒无 WebGL 时先运行 `pnpm check`、`pnpm build:portal` 与 `pnpm qa:portal:react`；Runner 使用严格 `pnpm qa:portal` 验证真实 WebGL、关键帧与截图。离线包详情参见 [恢复说明](tooling/offline/README.md)。GitHub Pages 首次启用依赖仓库管理员操作，参见 [Pages 说明](docs/pages.md)。

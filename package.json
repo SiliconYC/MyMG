@@ -18,7 +18,8 @@
     "frames": "node tooling/capture-frames.mjs",
     "portal": "pnpm --filter @mymg/portal dev",
     "build:portal": "pnpm --filter @mymg/portal build",
-    "qa:portal": "pnpm --filter @mymg/portal qa"
+    "qa:portal": "pnpm --filter @mymg/portal qa",
+    "qa:portal:react": "pnpm --filter @mymg/portal qa:react"
   },
   "type": "module"
 }

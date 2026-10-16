@@ -42,4 +42,5 @@ const portal = JSON.parse(readFileSync(join(root, 'apps/portal/package.json'), '
 for (const packageName of ['remotion','@remotion/player','@remotion/three']) {
   assert.equal(portal.dependencies[packageName], '4.0.534', `Portal Remotion mismatch: ${packageName}`);
 }
+// Dynamic registrations are checked by the independent tooling/catalog.test.mjs test.
 console.log('Workspace structure OK: 4 packages, one Studio, one Pages portal, aligned Remotion versions.');
