@@ -4,7 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [dev]
-    paths: ['.github/workflows/offline-bundle.yml']
+    paths:
+      - '.github/workflows/offline-bundle.yml'
+      - 'pnpm-lock.yaml'
 
 permissions:
   contents: write

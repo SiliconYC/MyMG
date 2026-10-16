@@ -29,7 +29,13 @@ const HbmArtwork: React.FC = () => (
 const ProjectCard: React.FC<{project: MgProject; index: number}> = ({project, index}) => (
   <a className="project-card" href={`#/${encodeURIComponent(project.id)}`} data-testid={`project-${project.id}`}>
     <div className="project-art">
-      <HbmArtwork />
+      {project.cover?.type === 'hbm' ? <HbmArtwork /> :
+        project.cover?.type === 'image' ?
+          <img className="artwork-cover" src={project.cover.src} alt={project.cover.alt} loading="lazy" /> :
+          <div className="artwork artwork-placeholder" aria-hidden="true">
+            <div className="placeholder-disc"/><div className="placeholder-orbit"/>
+            <span>{project.titleEn}</span>
+          </div>}
       <span className="card-index">{String(index+1).padStart(2,'0')} / {String(projects.length).padStart(2,'0')}</span>
       <span className="view-button">进入播放页 ↗</span>
     </div>

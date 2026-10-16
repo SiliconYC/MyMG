@@ -8,9 +8,11 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "qa": "node qa-portal.mjs"
+    "qa": "node qa-portal.mjs",
+    "qa:react": "node qa-react.mjs"
   },
   "dependencies": {
+    "@mymg/demo": "workspace:*",
     "@mymg/hbm": "workspace:*",
     "@mymg/mg": "workspace:*",
     "@remotion/player": "4.0.534",

@@ -13,8 +13,10 @@ const required = [
 ];
 for (const file of required) assert.ok(existsSync(join(root, file)), `Missing ${file}`);
 const manifests = [
-  'apps/studio/package.json', 'packages/mg/package.json',
-  'animations/hbm/web/package.json', 'apps/portal/package.json',
+  'apps/studio/package.json', 'packages/mg/package.json', 'apps/portal/package.json',
+  ...readdirSync(join(root,'animations'), {withFileTypes:true})
+    .filter(e=>e.isDirectory() && existsSync(join(root,'animations',e.name,'web','package.json')))
+    .map(e=>join('animations',e.name,'web','package.json')),
 ];
 const names = new Set();
 for (const file of manifests) {
@@ -23,7 +25,9 @@ for (const file of manifests) {
   assert.ok(!names.has(json.name), `Duplicate workspace name ${json.name}`);
   names.add(json.name);
 }
-assert.deepEqual([...names].sort(), ['@mymg/hbm', '@mymg/mg', '@mymg/portal', '@mymg/studio']);
+for (const name of ['@mymg/hbm','@mymg/demo','@mymg/mg','@mymg/portal','@mymg/studio']) {
+  assert.ok(names.has(name), 'Missing required package: '+name);
+}
 const studio = JSON.parse(readFileSync(join(root,'apps/studio/package.json')));
 for (const packageName of ['remotion', '@remotion/cli', '@remotion/three']) {
   assert.equal(studio.dependencies[packageName], '4.0.534', `Remotion version mismatch: ${packageName}`);
@@ -42,4 +46,5 @@ const portal = JSON.parse(readFileSync(join(root, 'apps/portal/package.json'), '
 for (const packageName of ['remotion','@remotion/player','@remotion/three']) {
   assert.equal(portal.dependencies[packageName], '4.0.534', `Portal Remotion mismatch: ${packageName}`);
 }
-console.log('Workspace structure OK: 4 packages, one Studio, one Pages portal, aligned Remotion versions.');
+// Dynamic registrations are checked by the independent tooling/catalog.test.mjs test.
+console.log('Workspace structure OK: '+names.size+' packages, one Studio, one Pages portal, aligned Remotion versions.');
