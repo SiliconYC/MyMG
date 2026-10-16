@@ -289,7 +289,7 @@ const GovernorAssembly: React.FC<{s: SteamFrame}> = ({s}) => {
   const radius=GOV_ARM*Math.sin(g.angle);
   const ballY=GOV_PIVOT_Y-GOV_ARM*Math.cos(g.angle);
   const beltPhase=s.theta;
-  return <group position={[GOV_X,-.28,0]} data-testid="watt-governor-assembly">
+  return <group position={[GOV_X,-.28,0]}>
     {/* Stationary frame, spindle bearing and vertical shaft. */}
     <mesh position={[0,-1.30,0]}>
       <boxGeometry args={[1.28,.22,1.22]}/>
