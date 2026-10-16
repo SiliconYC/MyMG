@@ -40,9 +40,9 @@ export const CYLINDER_TO_EXHAUST:PipePoint[] = [
 export function throttleLinkage(sleeveY:number){
   const x=THROTTLE_X,z=THROTTLE_Z;
   const collarPin:PipePoint=[x,sleeveY+GOV_LIFT,z];
-  const gateCenter:PipePoint=[x,sleeveY+.52,z];
-  const gateBottom:PipePoint=[x,sleeveY+.17,z];
-  const gateTop:PipePoint=[x,sleeveY+.87,z];
+  const gateCenter:PipePoint=[x,sleeveY+.32,z];
+  const gateBottom:PipePoint=[x,sleeveY-.03,z];
+  const gateTop:PipePoint=[x,sleeveY+.67,z];
   const valvePin:PipePoint=[...gateTop];
   return {collarPin,valvePin,gateBottom,gateTop,gateCenter};
 }
