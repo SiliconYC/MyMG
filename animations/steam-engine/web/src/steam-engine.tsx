@@ -3,6 +3,8 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
+import {pipeSections} from './pipe-path.ts';
+import {cameraPose} from './camera-path.ts';
 import {
   steamAtFrame, CYLINDER_LEFT, CYLINDER_RIGHT, CYLINDER_OUTER_RADIUS,
   CYLINDER_INNER_RADIUS, CRANK_X, CRANK_RADIUS, smoothstep, type SteamFrame,
@@ -39,12 +41,24 @@ const Rod: React.FC<{
   </mesh>;
 };
 
+/** One actual continuous tube, with radiused joints instead of broken
+ * cylinder segments or Catmull-Rom spline overshoot through sharp elbows. */
 const Pipe: React.FC<{points: V3[]; color: string; radius?: number}> =
   ({points, color, radius = .08}) => {
-    const curve = useMemo(() =>
-      new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p))), [points]);
+    const curve = useMemo(() => {
+      const path=new THREE.CurvePath<THREE.Vector3>();
+      for(const section of pipeSections(points,.25)){
+        const from=new THREE.Vector3(...section.start);
+        const to=new THREE.Vector3(...section.end);
+        if(section.kind==='elbow' && section.control)
+          path.add(new THREE.QuadraticBezierCurve3(
+            from,new THREE.Vector3(...section.control),to));
+        else path.add(new THREE.LineCurve3(from,to));
+      }
+      return path;
+    },[points]);
     return <mesh castShadow>
-      <tubeGeometry args={[curve, 56, radius, 10, false]}/>
+      <tubeGeometry args={[curve, Math.max(72,points.length*22),radius,14,false]}/>
       <meshStandardMaterial color={color} metalness={.72} roughness={.24}/>
     </mesh>;
   };
@@ -179,8 +193,8 @@ const ValveAssembly: React.FC<{s: SteamFrame; plane: THREE.Plane}> = ({s, plane}
           emissive={(i === 0) === (s.motion === 'right') ? '#9a3a14' : '#145a68'} emissiveIntensity={.38}/>
       </mesh>
     </group>)}
-    <Pipe points={[[-2.12, 2.44, -.10], [-2.12, 2.08, -.10],
-      [-1.65, 1.86, -.10], [-1.65, 1.62, -.10]]} color="#c88b4e" radius={.125}/>
+    {/* The inlet riser is part of ONE tube beginning at the boiler:
+        GovernorThrottle below builds its complete path to this steam chest. */}
     {/* Exhaust is one continuous riser, ending in a visibly open flanged vent. */}
     <Pipe points={[[-1.16, 1.65, -.13], [-1.16, 2.13, -.13],
       [-.45, 2.17, -.13], [-.38, 2.43, -.13], [-.38, 3.12, -.13]]}
@@ -194,7 +208,7 @@ const ValveAssembly: React.FC<{s: SteamFrame; plane: THREE.Plane}> = ({s, plane}
 
 const Flywheel: React.FC<{s: SteamFrame}> = ({s}) => {
   return <group>
-    <Rod from={[CRANK_X, 0, -1.02]} to={[CRANK_X, 0, 1.12]}
+    <Rod from={[CRANK_X, 0, -1.02]} to={[CRANK_X, 0, 1.48]}
       radius={.13} color="#b5b8b0"/>
     <group position={[CRANK_X, 0, .17]} rotation={[0, 0, s.theta]}>
       <mesh castShadow>
@@ -282,7 +296,7 @@ const EngineMechanics: React.FC<{s: SteamFrame}> = ({s}) => <group>
  * Arrangement based on Watt flyball drawings (Smithsonian / Powerhouse).
  */
 const GOV_X = 1.72;
-const GOV_Z = -.87;
+const GOV_Z = 1.20;
 const GOV_PIVOT_Y = 2.73;
 const GOV_ARM = .88;
 const THROTTLE_X = .12;
@@ -306,11 +320,11 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
     pivot[1]+.36*Math.cos(rockerAngle),GOV_Z];
   return <group>
     {/* Spindle stands on the engine bed immediately behind the flywheel. */}
-    <mesh position={[GOV_X,-1.14,GOV_Z]}>
-      <boxGeometry args={[.63,.22,.67]}/>
+    <mesh position={[GOV_X,-1.34,GOV_Z]}>
+      <boxGeometry args={[.63,.38,.67]}/>
       <meshStandardMaterial color="#4a606d" metalness={.64} roughness={.43}/>
     </mesh>
-    <Rod from={[GOV_X,-1.03,GOV_Z]} to={[GOV_X,2.84,GOV_Z]}
+    <Rod from={[GOV_X,-1.28,GOV_Z]} to={[GOV_X,2.84,GOV_Z]}
       radius={.068} color="#bfcace"/>
     {/* An actual rotating head and both balls turn on the same vertical axis. */}
     <group position={[GOV_X,0,GOV_Z]} rotation={[0,g.spindlePhase,0]}>
@@ -358,11 +372,14 @@ const GovernorThrottle: React.FC<{s:SteamFrame}> = ({s}) => {
   return <group>
     {/* One uninterrupted steam path: boiler-side downcomer -> transparent
         valve chamber -> steam-chest inlet. Pipes reach BOTH chamber flanges. */}
-    <Pipe points={[[2.52,4.95,-.75],[2.52,3.48,-.75],
+    <Pipe points={[[2.52,5.50,-.75],[2.52,3.48,-.75],
       [2.20,2.81,-.53],[1.48,THROTTLE_Y,THROTTLE_Z],
       [right,THROTTLE_Y,THROTTLE_Z]]} color="#c68a57" radius={.12}/>
+    {/* The outlet continues through every elbow into the steam chest without
+        a second unattached pipe piece at its upper-right connection. */}
     <Pipe points={[[left,THROTTLE_Y,THROTTLE_Z],
-      [-1.86,THROTTLE_Y,THROTTLE_Z],[-2.12,2.44,-.10]]}
+      [-1.86,THROTTLE_Y,THROTTLE_Z],[-2.12,2.44,-.10],
+      [-2.12,2.08,-.10],[-1.65,1.86,-.10],[-1.65,1.62,-.10]]}
       color="#c68a57" radius={.12}/>
     {/* The tube through the valve is transparent, NOT an omitted section.
         This makes the rotating butterfly readable without a broken pipe. */}
@@ -428,8 +445,8 @@ const Pedestals: React.FC = () => <group>
       </mesh>
     </group>
   )}
-  <mesh position={[.20, -1.59, -.35]}>
-    <boxGeometry args={[8.90, .20, 2.0]}/>
+  <mesh position={[.20, -1.59, .20]}>
+    <boxGeometry args={[8.90, .20, 3.70]}/>
     <meshStandardMaterial color="#334756" metalness={.54} roughness={.59}/>
   </mesh>
   <mesh position={[.2, -1.75, 0]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -438,24 +455,7 @@ const Pedestals: React.FC = () => <group>
   </mesh>
 </group>;
 
-/** One shared camera track for WebGL and accurate 3D-anchored callouts. */
-const cameraPose = (t:number) => {
-  const inspect=smoothstep((t-.78)/.43);
-  const governorView=smoothstep((t-4.80)/.53);
-  const valveView=smoothstep((t-8.85)/.48);
-  const eye:V3=[
-    6.6-.7*inspect+.10*governorView,
-    4.0-.35*inspect+.65*governorView,
-    13-1.05*inspect-1.0*governorView,
-  ];
-  const target:V3=[
-    -1.3*inspect+2.58*governorView-.14*valveView,
-    .06+.12*inspect+.93*governorView+.13*valveView,
-    -.22*governorView,
-  ];
-  return {eye,target,zoom:85+25*inspect+15*governorView+7*valveView};
-};
-
+/** Shared orbital camera and 3D leader-line projection are defined in camera-path.ts. */
 const World: React.FC<{s: SteamFrame}> = ({s}) => {
   const camera=useThree(state=>state.camera);
   useEffect(()=>{
@@ -594,6 +594,10 @@ export const SteamEngineScene: React.FC = () => {
     data-governor-throttle={s.governor.throttle.toFixed(4)}
     data-camera-shift={smoothstep((s.time-4.80)/.53).toFixed(4)}
     data-governor-x={GOV_X.toFixed(2)}
+    data-governor-z={GOV_Z.toFixed(2)}
+    data-pipe-z={THROTTLE_Z.toFixed(2)}
+    data-camera-azimuth={cameraPose(s.time).azimuth.toFixed(5)}
+    data-camera-elevation={cameraPose(s.time).elevation.toFixed(5)}
     data-throttle-x={THROTTLE_X.toFixed(2)}
     style={{background:'radial-gradient(ellipse at 54% 48%,#213d50 0%,#0e1e2d 67%,#08111d 100%)',
       overflow:'hidden'}}>
