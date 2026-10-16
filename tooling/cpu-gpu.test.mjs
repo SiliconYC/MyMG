@@ -216,8 +216,8 @@ test('the entire previous workload is UNMOUNTED before second-shape rendering',(
   assert.match(source,/<tetrahedronGeometry/);
   assert.match(source,/<cylinderGeometry/);
   assert.match(source,/THREE\.PerspectiveCamera/);
-  assert.match(source,/GPU 胜出/);
-  assert.match(source,/CPU 胜出/);
+  assert.match(source,/gpuWin\?'GPU':'CPU'/);
+  assert.match(source,/胜出/);
   assert.match(source,/16 个相同任务/);
   assert.match(source,/16 个混合任务/);
   assert.match(source,/胜出/);
