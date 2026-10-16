@@ -1,4 +1,4 @@
-/** Browser proof: literal task movement, four CPU waves vs one GPU wave. */
+/** Real browser QA for a concrete +1 workload and physically complete chip tops. */
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -35,8 +35,8 @@ try{
   const marker=page.getByTestId('cpu-gpu-native-scene');
   await marker.waitFor();
   assert.equal(await marker.getAttribute('data-renderer'),'react-threejs-webgl');
-  assert.equal(await marker.getAttribute('data-chip-design'),'package-with-exposed-silicon',
-    'CPU/GPU must now use actual processor package and exposed silicon die geometry');
+  assert.equal(await marker.getAttribute('data-chip-design'),'complete-silicon-top',
+    'chip must be a solid surface; not a cutaway package with missing top');
   assert.equal(await page.locator('video').count(),0);
   assert.equal(await marker.locator('img').count(),0);
   const canvas=marker.locator('canvas').first();
@@ -44,65 +44,54 @@ try{
   assert.ok(await canvas.evaluate(el=>{
     const gl=el.getContext('webgl2')||el.getContext('webgl');
     return !!gl&&!gl.isContextLost()&&el.width>=100&&el.height>=100;
-  }),'genuine Three.js WebGL context required');
-  const shot=async(frame,stage,doneCpu,doneGpu,workingCpu,workingGpu)=>{
+  }),'original Three.js WebGL context required');
+  const photo=async(frame,stage,doneCpu,doneGpu,workingCpu,workingGpu)=>{
     await seek(frame);
     assert.equal(await marker.getAttribute('data-workload'),stage);
     assert.equal(Number(await marker.getAttribute('data-task-count')),16);
-    if(frame>=100)
-      assert.equal(Number(await marker.getAttribute('data-cpu-lid-scale')),0,
-        'CPU cover must fully clear silicon during core processing');
-    if(frame>=334)
-      assert.equal(Number(await marker.getAttribute('data-gpu-lid-scale')),0,
-        'GPU cover must fully clear silicon during lane processing');
     assert.equal(Number(await marker.getAttribute('data-cpu-done')),doneCpu);
     assert.equal(Number(await marker.getAttribute('data-gpu-done')),doneGpu);
     assert.equal(Number(await marker.getAttribute('data-cpu-working')),workingCpu);
     assert.equal(Number(await marker.getAttribute('data-gpu-working')),workingGpu);
-    assert.equal(await marker.locator('span').count(),1,
-      'Only one caption — no visual dashboard');
-    const png=await marker.screenshot({path:resolve(out,'cpu-gpu-tasks-'+frame+'.png')});
-    assert.ok(png.byteLength>6000,'Expected populated 3D screenshot at '+frame);
-  };
-  await shot(40,'task',0,0,0,0);
-  // Package first, then its lid travels away revealing real core sizes.
-  await seek(64);
-  const closedCpu=await marker.screenshot({path:resolve(out,'cpu-package-lid-closed.png')});
-  await seek(89);
-  const openCpu=await marker.screenshot({path:resolve(out,'cpu-package-lid-retracting.png')});
-  assert.ok(Buffer.compare(closedCpu,openCpu)!==0,'CPU chip cover must physically move');
-  await shot(140,'cpu',0,0,4,0);
-  await shot(164,'cpu',4,0,4,0);
-  await shot(280,'cpu',16,0,0,0);
-  await seek(312);
-  const gpuOpening=await marker.screenshot({path:resolve(out,'gpu-silicon-reveal.png')});
-  assert.ok(gpuOpening.byteLength>8000,'GPU array must be visible while lid lifts');
-  await shot(352,'gpu',16,0,0,16);
-  await shot(380,'gpu',16,16,0,0);
-  await shot(430,'compare',16,16,0,0);
-  await shot(475,'compare',16,16,0,0);
-  // Regression: old scene cut at frame 80 (intro vanished), 291 (GPU popped),
-  // 424 (all jobs reset), while orthographic zoom cropped the chip package.
-  const boundaryFrames=[0,79,80,285,286,291,292,404,405,423,424,475];
-  let previousCompletedCpu=0,previousCompletedGpu=0;
-  for(const f of boundaryFrames){
-    await seek(f);
     const zoom=Number(await marker.getAttribute('data-camera-zoom'));
-    const cpuDone=Number(await marker.getAttribute('data-cpu-done'));
-    if(f>=100)assert.equal(Number(await marker.getAttribute('data-cpu-lid-scale')),0);
-    if(f>=334)assert.equal(Number(await marker.getAttribute('data-gpu-lid-scale')),0);
-    const gpuDone=Number(await marker.getAttribute('data-gpu-done'));
-    assert.ok(zoom>=40&&zoom<=67&&720/zoom>10.5,
-      'Camera clips the top/bottom of processor package at frame '+f);
-    assert.ok(cpuDone>=previousCompletedCpu,'CPU vanished/reset at frame '+f);
-    assert.ok(gpuDone>=previousCompletedGpu,'GPU vanished/reset at frame '+f);
-    previousCompletedCpu=cpuDone;
-    previousCompletedGpu=gpuDone;
-    const png=await marker.screenshot({path:resolve(out,'cpu-gpu-continuity-'+f+'.png')});
-    assert.ok(png.byteLength>6000,'Scene became empty around boundary frame '+f);
+    assert.ok(zoom>=40&&zoom<=67&&720/zoom>10.5);
+    assert.equal(await marker.locator('span').count(),1,'one annotation, no dashboard');
+    const png=await marker.screenshot({path:resolve(out,'cpu-gpu-full-die-'+frame+'.png')});
+    assert.ok(png.byteLength>6000,'empty WebGL frame at '+frame);
+    return png;
+  };
+
+  const f0=await photo(0,'task',0,0,0,0);
+  const caption=await marker.locator('span').textContent();
+  assert.match(caption,/每筆數據加 1/);
+  assert.match(caption,/白色待算/);
+  assert.match(caption,/藍色代表完成/);
+  const f8=await photo(8,'task',0,0,1,0);
+  assert.ok(Buffer.compare(f0,f8)!==0,
+    'intro is visually motionless: a real task must move in the first eight frames');
+  assert.ok(Number(await marker.getAttribute('data-intro-task-progress'))>.1);
+  await photo(34,'task',0,0,1,0);
+  assert.ok(Number(await marker.getAttribute('data-intro-task-dyed'))>.5,
+    'the actual input should visibly change color inside CPU');
+  await photo(64,'task',1,0,0,0);
+  await photo(72,'cpu',1,0,0,0);
+  await photo(90,'cpu',1,0,3,0);
+  await photo(146,'cpu',8,0,0,0);
+  await photo(222,'cpu',16,0,0,0);
+  await photo(340,'gpu',16,0,0,16);
+  await photo(357,'gpu',16,16,0,0);
+  await photo(420,'compare',16,16,0,0);
+  await photo(475,'compare',16,16,0,0);
+
+  for(const frame of [69,70,270,271,396,397,423,424]){
+    await seek(frame);
+    assert.equal(Number(await marker.getAttribute('data-cpu-done')),
+      frame<64?0:frame<108?1:frame<146?4:frame<184?8:frame<222?12:16,
+      'CPU outputs reset unexpectedly');
+    const png=await marker.screenshot({path:resolve(out,'cpu-gpu-transition-'+frame+'.png')});
+    assert.ok(png.byteLength>6000);
   }
-  assert.equal(previousCompletedCpu,16);
-  assert.equal(previousCompletedGpu,16);
+
   await seek(200);
   await page.getByRole('button',{name:'前进一帧'}).click();
   assert.equal(await readFrame(),201);
@@ -113,15 +102,15 @@ try{
     null,{timeout:10000});
   await page.getByTestId('play-toggle').click();
   await page.waitForTimeout(160);
-  const frozen=await readFrame();
+  const stopped=await readFrame();
   await page.waitForTimeout(300);
-  assert.equal(await readFrame(),frozen);
+  assert.equal(await readFrame(),stopped);
   await page.goto(new URL('#/cpu-gpu',site).href,{waitUntil:'networkidle'});
   await marker.waitFor();
   await page.setViewportSize({width:390,height:844});
-  await page.screenshot({path:resolve(out,'cpu-gpu-task-flow-mobile.png'),fullPage:true});
+  await page.screenshot({path:resolve(out,'cpu-gpu-full-die-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU continuous WebGL QA passed: no reset/cut at boundaries, safe camera zoom, real jobs, player, mobile.');
+  console.log('CPU/GPU WebGL QA passed: moving +1 intro, solid die, 16 actual jobs, continuous camera, mobile.');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}
