@@ -9,7 +9,8 @@
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "qa": "node qa-portal.mjs",
-    "qa:react": "node qa-react.mjs"
+    "qa:react": "node qa-react.mjs",
+    "qa:cpu-gpu": "node qa-cpu-gpu.mjs"
   },
   "dependencies": {
     "@mymg/cpu-gpu": "workspace:*",
