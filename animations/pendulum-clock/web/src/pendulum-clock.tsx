@@ -166,8 +166,6 @@ const Anchor:React.FC<{state:ClockState}>=({state})=>{
         <PalletTooth pose={pose}/>
       </group>
     )}
-    <Axle position={[0,0,-.34]} radius={.16} depth={.18} color={DARK}/>
-    <Axle position={[0,0,-.47]} radius={.078} depth={.11} color={GOLD}/>
   </group>;
 };
 
@@ -189,22 +187,15 @@ const ContactHighlights:React.FC<{state:ClockState;showDetail:boolean}>=
 /** One pendulum physically hangs from the same anchor pivot behind the wheel. */
 const Pendulum:React.FC=()=>
   <group position={[0,0,-.91]}>
-    <Rod a={[0,-.12,0]} b={[0,-6.28,0]} radius={.044} color={STEEL}/>
-    <Axle position={[0,-5.98,-.015]} radius={.14} depth={.18} color={METAL}/>
+    <Rod a={[0,0,0]} b={[0,-6.28,0]} radius={.044} color={STEEL}/>
     <mesh position={[0,-6.28,0]} scale={[1,1.18,.33]} castShadow>
       <sphereGeometry args={[.55,48,32]}/>
       <meshStandardMaterial color={BRASS} metalness={.74} roughness={.22}/>
     </mesh>
-    <mesh position={[-.16,-6.14,.18]} scale={[.5,1.8,.35]}>
-      <sphereGeometry args={[.22,24,20]}/>
-      <meshStandardMaterial color="#f4daa4" metalness={.58} roughness={.25}/>
-    </mesh>
-    <Axle position={[0,0,-.05]} radius={.17} depth={.20} color={METAL}/>
   </group>;
 
-/** Only the two axis bearings remain. No decorative chassis, cage or rails. */
+/** Only the wheel bearing remains; the pendulum-to-anchor joint is bare. */
 const MinimalSupports:React.FC=()=> <group>
-  <Axle position={[0,2.56,-1.08]} radius={.22} depth={.20} color={METAL}/>
   <Axle position={[0,.60,-.42]} radius={.23} depth={.22} color={METAL}/>
 </group>;
 
@@ -272,8 +263,9 @@ const Movement:React.FC<{frame:number}>=({frame})=>{
       {/* ONE pivot, ONE angle: pendulum rod, pendulum bob and both pallets
           form a single physically connected rotating Three.js assembly. */}
       <group position={[0,2.56,0]} rotation={[0,0,-state.pendulumAngle]}>
-        <Rod a={[0,0,-.91]} b={[0,0,-.33]}
-          radius={.085} color={STEEL}/>
+        {/* The ONLY connector between pendulum and escape pallets:
+            one plain coaxial cylinder, no collars, joints or extra links. */}
+        <Axle position={[0,0,-.62]} radius={.085} depth={.58} color={STEEL}/>
         <Pendulum/>
         <Anchor state={state}/>
       </group>
