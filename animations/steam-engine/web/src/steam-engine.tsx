@@ -560,7 +560,7 @@ const anchoredPoint = (part:TeachingPart,_s:SteamFrame):V3 => {
   if(part==='balls') return [GOV_X,GOV_PIVOT_Y-.28,GOV_Z];
   if(part==='sleeve') return [GOV_X,1.30-.28,GOV_Z];
   if(part==='valve') return [THROTTLE_X,THROTTLE_Y-.28,THROTTLE_Z];
-  return [CRANK_X,-1.08-.28,.17];
+  return [CRANK_X,-.78,.17];
 };
 const projectOnCanvas = (t:number,point:V3) => {
   const pose=cameraPose(t);
