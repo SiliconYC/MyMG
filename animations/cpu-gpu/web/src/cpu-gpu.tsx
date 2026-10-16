@@ -33,8 +33,15 @@ const Block:React.FC<BlockProps>=({
 const Camera:React.FC<{frame:number}>=({frame})=>{
   const {camera}=useThree();
   useLayoutEffect(()=>{
-    const {focusX,zoom,angle,targetY}=cameraAt(frame);
-    camera.position.set(focusX+4.5+angle*5,12,19-angle*9);
+    const {focusX,zoom,yaw,pitch,targetY}=cameraAt(frame);
+    // Genuine orbit: yaw rotates around the package's vertical axis, while
+    // pitch changes the viewing elevation. Neither is a screen-space wobble.
+    const radius=23;
+    camera.position.set(
+      focusX+radius*Math.cos(pitch)*Math.sin(yaw),
+      targetY+radius*Math.sin(pitch),
+      radius*Math.cos(pitch)*Math.cos(yaw),
+    );
     camera.lookAt(focusX,targetY,0);
     if(camera instanceof THREE.OrthographicCamera)camera.zoom=zoom;
     camera.updateProjectionMatrix();
@@ -42,24 +49,34 @@ const Camera:React.FC<{frame:number}>=({frame})=>{
   return null;
 };
 
-/** Generic arithmetic unit exists at its OWN location, not inside CPU/GPU. */
+/** 
+ * The generic unit is an EXPOSED, opaque arithmetic tile just like every
+ * CPU/GPU core. Its white input glides ABOVE the top and changes blue while
+ * on the tile. The previous translucent 1.96×0.71×1.96 casing submerged
+ * the result cube and made the example look completely different.
+ */
 const GenericArithmeticUnit:React.FC<{frame:number}>=({frame})=>{
   const state=exampleAt(frame);
+  const inside=smooth((state.progress-.27)/.13)*
+    (1-smooth((state.progress-.60)/.12));
   const shade=new THREE.Color(WHITE).lerp(new THREE.Color(BLUE),state.dyed);
-  const activity=state.phase==='processing'?1:0;
+  const activity=state.phase==='processing';
+  const pos:Vec=[state.point[0],state.point[1]-.20*inside,state.point[2]];
   return <group position={[GENERIC_X,0,0]}>
-    <Block pos={[0,-.32,0]} size={[2.45,.35,2.45]} color="#899096" metal={.20}/>
-    <Block pos={[0,.17,0]} size={[1.96,.71,1.96]} color="#b4b5b0"
-      metal={.18} opacity={.68}/>
-    <Block pos={[0,.56,0]} size={[1.58,.08,1.58]}
-      color={activity?'#9fabb0':'#d8d8d1'} metal={.12}
-      glow={BLUE} power={activity?.08:0}/>
-    {/* The input crosses this isolated arithmetic cell, turning blue inside. */}
-    <Block pos={[...state.point]} size={[.82,.82,.82]}
-      color={'#'+shade.getHexString()}/>
-    {/* Tiny landing marks separate source, cell and finished result. */}
-    <Block pos={[-2.55,-.29,0]} size={[1.1,.07,1.1]} color="#c6c5bf"/>
-    <Block pos={[2.55,-.29,0]} size={[1.1,.07,1.1]} color="#a9c6cb"/>
+    <Block pos={[0,-.32,0]} size={[2.55,.32,2.55]} color="#65757a" metal={.24}/>
+    <Block pos={[0,-.035,0]} size={[2.05,.26,2.05]}
+      color="#9badae" metal={.20}/>
+    <Block pos={[0,.108,0]} size={[1.83,.026,1.83]}
+      color={activity?'#c8b49d':'#b5c1bf'} metal={.13}
+      glow={BLUE} power={activity?.08:.005}/>
+    <Block pos={[-.44,.125,0]} size={[.20,.012,.88]} color="#8e9fa1"/>
+    <Block pos={[.44,.125,0]} size={[.20,.012,.88]} color="#8e9fa1"/>
+    <Block pos={pos}
+      size={[.56*state.coreScale,.56*state.coreScale,.56*state.coreScale]}
+      color={'#'+shade.getHexString()}
+      rotation={[0,state.rotation,0]}/>
+    <Block pos={[-2.55,-.15,0]} size={[1.10,.06,1.10]} color="#c6c5bf"/>
+    <Block pos={[2.55,-.15,0]} size={[1.10,.06,1.10]} color="#a9c6cb"/>
   </group>;
 };
 
@@ -130,7 +147,7 @@ const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
   const state=taskAt(frame,kind,index);
   const p=state.progress;
   const inside=smooth((p-.27)/.13)*(1-smooth((p-.60)/.12));
-  const size=TASK_CUBE_SIZE*(1-.59*inside);
+  const size=TASK_CUBE_SIZE*state.coreScale;
   const pos:Vec=[
     state.point[0],state.point[1]-.20*inside,state.point[2],
   ];
@@ -187,6 +204,8 @@ export const CpuGpuScene:React.FC=()=>{
     data-cpu-location={CENTER.cpu}
     data-gpu-location={CENTER.gpu}
     data-camera-zoom={cameraAt(frame).zoom}
+    data-camera-yaw={cameraAt(frame).yaw}
+    data-camera-pitch={cameraAt(frame).pitch}
     data-task-count={TASKS}
     data-cpu-done={completedCount(frame,'cpu')}
     data-gpu-done={completedCount(frame,'gpu')}
@@ -194,7 +213,7 @@ export const CpuGpuScene:React.FC=()=>{
     data-gpu-working={workingCount(frame,'gpu')}
     style={{background:'linear-gradient(#f4f0e7,#e8e2d9)',overflow:'hidden'}}>
     <ThreeCanvas orthographic width={1280} height={720}
-      camera={{position:[GENERIC_X+4.5,12,19],zoom:70,near:.1,far:160}}
+      camera={{position:[GENERIC_X+7,12,19],zoom:80,near:.1,far:160}}
       gl={{alpha:true,antialias:true,preserveDrawingBuffer:true}}
       style={{position:'absolute',inset:0,width:1280,height:720,background:'transparent'}}>
       <World frame={frame}/>
