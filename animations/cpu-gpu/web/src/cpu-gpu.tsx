@@ -243,7 +243,7 @@ const Caption:React.FC<{frame:number}>=({frame})=>{
     'mixed-compare':'16 项混合任务 · 控制流分歧',
   }[stageAt(frame)];
   const alpha=1-smooth(storyOpacityAt(frame)*1.2);
-  return <div aria-hidden="true" style={{
+  return <div aria-hidden="true" data-testid="cpu-gpu-caption" style={{
     position:'absolute',top:56,left:66,pointerEvents:'none',
     fontFamily:'"Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif',
     fontWeight:570,fontSize:25,letterSpacing:.45,color:'#45545a',
