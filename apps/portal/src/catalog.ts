@@ -128,7 +128,7 @@ export const projects: readonly MgProject[] = [
     title: '連發的原理 · 槍機的循環',
     titleEn: 'AUTOMATIC FIRE / THE MECHANICAL CYCLE',
     category: '機械 / 三維剖視',
-    description: '扳機持續按住，槍機退回與復進，下一次擊發如何自動接續？',
+    description: '一個完整的 3D 機械剖面：鏡頭進入機匣，看連發動作如何一遍遍接續。',
     status: 'React / Three.js 原生動畫',
     component: AutomaticFireScene,
     durationInFrames: 720,
@@ -136,7 +136,7 @@ export const projects: readonly MgProject[] = [
     width: 1280,
     height: 720,
     notes: [
-      '單一原生 3D 剖視模型；24 秒全程由 Three.js 依時間軸運算運鏡與機構，沒有 MP4 或圖片替代。',
+      '第二版全新立體模型，具有倒角槍托、護木、機匣及抽離的側蓋；24 秒運鏡包含推近、環繞、追拍與復位。',
       '概念示意：連發與半自動的關鍵差別在於持續扣住扳機後，前者能在自動循環中再次擊發；後者需重新扣動扳機。',
       '模型零件、尺寸及時序經刻意抽象，不代表真實槍械的設計、製造或改裝方式。',
     ],
