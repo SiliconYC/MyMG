@@ -484,6 +484,7 @@ export const SteamEngineScene: React.FC = () => {
     data-governor-angle={s.governor.angle.toFixed(4)}
     data-governor-sleeve={s.governor.sleeveY.toFixed(4)}
     data-governor-throttle={s.governor.throttle.toFixed(4)}
+    data-camera-shift={smoothstep((s.time-18.2)/2.1).toFixed(4)}
     style={{background:'radial-gradient(ellipse at 54% 48%,#213d50 0%,#0e1e2d 67%,#08111d 100%)',
       overflow:'hidden'}}>
     <ThreeCanvas width={1280} height={720} orthographic
