@@ -5,24 +5,27 @@ import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {
   TASKS, CPU_CORES, GPU_LANES, cameraAt, completedCount, workingCount,
-  taskAt, sampleAt, stageAt, smooth, type Kind, type Point,
+  taskAt, sampleAt, stageAt, smooth, corePosition, lidOpening,
+  type Kind,
 } from './model';
 
-// Only two visual identities: unprocessed gray and processed blue.
-// Terracotta and slate describe the mechanism, NOT additional task types.
-const INPUT='#c3c5c1';
-const OUTPUT='#418ca7';
-const CPU_BODY='#a98063';
-const GPU_BODY='#788b92';
+// Warm HBM-like studio lighting. Task color means one thing ONLY:
+// neutral = queued; cyan = the same task has been computed.
+const QUEUED='#c3c5c1';
+const FINISHED='#418ca7';
+const CPU='#b78057';
+const GPU='#648e9e';
 const CENTER:Record<Kind,number>={cpu:-6.5,gpu:6.5};
 type Vec=[number,number,number];
-
-const Box:React.FC<{pos:Vec;size:Vec;color:string;metal?:number;
-  opacity?:number; rotation?:Vec}> =
-({pos,size,color,metal=.05,opacity=1,rotation=[0,0,0]})=>(
+type BoxProps={pos:Vec;size:Vec;color:string;metal?:number;opacity?:number;
+  rotation?:Vec;glow?:string;power?:number};
+const Box:React.FC<BoxProps>=({
+  pos,size,color,metal=.08,opacity=1,rotation=[0,0,0],glow='#000000',power=0,
+})=>(
   <mesh position={pos} rotation={rotation}>
     <boxGeometry args={size}/>
-    <meshStandardMaterial color={color} roughness={.61} metalness={metal}
+    <meshStandardMaterial color={color} metalness={metal} roughness={.51}
+      emissive={glow} emissiveIntensity={power}
       transparent={opacity<1} opacity={opacity}/>
   </mesh>
 );
@@ -31,77 +34,144 @@ const Camera:React.FC<{frame:number}>=({frame})=>{
   const {camera}=useThree();
   useLayoutEffect(()=>{
     const {focusX,zoom,angle}=cameraAt(frame);
-    // Cinematography is authored as 3D movement, not a CSS stage transition.
     camera.position.set(focusX+4.5+angle*5,11.5,19-angle*9);
     camera.lookAt(focusX,0,0);
-    if(camera instanceof THREE.OrthographicCamera) camera.zoom=zoom;
+    if(camera instanceof THREE.OrthographicCamera)camera.zoom=zoom;
     camera.updateProjectionMatrix();
   },[camera,frame]);
   return null;
 };
 
+/** A recognizable single processor package, not three disconnected tracks. */
+const Package:React.FC<{kind:Kind}>=({kind})=>{
+  const copper=kind==='cpu'?'#c1a87d':'#b29a70';
+  const silicon=kind==='cpu'?'#39434c':'#263e4a';
+  return <group>
+    {/* Square PCB/ceramic substrate with layered edge and one central silicon die. */}
+    <Box pos={[0,-.58,0]} size={[6.55,.34,6.55]} color="#39474d" metal={.36}/>
+    <Box pos={[0,-.385,0]} size={[6.37,.07,6.37]} color="#7e8c86" metal={.18}/>
+    <Box pos={[0,-.25,0]} size={[5.50,.25,5.50]} color={silicon} metal={.48}/>
+    <Box pos={[0,-.115,0]} size={[5.27,.025,5.27]} color="#4d5b60" metal={.25}/>
+    {/* Just eight edge contacts on each side, visible enough to read as a chip. */}
+    {Array.from({length:8},(_,i)=>{
+      const n=(i-3.5)*.70;
+      return <React.Fragment key={i}>
+        <Box pos={[n,-.56,-3.35]} size={[.33,.10,.25]} color={copper} metal={.7}/>
+        <Box pos={[n,-.56,3.35]} size={[.33,.10,.25]} color={copper} metal={.7}/>
+        <Box pos={[-3.35,-.56,n]} size={[.25,.10,.33]} color={copper} metal={.7}/>
+        <Box pos={[3.35,-.56,n]} size={[.25,.10,.33]} color={copper} metal={.7}/>
+      </React.Fragment>;
+    })}
+    {/* A restrained metal perimeter clearly frames the exposed die. */}
+    {[-1,1].map(side=><React.Fragment key={side}>
+      <Box pos={[side*2.69,-.08,0]} size={[.07,.09,5.45]} color="#b1afa9" metal={.63}/>
+      <Box pos={[0,-.08,side*2.69]} size={[5.45,.09,.07]} color="#b1afa9" metal={.63}/>
+    </React.Fragment>)}
+  </group>;
+};
+
+/** CPU: four large, distinct cores and two quiet cache stripes. */
+const CpuDie:React.FC<{frame:number}>=({frame})=><group>
+  {Array.from({length:CPU_CORES},(_,i)=>{
+    const [x,,z]=corePosition('cpu',i);
+    const active=Array.from({length:TASKS},(_,t)=>t).some(t=>
+      t%CPU_CORES===i && taskAt(frame,'cpu',t).phase==='processing');
+    return <group key={i}>
+      <Box pos={[x,.105,z]} size={[1.91,.32,1.90]} color="#745b4c" metal={.32}/>
+      <Box pos={[x,.28,z]} size={[1.69,.075,1.68]}
+        color={active?'#efc6a4':'#c29c80'} metal={.22}
+        glow={CPU} power={active?.34:.025}/>
+      {/* Two visible internal arithmetic sub-blocks, no microcircuit spaghetti. */}
+      <Box pos={[x-.36,.326,z]} size={[.32,.02,.91]} color="#957b68" metal={.25}/>
+      <Box pos={[x+.36,.326,z]} size={[.32,.02,.91]} color="#957b68" metal={.25}/>
+    </group>;
+  })}
+  {/* Cache is secondary and visibly unlike a fifth core. */}
+  {[-1,1].map(s=><Box key={s} pos={[0,-.065,s*2.49]} size={[3.8,.06,.17]}
+    color="#a2a6a1" metal={.25}/>)}
+</group>;
+
+/** GPU: same die footprint, but 16 small parallel lanes in a dense matrix. */
+const GpuDie:React.FC<{frame:number}>=({frame})=><group>
+  {Array.from({length:GPU_LANES},(_,i)=>{
+    const [x,,z]=corePosition('gpu',i);
+    const active=taskAt(frame,'gpu',i).phase==='processing';
+    return <group key={i}>
+      <Box pos={[x,.105,z]} size={[.88,.28,1.00]} color="#47616c" metal={.30}/>
+      <Box pos={[x,.26,z]} size={[.74,.07,.86]}
+        color={active?'#b3dbe2':'#83a7b1'} metal={.18}
+        glow={GPU} power={active?.42:.015}/>
+    </group>;
+  })}
+</group>;
+
+/** Brief packaging reveal makes it immediately read as a semiconductor chip. */
+const Lid:React.FC<{frame:number;kind:Kind}>=({frame,kind})=>{
+  const open=lidOpening(frame,kind);
+  if(open>=.998)return null;
+  const tone=kind==='cpu'?'#c5c4bc':'#9cbbc2';
+  return <group position={[0,2.1*open,-4.6*open]}>
+    <Box pos={[0,.58,0]} size={[5.50,.29,5.50]} color={tone} metal={.73}/>
+    <Box pos={[0,.734,0]} size={[4.55,.027,4.55]}
+      color={kind==='cpu'?'#dad7cf':'#acc5c9'} metal={.52}/>
+  </group>;
+};
+
+/** Work is consumed BY the chip. The source and destination are bare cubes,
+ * not disconnected rectangular factory floors. */
 const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
 ({kind,index,frame})=>{
   const state=taskAt(frame,kind,index);
-  const pos:Vec=[...state.point];
-  const dyed=new THREE.Color(INPUT).lerp(new THREE.Color(OUTPUT),state.dyed);
-  return <Box pos={pos} size={[.46,.43,.46]} color={'#'+dyed.getHexString()}
+  const progress=state.progress;
+  const inside=smooth((progress-.27)/.13)*(1-smooth((progress-.60)/.12));
+  const size=.46*(1-.59*inside);
+  const pos:Vec=[
+    CENTER[kind]+state.point[0],
+    state.point[1]-.22*inside,
+    state.point[2],
+  ];
+  const c=new THREE.Color(QUEUED).lerp(new THREE.Color(FINISHED),state.dyed);
+  return <Box pos={pos} size={[size,size,size]} color={'#'+c.getHexString()}
     rotation={[0,state.rotation,0]}/>;
 };
 
-const Mechanism:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>{
-  const center=CENTER[kind];
-  const appear=smooth((frame-67)/35);
-  return <group position={[center,0,0]} scale={Math.max(.001,appear)}>
-    {/* Three physically separate regions: source -> machine -> destination. */}
-    <Box pos={[0,-.61,0]} size={[8.35,.26,7.12]} color="#c8c5be"/>
-    <Box pos={[-2.9,-.453,0]} size={[2.3,.075,6.5]} color="#b5b4af"/>
-    <Box pos={[0,-.443,0]} size={[2.23,.075,6.5]} color="#bdbbb4"/>
-    <Box pos={[2.94,-.453,0]} size={[2.3,.075,6.5]} color="#b1c5c8"/>
-    {kind==='cpu'
-      ? Array.from({length:CPU_CORES},(_,i)=>(
-          <group key={i}>
-            <Box pos={[-.15,-.20,(i-1.5)*1.43]} size={[1.28,.44,1.15]}
-              color={CPU_BODY} metal={.22}/>
-            <Box pos={[-.15,.045,(i-1.5)*1.43]} size={[.99,.07,.92]}
-              color="#dbc2aa"/>
-          </group>
-        ))
-      : Array.from({length:GPU_LANES},(_,i)=>(
-          <group key={i}>
-            <Box pos={[(i%4-1.5)*.52,-.23,(Math.floor(i/4)-1.5)*1.43]}
-              size={[.48,.38,.87]} color={GPU_BODY} metal={.18}/>
-            <Box pos={[(i%4-1.5)*.52,-.022,(Math.floor(i/4)-1.5)*1.43]}
-              size={[.39,.05,.71]} color="#b5c5c7"/>
-          </group>
-        ))}
+const Chip:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>{
+  const appear=smooth((frame-(kind==='cpu'?81:291))/30);
+  return <group>
+    <group position={[CENTER[kind],0,0]} scale={Math.max(.001,appear)}>
+      <Package kind={kind}/>
+      {kind==='cpu'?<CpuDie frame={frame}/>:<GpuDie frame={frame}/>}
+      <Lid kind={kind} frame={frame}/>
+    </group>
     {Array.from({length:TASKS},(_,i)=>(
-      <TaskCube key={i} index={i} frame={frame} kind={kind}/>
+      <group key={i} scale={Math.max(.001,appear)}>
+        <TaskCube kind={kind} index={i} frame={frame}/>
+      </group>
     ))}
   </group>;
 };
 
 const Intro:React.FC<{frame:number}>=({frame})=>{
   if(frame>=80)return null;
-  const a=1-smooth((frame-65)/14);
+  const alpha=1-smooth((frame-65)/14);
   const {x,y,dyed}=sampleAt(frame);
-  const color=new THREE.Color(INPUT).lerp(new THREE.Color(OUTPUT),dyed);
+  const c=new THREE.Color(QUEUED).lerp(new THREE.Color(FINISHED),dyed);
   return <group>
-    <Box pos={[-1.8,-.31,0]} size={[1.45,.15,1.45]} color="#aaa9a4" opacity={a}/>
-    <Box pos={[1.8,-.31,0]} size={[1.45,.15,1.45]} color="#b1c5c8" opacity={a}/>
-    <Box pos={[x,y,0]} size={[.99,.99,.99]} color={'#'+color.getHexString()} opacity={a}/>
+    <Box pos={[-1.8,-.31,0]} size={[1.45,.15,1.45]} color="#aaa9a4" opacity={alpha}/>
+    <Box pos={[1.8,-.31,0]} size={[1.45,.15,1.45]} color="#b1c5c8" opacity={alpha}/>
+    <Box pos={[x,y,0]} size={[.99,.99,.99]} color={'#'+c.getHexString()} opacity={alpha}/>
   </group>;
 };
 
 const Scene:React.FC<{frame:number}>=({frame})=>(
   <>
     <Camera frame={frame}/>
-    <ambientLight intensity={1.7}/>
-    <directionalLight position={[-7,16,12]} intensity={2.5} color="#fff7eb"/>
-    <directionalLight position={[11,8,-7]} intensity={.65} color="#e4eff2"/>
+    <ambientLight intensity={1.55}/>
+    <directionalLight position={[-7,16,12]} intensity={2.55} color="#fff7eb"/>
+    <directionalLight position={[11,8,-7]} intensity={.78} color="#e4eff2"/>
     <Intro frame={frame}/>
-    <Mechanism kind="cpu" frame={frame}/>
-    <Mechanism kind="gpu" frame={frame}/>
+    <Chip kind="cpu" frame={frame}/>
+    <Chip kind="gpu" frame={frame}/>
   </>
 );
 
@@ -109,9 +179,9 @@ const Caption:React.FC<{frame:number}>=({frame})=>{
   const stage=stageAt(frame);
   const label={
     task:'任務：把灰色方塊變成藍色',
-    cpu:'CPU · 4 個核心，分批完成',
-    gpu:'GPU · 16 個單元，同時處理',
-    compare:'同樣的任務，不同的並行方式',
+    cpu:'CPU · 4 個大型核心，分批運算',
+    gpu:'GPU · 16 條運算通道，同步處理',
+    compare:'兩顆晶片，處理相同的 16 個任務',
   }[stage];
   return <div aria-hidden="true" style={{
     position:'absolute',top:56,left:62,pointerEvents:'none',
@@ -126,6 +196,7 @@ export const CpuGpuScene:React.FC=()=>{
   const frame=useCurrentFrame();
   return <AbsoluteFill data-testid="cpu-gpu-native-scene"
     data-renderer="react-threejs-webgl"
+    data-chip-design="package-with-exposed-silicon"
     data-workload={stageAt(frame)}
     data-task-count={TASKS}
     data-cpu-done={completedCount(frame,'cpu')}
