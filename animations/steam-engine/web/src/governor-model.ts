@@ -8,8 +8,8 @@
  * Dimensionless gains are deliberately illustrative, not calibrated to a
  * particular nineteenth-century engine.
  */
-export const GOVERNOR_START_FRAME = 540;
-export const GOVERNOR_END_FRAME = 960;
+export const GOVERNOR_START_FRAME = 0;
+export const GOVERNOR_END_FRAME = 420;
 export const GOVERNOR_FPS = 30;
 export const NOMINAL_THROTTLE = 0.58;
 export const NOMINAL_ANGLE = 0.70;
@@ -24,7 +24,7 @@ const ease = (v: number) => {
 
 /** A temporary reduction of load (not an artificial change of ball angle). */
 export const loadReliefAt = (seconds: number) =>
-  ease((seconds - 21.15) / .40) * (1 - ease((seconds - 23.15) / .60));
+  ease((seconds - 6.55) / .32) * (1 - ease((seconds - 8.10) / .40));
 
 export type GovernorState = {
   theta: number;
@@ -39,7 +39,7 @@ export type GovernorState = {
 const neutralTheta = GOVERNOR_START_FRAME / GOVERNOR_FPS * NOMINAL_OMEGA - Math.PI / 2;
 const neutral = (): GovernorState => ({
   theta:neutralTheta, omega:NOMINAL_OMEGA, relativeSpeed:1,
-  angle:NOMINAL_ANGLE, sleeveY:2.36 - 1.84 * Math.cos(NOMINAL_ANGLE),
+  angle:NOMINAL_ANGLE, sleeveY:2.73 - 1.76 * Math.cos(NOMINAL_ANGLE),
   throttle:NOMINAL_THROTTLE, loadRelief:0, spindlePhase:neutralTheta*2.2,
 });
 
@@ -55,7 +55,7 @@ for (let i=1; i<=GOVERNOR_END_FRAME-GOVERNOR_START_FRAME; i++) {
     .20,1.15,
   );
   const angle=prev.angle+(equilibrium-prev.angle)*dt/.48;
-  const sleeveY=2.36 - 1.84 * Math.cos(angle);
+  const sleeveY=2.73 - 1.76 * Math.cos(angle);
   // High sleeve -> throttle closes -> weaker steam torque.
   const throttle=clamp(NOMINAL_THROTTLE-1.5*(angle-NOMINAL_ANGLE),.14,.85);
   // Rotor inertia: steam drive - friction/load + temporary load reduction.
