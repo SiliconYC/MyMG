@@ -13,6 +13,12 @@ import {GOV_X,GOV_Z,GOV_PIVOT_Y,GOV_LIFT,THROTTLE_X,THROTTLE_Y,THROTTLE_Z,THROTT
 import {pipeSections} from '../animations/steam-engine/web/src/pipe-path.ts';
 import {cameraPose} from '../animations/steam-engine/web/src/camera-path.ts';
 import {flowOpacity,flowProgress,visibleArrowCount} from '../animations/steam-engine/web/src/steam-flow.ts';
+import {BELT_LENGTH,DRIVE_RATIO,DRIVE_BELT_RADIUS,DRIVE_BELT_Z,
+  DRIVE_CRANK_X,DRIVE_GOV_X,DRIVE_SUPPORT_Y,BEVEL_APEX,
+  BEVEL_INPUT_TEETH,BEVEL_OUTPUT_TEETH,BEVEL_INPUT_LENGTH,BEVEL_OUTPUT_LENGTH,
+  BEVEL_INPUT_RADIUS,BEVEL_OUTPUT_RADIUS,beltPointAtTravel,beltTravelAt,
+  gearPhaseResidual
+} from '../animations/steam-engine/web/src/governor-drive-model.ts';
 
 test('20-second runtime and crank / piston / connecting rod stay linked',()=>{
   assert.equal(DURATION,600);
@@ -83,6 +89,77 @@ test('steam piston and governor spindle use shared integrated crank phase',()=>{
   assert.ok(Math.abs(b.theta-a.theta-b.governor.omega/30)<.005);
   assert.notEqual(a.pistonX,b.pistonX);
   assert.notEqual(a.governor.spindlePhase,b.governor.spindlePhase);
+});
+
+
+// A visible 90-degree transmission must account for flyball energy.
+// Merely rotating the governor from the same clock without a connected
+// belt / layshaft / gear pair would fail these checks.
+test('governor has a continuous mechanical power path from the flywheel shaft',()=>{
+  const src=readFileSync(new URL('../animations/steam-engine/web/src/steam-engine.tsx',import.meta.url),'utf8');
+  assert.ok(DRIVE_CRANK_X>DRIVE_GOV_X);
+  assert.equal(DRIVE_CRANK_X,CRANK_X);
+  assert.equal(BEVEL_APEX[0],GOV_X);
+  assert.equal(BEVEL_APEX[2],GOV_Z);
+  assert.equal(BEVEL_APEX[1],0);
+  assert.ok(DRIVE_SUPPORT_Y < -1);
+  assert.ok(DRIVE_BELT_Z<0);
+  assert.match(src,/const DrivePulley/);
+  assert.match(src,/const ClosedDriveBelt/);
+  assert.match(src,/const GovernorDrive/);
+  assert.match(src,/<ClosedDriveBelt theta=\{s\.theta\}\/>/);
+  assert.match(src,/<DrivePulley x=\{DRIVE_CRANK_X\} theta=\{s\.theta\}\/>/);
+  assert.match(src,/<DrivePulley x=\{DRIVE_GOV_X\} theta=\{s\.theta\}\/>/);
+  assert.match(src,/BEVEL_APEX/);
+  assert.match(src,/s\.governor\.spindlePhase/);
+  assert.match(src,/from=\{\[GOV_X,DRIVE_SUPPORT_Y,DRIVE_BELT_Z-\.15\]\}/);
+  assert.match(src,/from=\{\[0,\.03,0\]\} to=\{\[0,GOV_PIVOT_Y\+\.12,0\]\}/);
+  assert.doesNotMatch(src,/\[GOV_X,0,GOV_Z\].*coneGeometry args=\{\[\.19,\.26,24\]\}/);
+});
+
+test('belt is a closed tangent continuous circuit that really contacts both pulleys',()=>{
+  const r=DRIVE_BELT_RADIUS,span=DRIVE_CRANK_X-DRIVE_GOV_X;
+  const at=(u)=>beltPointAtTravel(u*BELT_LENGTH);
+  const p0=at(0),p1=at(1);
+  assert.ok(Math.hypot(...p0.map((x,i)=>x-p1[i]))<1e-9);
+  assert.deepEqual(p0,[DRIVE_CRANK_X,r,DRIVE_BELT_Z]);
+  assert.deepEqual(beltPointAtTravel(span),[DRIVE_GOV_X,r,DRIVE_BELT_Z]);
+  assert.ok(Math.abs(BELT_LENGTH-(2*span+2*Math.PI*r))<1e-12);
+  for(let i=0;i<=300;i++){
+    const p=at(i/300),next=at((i+1)/300);
+    assert.equal(p[2],DRIVE_BELT_Z);
+    assert.ok(Math.hypot(...next.map((x,k)=>x-p[k]))<BELT_LENGTH/299*1.001);
+    if(p[0]<DRIVE_GOV_X){
+      assert.ok(Math.abs(Math.hypot(p[0]-DRIVE_GOV_X,p[1])-r)<1e-8);
+    }else if(p[0]>DRIVE_CRANK_X){
+      assert.ok(Math.abs(Math.hypot(p[0]-DRIVE_CRANK_X,p[1])-r)<1e-8);
+    }else{
+      assert.ok(Math.abs(Math.abs(p[1])-r)<1e-8);
+    }
+  }
+  for(let f=0;f<599;f++){
+    const a=steamAtFrame(f),b=steamAtFrame(f+1);
+    const expected=(b.theta-a.theta)*r;
+    const actual=beltTravelAt(b.theta)-beltTravelAt(a.theta);
+    const wrapped=actual>0?actual:actual+BELT_LENGTH;
+    assert.ok(Math.abs(wrapped-expected)<1e-9,
+      'belt travel must equal crankshaft rim displacement exactly, every frame');
+  }
+});
+
+test('gears share a right-angle apex and all drive rotation derives from crank',()=>{
+  assert.equal(BEVEL_INPUT_TEETH,22);
+  assert.equal(BEVEL_OUTPUT_TEETH,10);
+  assert.equal(DRIVE_RATIO,BEVEL_INPUT_TEETH/BEVEL_OUTPUT_TEETH);
+  assert.ok(Math.abs(BEVEL_INPUT_RADIUS/BEVEL_INPUT_LENGTH-DRIVE_RATIO)<1e-12);
+  assert.ok(Math.abs(BEVEL_OUTPUT_RADIUS/BEVEL_OUTPUT_LENGTH-1/DRIVE_RATIO)<1e-12);
+  assert.ok(Math.abs(Math.atan(BEVEL_INPUT_RADIUS/BEVEL_INPUT_LENGTH)
+    +Math.atan(BEVEL_OUTPUT_RADIUS/BEVEL_OUTPUT_LENGTH)-Math.PI/2)<1e-10);
+  for(let frame=0;frame<600;frame++){
+    const s=steamAtFrame(frame);
+    assert.ok(Math.abs(gearPhaseResidual(s.theta,s.governor.spindlePhase))<1e-9);
+    assert.equal(s.theta,s.governor.theta);
+  }
 });
 
 test('bare cylinder has exactly two embedded side ports and no valve chest',()=>{
