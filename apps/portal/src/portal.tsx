@@ -76,7 +76,7 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
       const video = masterRef.current;
       if (!video) return;
       const onFrame = () => setFrame(Math.min(project.durationInFrames - 1,
-        Math.max(0, Math.floor(video.currentTime * project.fps + 0.001))));
+        Math.max(0, Math.round(video.currentTime * project.fps))));
       const onPlay = () => setPlaying(true);
       const onPause = () => setPlaying(false);
       video.addEventListener('timeupdate', onFrame);
@@ -175,6 +175,10 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
         <span>/ {project.durationInFrames-1} 帧</span>
       </div>
       <div className="playbar"><div className="frame-actions"><button type="button" onClick={()=>step(-1)} aria-label="后退一帧">← 前一帧</button><button type="button" onClick={()=>step(1)} aria-label="前进一帧">后一帧 →</button></div><span>{project.width} × {project.height} · {project.fps} FPS · {(project.durationInFrames/project.fps).toFixed(1)}S</span></div>
+      {isHbmMaster && <div className="master-link">
+        <span>画面源：Python Mustard-03（同源生成）</span>
+        <a href={`${import.meta.env.BASE_URL}media/hbm-python-original.mp4`} download>查看原始 MP4 ↗</a>
+      </div>}
       <div className="project-notes"><div className="notes-title">关于这项实验</div>{project.notes.map(note=><p key={note}>{note}</p>)}</div>
       <div className="other-projects"><a href="#/">← 浏览全部 MG 项目</a></div>
     </main>
