@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {
-  DURATION,FPS,TASKS,CPU_CORES,GPU_LANES,stageAt,cameraAt,jobProgress,
+  DURATION,FPS,TASKS,TASK_CUBE_SIZE,CPU_CORES,GPU_LANES,stageAt,cameraAt,jobProgress,
   taskAt,taskPositions,completedCount,workingCount,sampleAt,
 } from '../animations/cpu-gpu/web/src/model.ts';
 
@@ -44,10 +44,10 @@ test('every task has a physical source -> processor -> destination',()=>{
   assert.ok(taskAt(146,'cpu',0).dyed>.1);
   const cpuA=taskPositions('cpu',0).output;
   const cpuB=taskPositions('cpu',4).output;
-  assert.ok(cpuB[0]-cpuA[0]>.46,'output cubes must not merge into bars');
+  assert.ok(cpuB[0]-cpuA[0]>TASK_CUBE_SIZE+.15,'output cubes must not merge into bars');
   const gpuA=taskPositions('gpu',0).output;
   const gpuB=taskPositions('gpu',1).output;
-  assert.ok(gpuB[0]-gpuA[0]>.46,'GPU outputs must be individually readable');
+  assert.ok(gpuB[0]-gpuA[0]>TASK_CUBE_SIZE+.15,'GPU outputs must be individually readable');
   assert.equal(taskAt(165,'cpu',0).dyed,1);
   assert.ok(Math.abs(taskAt(90,'cpu',0).point[0]-input[0])<.01);
   assert.ok(Math.abs(taskAt(165,'cpu',0).point[0]-out[0])<.01);
