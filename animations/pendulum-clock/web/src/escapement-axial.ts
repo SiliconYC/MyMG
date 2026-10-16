@@ -11,6 +11,11 @@ export const WHEEL_THICKNESS = 0.18;
 export const PALLET_THICKNESS = 0.12;
 export const PALLET_PLANE_Z = WHEEL_PLANE_Z;
 export const PALLET_ARM_WELD_Z = PALLET_PLANE_Z;
+/** Entire lengths of both anchor fork arms lie in the wheel working plane.
+ * This includes the end at the rotating anchor spindle, not just the shoe
+ * weld. A 3D diagonal fork arm is mechanically wrong for this assembly.
+ */
+export const FORK_ARM_PLANE_Z = WHEEL_PLANE_Z;
 
 export const WHEEL_SPINDLE_RADIUS = 0.13;
 export const WHEEL_SPINDLE_REAR_Z = -0.55;
