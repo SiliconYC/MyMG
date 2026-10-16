@@ -49,10 +49,28 @@ const difference=(a,b)=>{
   return diff/(a.arr.length/3);
 };
 try{
-  await page.goto(site,{waitUntil:'networkidle',timeout:60000});
+  // Regression: ChatGPT and other apps append tracking parameters BEFORE #/.
+  // The route and deployed bundle must be identical to the canonical homepage.
+  const tracked = new URL(site);
+  tracked.searchParams.set('utm_source','chatgpt.com');
+  tracked.hash = '#/';
+  await page.goto(tracked.href,{waitUntil:'networkidle',timeout:60000});
+  await page.waitForFunction(()=>!location.search.includes('utm_source'),null,{timeout:10000});
+  assert.equal(new URL(page.url()).pathname,new URL(site).pathname);
+  assert.equal(new URL(page.url()).search,'');
+  assert.equal(new URL(page.url()).hash,'#/');
   await page.getByTestId('project-hbm').click();
   await page.getByTestId('project-player-page').waitFor();
   assert.equal(new URL(page.url()).hash,'#/hbm');
+  assert.equal(new URL(page.url()).search,'','Clicking HBM must stay on canonical URL');
+  const trackedBuild=await page.getByTestId('build-id').textContent();
+  const trackedScripts=await page.locator('script[type="module"]').evaluateAll(nodes=>nodes.map(n=>n.src));
+  assert.ok(trackedBuild?.includes('BUILD') && trackedScripts.length>0);
+  await page.goto(new URL('#/hbm',site).href,{waitUntil:'networkidle',timeout:60000});
+  assert.equal(await page.getByTestId('build-id').textContent(),trackedBuild,
+    'Tracked entry and clean direct entry must load same deployed build');
+  assert.deepEqual(await page.locator('script[type="module"]').evaluateAll(nodes=>nodes.map(n=>n.src)),trackedScripts,
+    'Tracked and canonical pages must load same JS bundle');
   assert.equal(await page.locator('video').count(),0,'MP4-based HBM playback is FORBIDDEN');
   assert.equal(await page.locator('img').count(),0,'No frame images inside native HBM player');
   await page.getByTestId('hbm-native-scene').waitFor();
