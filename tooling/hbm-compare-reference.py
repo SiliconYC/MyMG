@@ -28,13 +28,12 @@ def rgb(img:Image.Image)->np.ndarray:
 
 def normalized_screen(filename:pathlib.Path)->Image.Image:
     im=Image.open(filename).convert("RGB")
-    # Local player container has its own one-pixel border, not part of the
-    # 1280x720 canonical Python composition.
-    w,h=im.size
-    if w>1280 and h>720:
-        im=im.crop(((w-1280)//2,(h-720)//2,(w+1280)//2,(h+720)//2))
+    # Chromium can include one redundant bottom pixel if the composition's
+    # subpixel screen origin is rounded outwards. Cropping never rescales.
+    if im.size==(1280,721):
+        im=im.crop((0,0,1280,720))
     if im.size!=(1280,720):
-        im=im.resize((1280,720),Image.Resampling.LANCZOS)
+        raise AssertionError(f"Canvas screenshot must be 1280x720 without CSS scale or borders, got {im.size} from {filename}")
     return im
 
 def ssim(ref:np.ndarray,test:np.ndarray)->float:

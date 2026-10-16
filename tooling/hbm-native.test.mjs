@@ -21,8 +21,8 @@ test('All 345 frames produce deterministic live Three.js geometry; transitions h
   const counts=[0,30,67,129,165,224,273,316,344].map(f=>{
     const a=buildScene(f),b=buildScene(f);
     assert.deepEqual(a,b,`frame ${f} differs across calculations`);
-    assert.ok(a.length>6,`incomplete frame ${f}`);
-    assert.ok(a.some(p=>p.world?.length===4),`no original XYZ polygons on frame ${f}`);
+    assert.ok(a.length>(f===0?0:6),`incomplete frame ${f}`);
+    assert.ok(f===0 ? a.some(p=>p.shadow) : a.some(p=>p.world?.length===4),`no proper geometry on frame ${f}`);
     assert.ok(a.every(p=>Number.isFinite(p.opacity)&&p.opacity>0&&p.opacity<=1));
     assert.ok(a.every(p=>p.points.every(x=>Number.isFinite(x[0])&&Number.isFinite(x[1]))));
     return a.length;

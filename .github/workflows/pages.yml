@@ -57,6 +57,7 @@ jobs:
         run: pnpm --filter @mymg/portal build
         env:
           MYMG_BASE_PATH: /MyMG/
+          VITE_MYMG_BUILD_ID: ${{ github.sha }}
       - name: Upload site
         uses: actions/upload-pages-artifact@v4
         with:
