@@ -1,13 +1,14 @@
 import type {ComponentType} from 'react';
 import {HbmMustard03Native} from '@mymg/hbm';
 import {DemoScene} from '@mymg/demo';
+import {CpuGpuScene} from '@mymg/cpu-gpu';
 // @mymg-generator-imports
 
 /** Single catalog powers all portal cards and player routes. */
 export type MgProject = {
   id: string;
   compositionId: string;
-  cover?: {type: 'hbm'} | {type: 'image'; src: string; alt: string};
+  cover?: {type: 'hbm'} | {type: 'cpu-gpu'} | {type: 'image'; src: string; alt: string};
   title: string;
   titleEn: string;
   category: string;
@@ -57,6 +58,27 @@ export const projects: readonly MgProject[] = [
     width: 1280,
     height: 720,
     notes: ['用于验证新作品能以单一登记进入门户与 Studio。', '画面由帧号决定，无需 WebGL 或服务器。'],
+  },
+  {
+    id: 'cpu-gpu',
+    compositionId: 'CpuGpuScene',
+    cover: {type: 'cpu-gpu'},
+    title: 'CPU 与 GPU：两种计算方式',
+    titleEn: 'CPU / GPU · PARALLEL COMPUTE',
+    category: '芯片 / 三维运算架构',
+    description: '看见四个强控制核心与八十条同步计算通道，理解重复任务和复杂分支如何改变优势。',
+    status: 'React / Three.js 原生动画',
+    component: CpuGpuScene,
+    durationInFrames: 630,
+    fps: 30,
+    width: 1280,
+    height: 720,
+    notes: [
+      '原生实时 Three.js 几何，无 MP4、视频贴图或预渲染帧；可逐帧检视核心、数据包与输出。',
+      '规则任务：大量计算通道执行相同指令、处理不同数据；四个 CPU 核心通过连续多轮完成。',
+      '分支任务：CPU 核心各走不同控制流；GPU 示意为分歧路径分组轮流执行。',
+      '80 条 GPU 运算通道是概念化示意，不代表 80 颗完整 GPU 核心；动画速率不是实际硬件跑分。',
+    ],
   },
   // @mymg-generator-projects
 ];
