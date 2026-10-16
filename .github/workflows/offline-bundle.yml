@@ -1,0 +1,90 @@
+name: MyMG offline bundle (on demand)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+    paths: ['.github/workflows/offline-bundle.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mymg-offline-bundle
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.20.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Warm pnpm store and Chromium browser
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/mymg-cache/store" "$RUNNER_TEMP/mymg-cache/browsers"
+          pnpm install --frozen-lockfile --store-dir "$RUNNER_TEMP/mymg-cache/store"
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mymg-cache/browsers" \
+            pnpm --filter @mymg/portal exec playwright install --with-deps chromium
+          npm pack pnpm@10.20.0 --pack-destination "$RUNNER_TEMP/mymg-cache" --silent
+          sha256sum pnpm-lock.yaml | awk '{print $1}' > "$RUNNER_TEMP/mymg-cache/lock.sha256"
+      - name: Restore with registry deliberately unreachable
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -path './.git' -prune -o -type d -name node_modules -prune -exec rm -rf '{}' +
+          export npm_config_registry=http://127.0.0.1:9
+          export npm_config_offline=true
+          pnpm install --offline --frozen-lockfile --store-dir "$RUNNER_TEMP/mymg-cache/store"
+          pnpm check
+          pnpm --filter @mymg/portal build
+          nohup pnpm --filter @mymg/portal exec vite preview --host 127.0.0.1 --port 4173 > "$RUNNER_TEMP/mymg-preview.log" 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4173/MyMG/ >/dev/null; then break; fi
+            sleep 1
+          done
+          PLAYWRIGHT_BROWSERS_PATH="$RUNNER_TEMP/mymg-cache/browsers" \
+            MYMG_QA_URL=http://127.0.0.1:4173/MyMG/ \
+            MYMG_QA_OUTPUT="$RUNNER_TEMP/mymg-qa" \
+            pnpm --filter @mymg/portal qa
+      - name: Package lockfile-bound archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOCK_HASH="$(sha256sum pnpm-lock.yaml | cut -d' ' -f1)"
+          echo "OFFLINE_TAG=offline-linux-x64-node22-${LOCK_HASH:0:16}" >> "$GITHUB_ENV"
+          tar -C "$RUNNER_TEMP/mymg-cache" -czf "$RUNNER_TEMP/mymg-offline-linux-x64-node22.tar.gz" .
+          (cd "$RUNNER_TEMP" && sha256sum mymg-offline-linux-x64-node22.tar.gz > SHA256SUMS)
+          ls -lh "$RUNNER_TEMP/mymg-offline-linux-x64-node22.tar.gz"
+      - name: Publish durable GitHub Release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$OFFLINE_TAG" >/dev/null 2>&1; then
+            echo "Release already exists: $OFFLINE_TAG"
+            exit 0
+          fi
+          gh release create "$OFFLINE_TAG" \
+            "$RUNNER_TEMP/mymg-offline-linux-x64-node22.tar.gz" "$RUNNER_TEMP/SHA256SUMS" \
+            --title "MyMG offline Linux x64 Node 22" \
+            --notes "Immutable lockfile-pinned pnpm store, pnpm 10.20.0 and Chromium; verify SHA256SUMS before restoring." \
+            --target "$GITHUB_SHA"
+      - name: Preserve failure logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-bundle-failure
+          path: |
+            ${{ runner.temp }}/mymg-preview.log
+            ${{ runner.temp }}/mymg-qa/
+          if-no-files-found: ignore
