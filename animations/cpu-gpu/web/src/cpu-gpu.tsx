@@ -142,6 +142,32 @@ const TaskCube:React.FC<{kind:Kind;index:number;frame:number}>=
 };
 
 
+
+/**
+ * Victory belongs to the CHIPS, not a detached typographic card.
+ * Four slim luminous strokes trace the successful die's perimeter. During
+ * ordinary computing these strokes are not mounted at all.
+ */
+const VictoryTrace:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>{
+  const beat=storyBeatAt(frame);
+  const winner=beat==='gpu-wins'?'gpu':beat==='cpu-wins'?'cpu':null;
+  if(winner!==kind)return null;
+  const alpha=storyOpacityAt(frame)*(.81+.10*Math.sin(frame*.16));
+  const line=kind==='gpu'?'#5c9eb5':'#c58d61';
+  const extent=3.58;
+  const thickness=.065;
+  return <group position={[0,.16,0]}>
+    <Block pos={[0,0,-extent]} size={[extent*2,thickness,thickness]}
+      color={line} glow={line} power={.32} opacity={alpha}/>
+    <Block pos={[0,0,extent]} size={[extent*2,thickness,thickness]}
+      color={line} glow={line} power={.32} opacity={alpha}/>
+    <Block pos={[-extent,0,0]} size={[thickness,thickness,extent*2]}
+      color={line} glow={line} power={.32} opacity={alpha}/>
+    <Block pos={[extent,0,0]} size={[thickness,thickness,extent*2]}
+      color={line} glow={line} power={.32} opacity={alpha}/>
+  </group>;
+};
+
 /** One shared silhouette palette: 4 cubes, spheres, tetrahedra and cylinders. */
 const ShapeGeometry:React.FC<{shape:Shape}>=({shape})=>{
   if(shape==='sphere')return <sphereGeometry args={[.30,18,12]}/>;
@@ -184,6 +210,7 @@ const Chip:React.FC<{kind:Kind;frame:number}>=({kind,frame})=>
     <Package kind={kind}/>
     {kind==='cpu'?<CpuDie frame={frame}/>:<GpuDie frame={frame}/>}
     <JobStations/>
+    <VictoryTrace kind={kind} frame={frame}/>
     {frame<ORIGINAL_FRAMES&&Array.from({length:TASKS},(_,i)=>(
       <TaskCube key={i} kind={kind} index={i} frame={frame}/>
     ))}
@@ -203,85 +230,106 @@ const World:React.FC<{frame:number}>=({frame})=>(
   </>
 );
 
+
+/** Always one quiet, consistent annotation when a chapter title is absent. */
 const Caption:React.FC<{frame:number}>=({frame})=>{
   const label={
-    cpu:'第一轮 · 相同任务｜CPU 四核心分批处理',
-    gpu:'第一轮 · 相同任务｜GPU 十六路并行',
-    compare:'第一轮 · 相同任务｜并行效率对比',
-    'mixed-intro':'第二轮 · 不同形状代表不同任务分支',
-    'mixed-cpu':'第二轮 · 分歧任务｜CPU 核心独立工作',
-    'mixed-gpu':'第二轮 · 分歧任务｜GPU 分支导致等待',
-    'mixed-compare':'第二轮 · 分歧任务｜两种处理方式',
+    cpu:'CPU · 四核心分批执行',
+    gpu:'GPU · 十六路同步执行',
+    compare:'16 项相同任务 · 并行吞吐',
+    'mixed-intro':'16 项混合任务 · 四条执行路径',
+    'mixed-cpu':'CPU · 独立处理不同分支',
+    'mixed-gpu':'GPU · 分歧通道需要等待',
+    'mixed-compare':'16 项混合任务 · 控制流分歧',
   }[stageAt(frame)];
+  const alpha=1-smooth(storyOpacityAt(frame)*1.2);
   return <div aria-hidden="true" style={{
-    position:'absolute',top:56,left:62,pointerEvents:'none',
+    position:'absolute',top:56,left:66,pointerEvents:'none',
     fontFamily:'"Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif',
-    fontWeight:650,fontSize:31,letterSpacing:.4,color:'#343c40',
+    fontWeight:570,fontSize:25,letterSpacing:.45,color:'#45545a',
+    opacity:alpha,
   }}><span>{label}</span></div>;
 };
 
-
 /**
- * Short, animated editorial beats layered over the unchanged native WebGL.
- * Unlike a static slide, a neutral-color diagonal wipe crosses the actual
- * chip camera shot as completed cubes disappear and new shapes fly in.
- * Only one major title is ever visible; no extra charts or text panels.
+ * Two IDENTICAL typographic chapter entrances; no card, background plate,
+ * rounded corners, giant victory banners or unrelated overlay graphic.
+ * Victory gets a small anchored lower-third matching its illuminated chip.
  */
 const StoryAnnouncement:React.FC<{frame:number}>=({frame})=>{
   const beat=storyBeatAt(frame);
-  const opacity=storyOpacityAt(frame);
-  const wipeOpacity=handoverOpacityAt(frame);
-  const sweep=handoverProgressAt(frame);
-  const second=beat==='round-two';
+  const alpha=storyOpacityAt(frame);
+  const chapter=beat==='round-one'||beat==='round-two';
+  const roundTwo=beat==='round-two';
   const gpuWin=beat==='gpu-wins';
   const cpuWin=beat==='cpu-wins';
-  const entering=second?smooth((frame-324)/12):
-    gpuWin?smooth((frame-276)/12):smooth((frame-700)/12);
-  const foreground=gpuWin?'#3b7892':cpuWin?'#aa7450':'#344951';
-  const left=second?'50%':gpuWin?'68%':'32%';
+  const enterStart=roundTwo?324:gpuWin?274:cpuWin?700:0;
+  const reveal=smooth((frame-enterStart)/12);
+  const sweep=handoverProgressAt(frame);
+  const sweepOpacity=handoverOpacityAt(frame);
+  const accent=gpuWin?'#477e96':cpuWin?'#b17b55':'#506872';
   return <>
     <div aria-hidden="true" data-testid="cpu-gpu-round-wipe"
-      data-active={wipeOpacity>.02?'true':'false'}
+      data-active={sweepOpacity>.02?'true':'false'}
       style={{
-        position:'absolute',zIndex:2,top:'-17%',left:'-48%',
-        width:'96%',height:'135%',pointerEvents:'none',
-        background:'linear-gradient(90deg,transparent 0%,#e6e9e7 32%,#f4f0e7 75%,transparent 100%)',
-        opacity:wipeOpacity*.97,
-        transform:`translateX(${-85+220*sweep}%) rotate(-10deg)`,
+        position:'absolute',zIndex:2,left:0,top:'-8%',
+        width:125,height:'116%',pointerEvents:'none',
+        opacity:sweepOpacity*.42,
+        background:'linear-gradient(90deg,transparent,#d4dfdc 38%,#edf0e9 55%,transparent)',
+        transform:`translateX(${-190+1470*sweep}px) skewX(-8deg)`,
       }}/>
     {beat!=='none'&&<div aria-hidden="true"
-      data-testid="cpu-gpu-story-title" data-beat={beat}
+      data-testid="cpu-gpu-story-title"
+      data-beat={beat}
+      data-layout={chapter?'chapter':'verdict'}
       style={{
         position:'absolute',zIndex:3,
-        top:second?'42%':'50%',left,
-        transform:`translate(-50%,-50%) translateY(${(1-entering)*25}px) scale(${.96+.04*entering})`,
-        opacity,pointerEvents:'none',textAlign:'center',
-        whiteSpace:'nowrap',
-        background:'rgba(246,244,238,.92)',
-        padding:second?'22px 43px 25px':'17px 34px 21px',
-        borderRadius:9,
+        left:chapter?66:gpuWin?785:105,
+        top:chapter?53:'auto',bottom:chapter?'auto':64,
+        pointerEvents:'none',
+        width:chapter?510:380,
+        opacity:alpha,
         fontFamily:'"Noto Sans CJK SC","Microsoft YaHei",system-ui,sans-serif',
-        boxShadow:'0 9px 42px rgba(67,79,80,.07)',
+        transform:`translateY(${(1-reveal)*(chapter?13:9)}px)`,
+        color:'#394e57',textAlign:'left',
+        textShadow:'0 1px 2px rgba(250,247,240,.76)',
       }}>
-      <div style={{
-        fontSize:second?24:20,fontWeight:650,
-        letterSpacing:second?5:3,color:'#68777b',
-        marginBottom:7,
-      }}>
-        {second?'第二轮 · 新的挑战':
-          gpuWin?'第一轮 · 相同任务':'第二轮 · 分歧任务'}
-      </div>
-      <div style={{
-        fontSize:second?65:63,lineHeight:1.14,
-        fontWeight:820,letterSpacing:second?3:1,
-        color:foreground,
-      }}>
-        {second?'16 个混合任务':gpuWin?'GPU 胜出':'CPU 胜出'}
-      </div>
-      {second&&<div style={{
-        fontSize:22,fontWeight:540,color:'#667378',
-        letterSpacing:1,marginTop:10,
-      }}>方块 · 球体 · 四面体 · 圆柱</div>}
+      {chapter?<>
+        <div style={{
+          fontSize:16,fontWeight:750,letterSpacing:3.5,color:'#6e7b7e',
+          display:'flex',alignItems:'center',gap:13,marginBottom:11,
+        }}>
+          <span style={{fontVariantNumeric:'tabular-nums',color:'#a47758'}}>
+            {roundTwo?'02':'01'}</span>
+          <span style={{height:1,width:38,background:'#8f9997'}}/>
+          <span>{roundTwo?'第二轮':'第一轮'}</span>
+        </div>
+        <div style={{
+          fontSize:43,fontWeight:740,letterSpacing:.9,lineHeight:1.22,
+        }}>{roundTwo?'16 个混合任务':'16 个相同任务'}</div>
+        <div style={{
+          fontSize:19,fontWeight:460,letterSpacing:1.1,
+          marginTop:12,color:'#63737a',
+        }}>{roundTwo?'形状不同 · 分支各异':'规则一致 · 并行处理'}</div>
+      </>:<>
+        <div style={{
+          fontSize:16,fontWeight:670,letterSpacing:2.5,
+          color:'#697b81',marginBottom:11,
+        }}>{gpuWin?'01  /  同质任务':'02  /  分歧任务'}</div>
+        <div style={{
+          display:'flex',alignItems:'baseline',gap:13,
+          letterSpacing:.4,lineHeight:1.2,
+        }}>
+          <span style={{fontSize:49,fontWeight:800,color:accent}}>
+            {gpuWin?'GPU':'CPU'}</span>
+          <span style={{fontSize:33,fontWeight:600,color:'#4b5960'}}>胜出</span>
+        </div>
+        <div style={{
+          height:3,width:106,background:accent,
+          marginTop:13,
+          transformOrigin:'left center',transform:`scaleX(${reveal})`,
+        }}/>
+      </>}
     </div>}
   </>;
 };
