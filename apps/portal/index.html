@@ -6,6 +6,25 @@
     <meta name="theme-color" content="#0f171e" />
     <meta name="description" content="MyMG — 用于探索动态图形、三维可视化与动画工程的实验作品门户。" />
     <title>MyMG — 动态图形实验室</title>
+    <link rel="canonical" href="https://siliconyc.github.io/MyMG/" />
+    <script>
+      // Normalize marketing/tracking query variants before loading a bundle.
+      // Query-specific cached HTML can otherwise boot an old JS deployment.
+      // Preserve the hash route (including #/hbm) and non-tracking parameters.
+      (() => {
+        const url = new URL(window.location.href);
+        let changed = false;
+        for (const key of Array.from(url.searchParams.keys())) {
+          if (/^utm_/i.test(key) || ['fbclid', 'gclid', 'mc_cid', 'mc_eid'].includes(key)) {
+            url.searchParams.delete(key);
+            changed = true;
+          }
+        }
+        if (changed) {
+          window.location.replace(url.pathname + url.search + url.hash);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
