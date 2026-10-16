@@ -315,7 +315,7 @@ const StoryAnnouncement:React.FC<{frame:number}>=({frame})=>{
         <div style={{
           fontSize:16,fontWeight:670,letterSpacing:2.5,
           color:'#697b81',marginBottom:11,
-        }}>{gpuWin?'01  /  同质任务':'02  /  分歧任务'}</div>
+        }}>{gpuWin?'第一轮 · 同质任务':'第二轮 · 分歧任务'}</div>
         <div style={{
           display:'flex',alignItems:'baseline',gap:13,
           letterSpacing:.4,lineHeight:1.2,
