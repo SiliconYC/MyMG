@@ -6,6 +6,20 @@
 
 .master-link{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:15px 0;border-bottom:1px solid #455a63;color:#9db0b4;font-size:12px}.master-link a{color:#efa779;text-decoration:underline;text-underline-offset:4px}@media(max-width:700px){.master-link{align-items:flex-start;flex-direction:column}}
 
+/* Dedicated clock-work cover; the detail scene uses genuine Three.js meshes. */
+.artwork-clock{background:radial-gradient(ellipse at 43% 44%,#334e54,#0a222d 80%);overflow:hidden}
+.clock-arc{position:absolute;left:10%;top:6%;width:54%;height:89%;border-radius:50%;border:1px solid #76929250}
+.clock-wheel{position:absolute;left:25%;top:28%;width:35%;aspect-ratio:1;border:14px dashed #cfa562;border-radius:50%;box-shadow:0 0 0 7px #be986a45,0 0 28px #c59e5566;animation:clock-cover-wheel 25s steps(30,end) infinite}
+.clock-wheel-core{position:absolute;inset:25%;border:9px solid #a2b3aa;border-radius:50%}
+.clock-anchor{position:absolute;left:30%;top:14%;height:46px;width:28%;border-left:8px solid #bed0c9;border-right:8px solid #bed0c9;border-bottom:9px solid #bed0c9;transform:perspective(75px) rotateX(26deg);border-radius:0 0 40px 40px}
+.clock-pendulum{position:absolute;left:42%;top:16%;height:71%;width:4px;background:#bad2cf;transform-origin:top center;animation:clock-cover-swing 2s ease-in-out infinite alternate}
+.clock-bob{position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);height:34px;width:34px;border-radius:50%;background:radial-gradient(circle at 34% 32%,#fce5a4,#bd7e37 76%);box-shadow:0 0 15px #bc853f55}
+.clock-dial{position:absolute;right:11%;top:16%;width:26%;aspect-ratio:1;background:#203943;border:4px solid #bc945b;box-shadow:0 0 0 6px #ba985533;border-radius:50%}
+.clock-hand{position:absolute;left:49%;top:12%;height:40%;width:2px;background:#e67d67;transform-origin:50% 95%;animation:clock-cover-wheel 60s steps(60,end) infinite}
+@keyframes clock-cover-swing{from{transform:rotate(-10deg)}to{transform:rotate(10deg)}}
+@keyframes clock-cover-wheel{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.clock-pendulum,.clock-wheel,.clock-hand{animation:none}}
+
 /* Steam Engine #21: lightweight native CSS cover art (player is real WebGL). */
 .artwork-steam{background:radial-gradient(circle at 70% 50%,#325369 0%,#152c3d 63%,#0d1a27 100%);perspective:700px}
 .steam-cylinder{position:absolute;left:14%;top:38%;width:47%;height:30%;border:12px solid #869aa8;border-left:16px solid #b6c2c4;border-radius:38px 22px 22px 38px;background:linear-gradient(180deg,#2f5368,#172f41);transform:skewY(-9deg);box-shadow:14px 14px 0 #112635,20px 19px 17px #0b1821}
