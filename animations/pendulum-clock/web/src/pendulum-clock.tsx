@@ -3,7 +3,8 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
-import {clockAtFrame, TEETH} from './clock-model';
+import {clockAtFrame, TEETH, type ClockState} from './clock-model';
+import {palletPose, contactDistance, type Side, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 
 /**
@@ -104,65 +105,72 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
   </group>;
 };
 
-/** Paired, genuinely extruded escapement PALLETS, not rectangular proxy blocks.
- * Locking face (short near-radial land) and sloped impulse face have different
- * planar normals. Geometry is representative, not a manufactured Graham profile.
- * The tips extend into the 1.3-1.55 radius zone occupied by the escape teeth.
+/** A slim beveled locking wedge with a narrow contact tip.
+ * Local +Y points outward from the wheel; (0,0) is the actual contact.
+ * These two tiny wedges replace both oversized ornamental mechanisms.
  */
-function makePalletTooth(side:-1|1):THREE.ExtrudeGeometry {
-  const p=new THREE.Shape();
-  const contour:[number,number][]=[
-    [-.17,.26],[.11,.25],[.19,.12],[.17,.015],
-    [.07,-.12],[.04,-.295],[-.12,-.28],[-.145,-.08],
-  ];
-  contour.forEach(([x,y],i)=>{
-    const xx=x*side;
-    if(i===0)p.moveTo(xx,y);else p.lineTo(xx,y);
+function makeSlimPallet():THREE.ExtrudeGeometry {
+  const shape=new THREE.Shape();
+  shape.moveTo(0,0);                   // tooth-facing locking point
+  shape.lineTo(.024,.029);             // short locking land
+  shape.lineTo(.035,.082);             // sloping impulse face
+  shape.lineTo(.075,.18);
+  shape.lineTo(-.075,.18);
+  shape.lineTo(-.032,.072);
+  shape.lineTo(-.012,.019);
+  shape.closePath();
+  const geom=new THREE.ExtrudeGeometry(shape,{
+    depth:.12,bevelEnabled:true,steps:1,
+    bevelSize:.006,bevelThickness:.006,bevelSegments:2,
   });
-  p.closePath();
-  const g=new THREE.ExtrudeGeometry(p,{
-    depth:.22,steps:1,bevelEnabled:true,
-    bevelSize:.012,bevelThickness:.012,bevelSegments:2,
-  });
-  g.translate(0,0,-.11);
-  return g;
+  geom.translate(0,0,-.10);
+  return geom;
 }
 
-const PalletTooth:React.FC<{side:-1|1;engaged:boolean;releasing:boolean}>=
-({side,engaged,releasing})=>{
-  const geometry=useMemo(()=>makePalletTooth(side),[side]);
+const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
+  const geometry=useMemo(makeSlimPallet,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
-  return <group>
+  return <group position={[pose.tip[0],pose.tip[1],-.06]}
+    rotation={[0,0,-pose.radialAngle]}>
     <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color={engaged?GOLD:STEEL}
-        roughness={.24} metalness={.82}
-        emissive={engaged?(releasing?'#8a5425':'#4f381a'):'#000000'}
-        emissiveIntensity={engaged ? 0.15 : 0}/>
+      <meshStandardMaterial color={pose.engaged?GOLD:STEEL}
+        metalness={.75} roughness={.24}
+        emissive={pose.engaged?'#8b6033':'#000000'}
+        emissiveIntensity={pose.engaged?.12:0}/>
     </mesh>
-    {/* Fine 3D face inlays emphasize the two nonparallel working surfaces. */}
-    <Rod a={[side*.19,.12,.131]} b={[side*.17,.015,.131]}
-      radius={.015} color={BRASS}/>
-    <Rod a={[side*.17,.015,.132]} b={[side*.07,-.12,.132]}
-      radius={.014} color={engaged?'#f8daaa':GOLD}/>
+    {/* The visible edge of the actual short locking face. */}
+    <Rod a={[0,0,-.118]} b={[.024,.029,-.118]}
+      radius={.008} color="#f3dbb0"/>
+    {/* The angled impulse face is much longer than the locking land. */}
+    <Rod a={[.024,.029,-.118]} b={[.035,.082,-.118]}
+      radius={.008} color={BRASS}/>
   </group>;
 };
 
-const Anchor:React.FC<{angle:number;lock:'entry'|'exit';releasing:boolean}>=
-({angle,lock,releasing})=>
-  <group position={[0,2.56,-.33]} rotation={[0,0,-angle]}>
-    <Rod a={[0,0,0]} b={[-1.13,-.94,0]} radius={.08} color={METAL}/>
-    <Rod a={[0,0,0]} b={[1.13,-.94,0]} radius={.08} color={METAL}/>
-    {([-1,1] as const).map(side=>
-      <group key={side} position={[side*1.13,-.94,.27]}
-        rotation={[0,0,side*.20]}>
-        <PalletTooth side={side}
-          engaged={(side===-1&&lock==='entry')||(side===1&&lock==='exit')}
-          releasing={releasing}/>
+/** Geometrically registered with REAL tooth flanks, not an independent V art.
+ * Each pallet sits at a reference flank point; during release it retracts
+ * outwards as the wheel advances the half pitch to the opposite flank.
+ */
+const Anchor:React.FC<{state:ClockState;showDetail:boolean}>=({state,showDetail})=>{
+  const entry=palletPose('entry',state);
+  const exit=palletPose('exit',state);
+  return <group>
+    {([entry,exit] as PalletPose[]).map(pose=>
+      <group key={pose.side}>
+        <Rod a={[0,2.56,-.33]}
+          b={[pose.mounting[0],pose.mounting[1],-.13]}
+          radius={.043} color={STEEL}/>
+        <PalletTooth pose={pose}/>
+        {pose.engaged&&showDetail&&
+          <Rod a={[pose.flankStart[0],pose.flankStart[1],-.155]}
+            b={[pose.flankEnd[0],pose.flankEnd[1],-.155]}
+            radius={.018} color="#fff0c4"/>}
       </group>
     )}
-    <Axle position={[0,0,-.05]} radius={.20} depth={.23} color={DARK}/>
-    <Axle position={[0,0,-.23]} radius={.09} depth={.14} color={GOLD}/>
+    <Axle position={[0,2.56,-.34]} radius={.16} depth={.18} color={DARK}/>
+    <Axle position={[0,2.56,-.47]} radius={.078} depth={.11} color={GOLD}/>
   </group>;
+};
 
 /** One pendulum physically hangs from the same anchor pivot behind the wheel. */
 const Pendulum:React.FC<{angle:number}>=({angle})=>
@@ -233,8 +241,9 @@ const CinematicCamera:React.FC<{frame:number}>=({frame})=>{
 
 const Movement:React.FC<{frame:number}>=({frame})=>{
   const state=clockAtFrame(frame);
+  const shot=cameraAtFrame(frame);
   return <ThreeCanvas width={1280} height={720}
-    camera={{position:[3.3,1.4,15],fov:33,near:.1,far:95}}
+    camera={{position:[0,1.2,14.5],fov:35,near:.1,far:95}}
     gl={{alpha:false,antialias:true,preserveDrawingBuffer:true}}
     style={{position:'absolute',inset:0,width:1280,height:720}}>
     <color attach="background" args={['#edece6']}/>
@@ -247,24 +256,25 @@ const Movement:React.FC<{frame:number}>=({frame})=>{
       <MinimalSupports/>
       <Pendulum angle={state.pendulumAngle}/>
       <EscapeWheel angle={state.wheelAngle}/>
-      <Anchor angle={state.anchorAngle} lock={state.lock} releasing={state.releasing}/>
+      <Anchor state={state} showDetail={shot.chapter==='contact'||shot.chapter==='rear'}/>
       <Dial angle={state.secondHandAngle}/>
     </group>
   </ThreeCanvas>;
 };
 
 const CAPTIONS={
-  front:'钟摆往复摆动，秒针却只走一步',
-  rear:'两块擒纵瓦交替卡住轮齿',
-  entry:'入端擒纵瓦：锁止面挡住轮齿，再放行',
-  exit:'出端擒纵瓦：接住下一齿，控制步进',
-  proof:'每次解锁，轮轴与秒针一起前进',
+  front:'秒针一步一走：先看看钟摆的节奏',
+  rear:'两块小擒纵瓦，分别接住轮齿的斜面',
+  contact:'轮齿被锁住 → 放行半齿 → 对侧重新锁住',
+  proof:'每一次放行，秒针恰好前进一步',
 } as const;
 
 export const PendulumClockScene:React.FC=()=>{
   const frame=useCurrentFrame();
   const state=clockAtFrame(frame);
   const shot=cameraAtFrame(frame);
+  const entry=palletPose('entry',state);
+  const exit=palletPose('exit',state);
   return <AbsoluteFill
     data-testid="pendulum-clock-scene" data-renderer="react-threejs-webgl"
     data-beats={state.beats} data-lock={state.lock}
@@ -278,6 +288,9 @@ export const PendulumClockScene:React.FC=()=>{
       shot.position[2]-shot.target[2]).toFixed(4)}
     data-camera-chapter={shot.chapter}
     data-camera-mode={shot.mode}
+    data-contact-side={entry.engaged?'entry':exit.engaged?'exit':'free'}
+    data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
+    data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
     style={{overflow:'hidden',background:'#edece6',color:'#28383d',
       fontFamily:'"Noto Sans SC","Microsoft YaHei",sans-serif'}}>
     <Movement frame={frame}/>
