@@ -113,7 +113,54 @@ try{
   assert.ok(await number('data-camera-distance')>introDistance*1.8,
     'final two-chip framing must come from a real 3D dolly, not orthographic zoom');
 
-  for(const frame of [59,60,94,95,237,250,266,270,271,331,345,346,377]){
+  // The FIRST 420 frames stay intact; at frame 420 a second, independently
+  // animated set of 16 mixed geometry tasks enters the very same ThreeCanvas.
+  const firstActLastCamera={
+    zoom:await number('data-camera-zoom'),
+    x:await number('data-cpu-location'),
+    yaw:await number('data-camera-yaw'),
+    pitch:await number('data-camera-pitch'),
+    distance:await number('data-camera-distance'),
+  };
+  const mixedImage=async(f,stage,cpuDone,gpuDone,cpuWork,gpuWork,idle)=>{
+    await seek(f);
+    assert.equal(await scene.getAttribute('data-workload'),stage);
+    assert.equal(await number('data-mixed-task-count'),16);
+    assert.equal(await number('data-mixed-cpu-done'),cpuDone);
+    assert.equal(await number('data-mixed-gpu-done'),gpuDone);
+    assert.equal(await number('data-mixed-cpu-working'),cpuWork);
+    assert.equal(await number('data-mixed-gpu-working'),gpuWork);
+    if(idle!==undefined)assert.equal(await number('data-mixed-gpu-idle'),idle);
+    assert.equal(await scene.locator('span').count(),1);
+    const png=await scene.screenshot({
+      path:resolve(out,'cpu-gpu-mixed-'+f+'.png'),
+    });
+    assert.ok(png.byteLength>6000,'mixed WebGL stage failed '+f);
+    return png;
+  };
+  await mixedImage(420,'mixed-intro',0,0,0,0,0);
+  assert.equal(await number('data-camera-zoom'),firstActLastCamera.zoom);
+  assert.equal(await number('data-camera-yaw'),firstActLastCamera.yaw);
+  assert.equal(await number('data-camera-pitch'),firstActLastCamera.pitch);
+  assert.equal(await number('data-camera-distance'),firstActLastCamera.distance);
+  const newShapes=await mixedImage(460,'mixed-intro',0,0,0,0,0);
+  const cpuChanging=await mixedImage(525,'mixed-cpu',0,0,4,0,0);
+  assert.notDeepEqual(newShapes,cpuChanging);
+  await mixedImage(537,'mixed-cpu',4,0,0,0,0);
+  await mixedImage(585,'mixed-cpu',12,0,0,0,0);
+  await mixedImage(609,'mixed-cpu',16,0,0,0,0);
+  await mixedImage(660,'mixed-gpu',16,0,0,0,0);
+  const divergent=await mixedImage(679,'mixed-gpu',16,0,0,4,12);
+  await mixedImage(701,'mixed-gpu',16,4,0,0,12);
+  await mixedImage(726,'mixed-gpu',16,8,0,0,8);
+  await mixedImage(751,'mixed-gpu',16,12,0,0,4);
+  await mixedImage(776,'mixed-gpu',16,16,0,0,0);
+  const comparison=await mixedImage(839,'mixed-compare',16,16,0,0,0);
+  assert.ok(Buffer.compare(divergent,comparison)!==0);
+  assert.equal(await page.locator('video').count(),0);
+
+  for(const frame of [59,60,94,95,237,250,266,270,271,331,345,346,377,
+    419,420,431,455,482,485,615,645,657,677,785,828,839]){
     await seek(frame);
     if(frame>=60)assert.equal(await number('data-example-progress'),1);
     const png=await scene.screenshot({path:resolve(out,'cpu-gpu-cut-boundary-'+frame+'.png')});
@@ -139,7 +186,7 @@ try{
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:resolve(out,'cpu-gpu-cinematic-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU perspective WebGL verified: actual depth, 3D dolly, fast yaw/pitch orbit, mobile.');
+  console.log('CPU/GPU 28s WebGL verified: original act I unchanged, 16 mixed shapes, CPU paths, SIMT masked GPU paths, perspective and mobile.');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}
