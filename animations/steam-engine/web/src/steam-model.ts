@@ -1,5 +1,5 @@
 /** Pure frame-driven physical model; independent of React and clipping state. */
-import {governorAtFrame, GOVERNOR_START_FRAME, type GovernorState} from './governor-model';
+import {governorAtFrame, GOVERNOR_START_FRAME, type GovernorState} from './governor-model.ts';
 
 export const FPS = 30;
 export const DURATION = 960;
