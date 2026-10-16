@@ -67,7 +67,7 @@ try {
     assert.equal(await chapter.count(),1,'Only one unobtrusive chapter title is allowed');
     assert.equal(await chapter.textContent(),title);
   }
-  for(const n of [110,405]){
+  for(const n of [110,418]){
     await seek(n);
     assert.equal(await chapter.count(),0,'Model must be alone on screen between chapters');
   }
