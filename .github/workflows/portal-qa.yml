@@ -65,6 +65,11 @@ jobs:
         env:
           MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
           MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal
+      - name: Verify new pendulum clock WebGL and synchronized second hand
+        run: pnpm --filter @mymg/portal qa:clock
+        env:
+          MYMG_QA_URL: http://127.0.0.1:4173/MyMG/
+          MYMG_QA_OUTPUT: ${{ github.workspace }}/output/qa-portal/clock
       - name: Verify CPU/GPU #22 native WebGL and four motion stages
         run: pnpm --filter @mymg/portal qa:cpu-gpu
         env:
