@@ -1,6 +1,8 @@
 /** Pure frame-driven physical model; independent of React and clipping state. */
+import {governorAtFrame, GOVERNOR_START_FRAME, type GovernorState} from './governor-model';
+
 export const FPS = 30;
-export const DURATION = 540;
+export const DURATION = 960;
 export const CRANK_X = 3.08;
 export const CRANK_RADIUS = 0.66;
 export const CONNECTING_ROD = 2.72;
@@ -26,11 +28,14 @@ export type SteamFrame = {
   leftPressure: number;
   rightPressure: number;
   motion: 'right' | 'left';
+  governor: GovernorState;
 };
 /** Closed-form slider-crank constraint: pin, connecting rod, crosshead, piston synchronized. */
 export function steamAtFrame(frame: number): SteamFrame {
   const time = frame / FPS;
-  const theta = time * Math.PI * 2 * 0.56 - Math.PI / 2;
+  const governor = governorAtFrame(frame);
+  const theta = frame <= GOVERNOR_START_FRAME
+    ? time * Math.PI * 2 * 0.56 - Math.PI / 2 : governor.theta;
   const pinX = CRANK_X + CRANK_RADIUS * Math.cos(theta);
   const pinY = CRANK_RADIUS * Math.sin(theta);
   const crossheadX = pinX - Math.sqrt(CONNECTING_ROD ** 2 - pinY ** 2);
@@ -41,8 +46,9 @@ export function steamAtFrame(frame: number): SteamFrame {
   const velocity = -Math.sin(theta);
   return {
     time, theta, pistonX, crossheadX, pinX, pinY, cut, cutZ,
-    leftPressure: 0.28 + 0.64 * Math.max(0, velocity),
-    rightPressure: 0.28 + 0.64 * Math.max(0, -velocity),
+    leftPressure: (0.28 + 0.64 * Math.max(0, velocity)) * governor.throttle / .58,
+    rightPressure: (0.28 + 0.64 * Math.max(0, -velocity)) * governor.throttle / .58,
     motion: velocity >= 0 ? 'right' : 'left',
+    governor,
   };
 }
