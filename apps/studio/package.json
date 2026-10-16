@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@mymg/cpu-gpu": "workspace:*",
     "@mymg/demo": "workspace:*",
     "@mymg/mg": "workspace:*",
     "@mymg/hbm": "workspace:*",
