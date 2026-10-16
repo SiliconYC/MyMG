@@ -99,7 +99,7 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
       const a=i*Math.PI/3;
       return <Rod key={i}
         a={[.27*Math.sin(a),.27*Math.cos(a),.09]}
-        b={[1.28*Math.sin(a),1.28*Math.cos(a),.09]}
+        b={[1.03*Math.sin(a),1.03*Math.cos(a),.09]}
         radius={.067} color={GOLD}/>;
     })}
     <Axle position={[0,0,.13]} radius={.32} depth={.24} color={METAL}/>
