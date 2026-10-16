@@ -66,9 +66,30 @@ const Home: React.FC = () => (
 
 const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
   const playerRef = useRef<PlayerRef>(null);
+  const masterRef = useRef<HTMLVideoElement>(null);
+  const isHbmMaster = project.id === 'hbm';
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [mediaFailed, setMediaFailed] = useState(false);
   useEffect(() => {
+    if (isHbmMaster) {
+      const video = masterRef.current;
+      if (!video) return;
+      const onFrame = () => setFrame(Math.min(project.durationInFrames - 1,
+        Math.max(0, Math.floor(video.currentTime * project.fps + 0.001))));
+      const onPlay = () => setPlaying(true);
+      const onPause = () => setPlaying(false);
+      video.addEventListener('timeupdate', onFrame);
+      video.addEventListener('seeked', onFrame);
+      video.addEventListener('play', onPlay);
+      video.addEventListener('pause', onPause);
+      return () => {
+        video.removeEventListener('timeupdate', onFrame);
+        video.removeEventListener('seeked', onFrame);
+        video.removeEventListener('play', onPlay);
+        video.removeEventListener('pause', onPause);
+      };
+    }
     const player = playerRef.current;
     if (!player) return;
     const onFrame = (event: {detail: {frame: number}}) => setFrame(event.detail.frame);
@@ -82,18 +103,33 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
       player.removeEventListener('play', onPlay);
       player.removeEventListener('pause', onPause);
     };
-  }, [project.id]);
+  }, [project.id, project.durationInFrames, project.fps, isHbmMaster]);
   const seek = (target: number) => {
-    const player = playerRef.current;
-    if (!player) return;
     const next = Math.max(0, Math.min(project.durationInFrames - 1, Math.round(target)));
-    player.pause();
-    player.seekTo(next);
+    if (isHbmMaster) {
+      const video = masterRef.current;
+      if (!video) return;
+      video.pause();
+      video.currentTime = next / project.fps;
+    } else {
+      const player = playerRef.current;
+      if (!player) return;
+      player.pause();
+      player.seekTo(next);
+    }
     setFrame(next);
     setPlaying(false);
   };
-  const step = (delta: number) => seek((playerRef.current?.getCurrentFrame() ?? frame) + delta);
+  const step = (delta: number) => seek(
+    (isHbmMaster ? frame : (playerRef.current?.getCurrentFrame() ?? frame)) + delta);
   const togglePlayback = () => {
+    if (isHbmMaster) {
+      const video = masterRef.current;
+      if (!video) return;
+      if (!video.paused) video.pause();
+      else void video.play().catch(() => setMediaFailed(true));
+      return;
+    }
     const player = playerRef.current;
     if (!player) return;
     if (playing) player.pause();
@@ -105,13 +141,29 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
       <a href="#/" className="back-link">←　返回所有作品</a>
       <div className="detail-head"><div><div className="eyebrow detail-kicker">{project.titleEn}</div><h1>{project.title}</h1><p>{project.description}</p></div><span className="status-pill">{project.status}</span></div>
       <div className="player-shell" data-testid="player-shell">
-        <Player ref={playerRef} key={project.id} component={project.component}
-          compositionWidth={project.width} compositionHeight={project.height}
-          fps={project.fps} durationInFrames={project.durationInFrames}
-          loop
-          style={{width: '100%', aspectRatio: `${project.width} / ${project.height}`, display:'block'}}
-          errorFallback={({error}) => <div className="player-error" role="alert">播放器运行出错：{error.message}</div>}
-        />
+        {isHbmMaster ? (
+          <>
+            <video ref={masterRef} data-testid="hbm-master-video"
+              src={`${import.meta.env.BASE_URL}media/hbm-mustard03.mp4`}
+              poster={`${import.meta.env.BASE_URL}media/hbm-poster.jpg`}
+              preload="auto" playsInline loop
+              aria-label="HBM Mustard-03 Python 原版完整影片"
+              onError={() => setMediaFailed(true)}
+              style={{width:'100%',aspectRatio:'16 / 9',display:'block',background:'#eeeae1'}}
+            />
+            {mediaFailed && <div className="player-error" role="alert">
+              HBM 正式影片加载失败。请检查 Pages 媒体资源部署。
+            </div>}
+          </>
+        ) : (
+          <Player ref={playerRef} key={project.id} component={project.component}
+            compositionWidth={project.width} compositionHeight={project.height}
+            fps={project.fps} durationInFrames={project.durationInFrames}
+            loop
+            style={{width: '100%', aspectRatio: `${project.width} / ${project.height}`, display:'block'}}
+            errorFallback={({error}) => <div className="player-error" role="alert">播放器运行出错：{error.message}</div>}
+          />
+        )}
       </div>
       <div className="transport" data-testid="transport">
         <button type="button" data-testid="play-toggle" onClick={togglePlayback}
