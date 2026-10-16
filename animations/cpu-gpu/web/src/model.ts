@@ -1,16 +1,13 @@
-/**
- * A generic (+1) processing tile demonstrates the exact same task movement
- * as CPU's 4 large cores and GPU's 16 light lanes. Three.js is frame-driven.
- */
+/** Two consecutive workloads use the same 16-task geometry and frame-driven Three.js. */
 export const FPS=30;
-export const ORIGINAL_FRAMES=420;
-export const DURATION=840;
+export const ORIGINAL_FRAMES=324;
+export const DURATION=744;
 export const TASKS=16;
 export const TASK_CUBE_SIZE=.40;
 export const CPU_CORES=4;
 export const GPU_LANES=16;
 export type Kind='cpu'|'gpu';
-export type Stage='task'|'cpu'|'gpu'|'compare'|
+export type Stage='cpu'|'gpu'|'compare'|
   'mixed-intro'|'mixed-cpu'|'mixed-gpu'|'mixed-compare';
 export type Shape='cube'|'sphere'|'tetrahedron'|'cylinder';
 export type TaskPhase='waiting'|'entering'|'processing'|'leaving'|'done';
@@ -20,7 +17,6 @@ export type CameraState={
   yaw:number;pitch:number;targetY:number;
 };
 
-export const GENERIC_X=-26.5;
 export const CENTER:Record<Kind,number>={cpu:-8.4,gpu:8.4};
 export const CHIP_HALF=3.275;
 export const GRID_STEP=.63;
@@ -41,37 +37,32 @@ export const smooth=(n:number)=>{
   return t*t*(3-2*t);
 };
 export const stageAt=(frame:number):Stage=>
-  frame<96?'task':frame<271?'cpu':frame<346?'gpu':
+  frame<175?'cpu':frame<250?'gpu':
   frame<ORIGINAL_FRAMES?'compare':
-  frame<485?'mixed-intro':frame<645?'mixed-cpu':
-  frame<785?'mixed-gpu':'mixed-compare';
+  frame<389?'mixed-intro':frame<549?'mixed-cpu':
+  frame<689?'mixed-gpu':'mixed-compare';
 
-/** 
- * Deliberate camera choreography, no uniform-speed slide:
- * generic -> CPU at 60..95 (1.17s)
- * CPU -> GPU at 237..266 (0.97s), with a brief pullback and an actual orbit
- * GPU -> both at 332..377 (1.5s). Three dimensional yaw AND pitch change.
+/**
+ * Act I starts directly on the CPU: the obsolete single-tile introduction and
+ * its 96 frames are removed. The remaining camera, task and mixed-workload
+ * cues equal their former frame numbers minus 96.
  */
 export const cameraAt=(frame:number):CameraState=>{
   if(frame>=ORIGINAL_FRAMES)return mixedCameraAt(frame);
-  const cpu=smooth((frame-60)/35);
-  const gpu=smooth((frame-237)/29);
-  const together=smooth((frame-332)/45);
-  const zoom=80-10*cpu
-    -7*smooth((frame-238)/12)+7*smooth((frame-250)/17)
+  const gpu=smooth((frame-141)/29);
+  const together=smooth((frame-236)/45);
+  const zoom=70
+    -7*smooth((frame-142)/12)+7*smooth((frame-154)/17)
     -35*together;
   return {
-    focusX:GENERIC_X+(CENTER.cpu-GENERIC_X)*cpu+
-      (CENTER.gpu-CENTER.cpu)*gpu-CENTER.gpu*together,
+    focusX:CENTER.cpu+(CENTER.gpu-CENTER.cpu)*gpu-CENTER.gpu*together,
     zoom,
     distance:perspectiveDistance(zoom),
-    yaw:.35+.13*smooth((frame-8)/45)
-      -.75*smooth((frame-60)/35)
-      +.31*smooth((frame-110)/116)
-      -.66*smooth((frame-237)/29)
-      +.33*smooth((frame-280)/45)
+    yaw:-.27+.31*smooth((frame-14)/116)
+      -.66*smooth((frame-141)/29)
+      +.33*smooth((frame-184)/45)
       +.36*together,
-    pitch:.52+.12*cpu-.20*gpu+.08*together,
+    pitch:.64-.20*gpu+.08*together,
     targetY:.12,
   };
 };
@@ -108,17 +99,6 @@ export const flowAt=(p:number,input:Point,processor:Point,output:Point)=>{
   };
 };
 
-/** Anonymous, independent arithmetic tile, not a CPU-specific demonstration. */
-export const exampleStart=0;
-export const exampleDuration=60;
-export const exampleProgress=(frame:number)=>clamp((frame-exampleStart)/exampleDuration);
-export const exampleAt=(frame:number)=>flowAt(
-  exampleProgress(frame),
-  [-2.55,.16,0],
-  [0,.43,0],
-  [2.55,.16,0],
-);
-
 /** Input and 4×4 completed-output grids both live beyond the chip package. */
 export const queuePosition=(_kind:Kind,index:number,side:'input'|'output'):Point=>{
   const col=index%4,row=Math.floor(index/4);
@@ -143,7 +123,7 @@ export const taskPositions=(kind:Kind,index:number)=>({
 
 /** Scheduled around camera holds, not while the camera is racing between chips. */
 export const jobStart=(_frame:number,kind:Kind,index:number)=>
-  kind==='cpu'?101+Math.floor(index/CPU_CORES)*34:280;
+  kind==='cpu'?5+Math.floor(index/CPU_CORES)*34:184;
 export const jobDuration=(_frame:number,kind:Kind)=>kind==='cpu'?32:42;
 export const jobProgress=(frame:number,kind:Kind,index:number)=>
   clamp((frame-jobStart(frame,kind,index))/jobDuration(frame,kind));
@@ -170,13 +150,13 @@ export const SHAPES:readonly Shape[]=['cube','sphere','tetrahedron','cylinder'];
 export const shapeIndex=(index:number)=>(index+Math.floor(index/4))%4;
 export const shapeAt=(index:number):Shape=>SHAPES[shapeIndex(index)];
 
-export const MIXED_APPEAR=433;
-export const MIXED_CPU_FIRST=515;
+export const MIXED_APPEAR=337;
+export const MIXED_CPU_FIRST=419;
 export const MIXED_CPU_BATCH=24;
 export const MIXED_CPU_DURATION=22;
-export const MIXED_GPU_ENTER=651;
-export const MIXED_GPU_READY=675;
-export const MIXED_GPU_FIRST_PATH=677;
+export const MIXED_GPU_ENTER=555;
+export const MIXED_GPU_READY=579;
+export const MIXED_GPU_FIRST_PATH=581;
 export const MIXED_GPU_PATH_SPACING=25;
 export const MIXED_GPU_PATH_DURATION=24;
 
@@ -234,17 +214,17 @@ export const mixedIdleLanes=(frame:number)=>
 /** A direct continuation of the last frame in Act I, never a new camera cut. */
 export const mixedCameraAt=(frame:number):CameraState=>{
   const end=cameraAt(ORIGINAL_FRAMES-1);
-  const cpu=smooth((frame-443)/40);
-  const gpu=smooth((frame-615)/42);
-  const wide=smooth((frame-779)/49);
+  const cpu=smooth((frame-347)/40);
+  const gpu=smooth((frame-519)/42);
+  const wide=smooth((frame-683)/49);
   const zoom=end.zoom+35*cpu-35*wide
-    -5*smooth((frame-615)/13)+5*smooth((frame-632)/22);
+    -5*smooth((frame-519)/13)+5*smooth((frame-536)/22);
   return {
     focusX:end.focusX+CENTER.cpu*cpu+
       (CENTER.gpu-CENTER.cpu)*gpu-CENTER.gpu*wide,
     zoom,distance:perspectiveDistance(zoom),
-    yaw:end.yaw-.27*cpu+.10*smooth((frame-490)/112)
-      -.46*gpu+.10*smooth((frame-682)/85)+.53*wide,
+    yaw:end.yaw-.27*cpu+.10*smooth((frame-394)/112)
+      -.46*gpu+.10*smooth((frame-586)/85)+.53*wide,
     pitch:end.pitch+.08*cpu-.14*gpu+.06*wide,
     targetY:end.targetY,
   };
