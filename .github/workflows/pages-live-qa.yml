@@ -42,7 +42,7 @@ jobs:
           test -s /tmp/mymg-live.html
           grep -q 'id="root"' /tmp/mymg-live.html
           grep -q '/MyMG/assets/' /tmp/mymg-live.html
-      - name: Live Python master MP4 decode, 9 frames, transport and mobile QA
+      - name: Live native React Three.js WebGL, 9 frames, transport and mobile QA
         run: pnpm --filter @mymg/portal qa
         env:
           MYMG_QA_URL: https://siliconyc.github.io/MyMG/

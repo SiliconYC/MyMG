@@ -11,7 +11,7 @@ test('Pages portal is a single registered project entry point',()=>{
   const portal=read('apps/portal/src/portal.tsx');
   assert.equal(manifest.private,true);
   assert.match(catalog,/id:\s*'hbm'/);
-  assert.match(catalog,/component:\s*HbmInfrastructureCheck/);
+  assert.match(catalog,/component:\s*HbmMustard03Native/);
   assert.match(portal,/projects\.map/);
   assert.match(portal,/#\/\$\{encodeURIComponent\(project\.id\)\}/);
   assert.match(portal,/component=\{project\.component\}/);

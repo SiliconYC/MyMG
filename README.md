@@ -46,12 +46,12 @@ pnpm check
 - **入口：** `https://siliconyc.github.io/MyMG/`（已正式部署并通过线上浏览器验收）。
 - **作品链接：** `https://siliconyc.github.io/MyMG/#/hbm`。
 - **门户代码：** `apps/portal/`，所有可播放作品统一在 `apps/portal/src/catalog.ts` 登记。
-- **HBM 完整正片：** `/#/hbm` 已改为 **Mustard-03 原版 345 帧**（11.5 秒、30 FPS、1280×720）；与 `/#/demo` 共用 React 门户。网页当前播放由正式 Python 渲染生成的 H.264 兼容视频，不声称完成原生 React Three Fiber 的几何移植。
-- **体验：** 作品页支持播放、暂停、时间轴拖动、单帧前后退和移动端浏览。HBM 另提供 Python 原版 MP4 供对照；两份媒体只随 Pages 部署，不提交 Git。
+- **HBM 原生复刻：** `/#/hbm` 是 Mustard-03 的 React + Three.js WebGL 网页动画（345 帧、11.5 秒、30 FPS、1280×720）。按原 Python 3D 几何和轴测投影逐帧绘制，不使用 MP4、视频纹理或逐帧图片。
+- **体验：** 原生网页播放、暂停、时间轴拖动、单帧前后退和移动端浏览。HBM 网页本身不加载或发布 MP4；源 Python 仅作离线视觉基准。
 
 本地开发：在仓库根目录执行 `corepack pnpm install`、`corepack pnpm portal`。静态站点建置：`corepack pnpm build:portal`。仓库不托管生成的视频文件。
 
-部署工作流 `.github/workflows/pages.yml` 只在 `dev` 的门户或 HBM 源码变更时运行，或者手动触发。首次运行由 Python 生成 345 帧的正式影片、H.264 网页版及封面，后续相同源文件复用缓存，不把媒体提交到 Git。PR 上的截图验收工作流 `.github/workflows/portal-qa.yml` 也只在 Web 文件变化时触发。
+部署工作流 `.github/workflows/pages.yml` 只在 `dev` 的门户或前端动画源码变更时运行，或者手动触发；不再调用 Python/FFmpeg，也不发布影片媒体。PR 上的截图验收工作流 `.github/workflows/portal-qa.yml` 也只在 Web 文件变化时触发。
 
 仓库已公开，Pages 由 `dev` 的官方 GitHub Actions 工作流发布，网站内容默认公开。不要提交内部机密或授权受限素材。详见 [门户说明](apps/portal/README.md)。
 

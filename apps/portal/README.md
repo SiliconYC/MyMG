@@ -2,7 +2,7 @@
 
 此网站是所有 MG 项目的**唯一公开入口**。首页从 `src/catalog.ts` 渲染作品清单，项目链接使用 `/#/<project-id>` 哈希路由：刷新项目页不会产生 GitHub Pages 404。
 
-门户现将 `/#/hbm` 切换为 Python Mustard-03 正片（345 帧），而非原 5 秒浏览器技术样片；`/#/demo` 仍为非 HBM 独立二维 MG 模板。正式网址 `https://siliconyc.github.io/MyMG/`。
+门户现将 `/#/hbm` 切换为 React Three.js 实时生成的 Mustard-03 动画（345 帧），不再播放 MP4；`/#/demo` 仍为非 HBM 独立二维 MG 模板。正式网址 `https://siliconyc.github.io/MyMG/`。
 
 ## 本地开发
 
@@ -19,7 +19,7 @@
 3. 执行 `pnpm check`、`pnpm build:portal`、`pnpm qa:portal:react`，需要 WebGL 的场景再执行严格浏览器 `pnpm qa:portal`。
 4. 门户和 Studio 共用注册表。`/#/<id>` 可直接播放、暂停、拖动与逐帧浏览，不要复制新门户，也不再人工修改 `apps/studio/src/root.tsx`。
 
-作品播放器支持暂停、拖动进度条、逐帧前后退。HBM 为官方 Python 源码生成的原版 MP4 和浏览器兼容 H.264 影片：由 `bash tooling/render-hbm-master.sh apps/portal/dist/media` 在构建后生成，并在 CI 检查 345 帧、尺寸、帧率与关键帧画质。网页播放完全一致的源动画内容；不是 React 原生几何重建。不要将视频、字体文件或未经授权的素材提交到仓库。
+作品播放器支持暂停、拖动进度条、逐帧前后退。HBM 由 React 计算每一帧的空间坐标，并在 Three.js WebGL 中将 Python 的 2:1 轴测投影、四层 DRAM、TSV 和 GPU/八 HBM 封装绘制出来。网站不加载视频、不提供帧图素材。浏览器 QA 核对真实 WebGL 上下文与九帧截图；严格像素一致性仍需基准差异统计。不要将视频、字体文件或未经授权的素材提交到仓库。
 
 > 真实 WebGL 与关键帧严格验收在 GitHub Runner 上执行；普通 React 交互可在具备 Chromium 的 OpenAI 沙盒运行。
 
