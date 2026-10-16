@@ -1,4 +1,4 @@
-/** Visual minimalism and real browser 3D validation; no screenshot/video masquerade. */
+/** Browser proof: literal task movement, four CPU waves vs one GPU wave. */
 import assert from 'node:assert/strict';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -41,24 +41,29 @@ try{
   await canvas.waitFor();
   assert.ok(await canvas.evaluate(el=>{
     const gl=el.getContext('webgl2')||el.getContext('webgl');
-    return !!gl && !gl.isContextLost() && el.width>=100 && el.height>=100;
-  }),'must use a working, original Three.js WebGL canvas');
-  for(const [frame,beat,labels] of [
-    [70,'cpu',['CPU']],
-    [200,'gpu',['GPU']],
-    [350,'compare',['CPU','GPU']],
-  ]){
+    return !!gl&&!gl.isContextLost()&&el.width>=100&&el.height>=100;
+  }),'genuine Three.js WebGL context required');
+  const shot=async(frame,stage,doneCpu,doneGpu,workingCpu,workingGpu)=>{
     await seek(frame);
-    assert.equal(await marker.getAttribute('data-workload'),beat);
-    const shown=await marker.locator('span').allTextContents();
-    assert.deepEqual(shown,labels,'No subtitle paragraphs or HUD clutter in the animation');
-    const shot=await marker.screenshot({path:resolve(out,'cpu-gpu-minimal-'+frame+'.png')});
-    assert.ok(shot.byteLength>5000,'Expected a real, populated 3D scene at '+frame);
-    const cpu=Number(await marker.getAttribute('data-cpu-active'));
-    const gpu=Number(await marker.getAttribute('data-gpu-active'));
-    if(frame===70)assert.ok(cpu<=1 && gpu===0,'CPU is observed alone');
-    if(frame===200)assert.equal(gpu,64,'GPU wave is synchronized');
-  }
+    assert.equal(await marker.getAttribute('data-workload'),stage);
+    assert.equal(Number(await marker.getAttribute('data-task-count')),16);
+    assert.equal(Number(await marker.getAttribute('data-cpu-done')),doneCpu);
+    assert.equal(Number(await marker.getAttribute('data-gpu-done')),doneGpu);
+    assert.equal(Number(await marker.getAttribute('data-cpu-working')),workingCpu);
+    assert.equal(Number(await marker.getAttribute('data-gpu-working')),workingGpu);
+    assert.equal(await marker.locator('span').count(),1,
+      'Only one caption — no visual dashboard');
+    const png=await marker.screenshot({path:resolve(out,'cpu-gpu-tasks-'+frame+'.png')});
+    assert.ok(png.byteLength>6000,'Expected populated 3D screenshot at '+frame);
+  };
+  await shot(40,'task',0,0,0,0);
+  await shot(140,'cpu',0,0,4,0);
+  await shot(164,'cpu',4,0,4,0);
+  await shot(280,'cpu',16,0,0,0);
+  await shot(352,'gpu',16,0,0,16);
+  await shot(380,'gpu',16,16,0,0);
+  await shot(430,'compare',0,0,0,0);
+  await shot(530,'compare',4,16,4,0);
   await seek(200);
   await page.getByRole('button',{name:'前进一帧'}).click();
   assert.equal(await readFrame(),201);
@@ -70,14 +75,14 @@ try{
   await page.getByTestId('play-toggle').click();
   await page.waitForTimeout(160);
   const frozen=await readFrame();
-  await page.waitForTimeout(290);
+  await page.waitForTimeout(300);
   assert.equal(await readFrame(),frozen);
   await page.goto(new URL('#/cpu-gpu',site).href,{waitUntil:'networkidle'});
   await marker.waitFor();
   await page.setViewportSize({width:390,height:844});
-  await page.screenshot({path:resolve(out,'cpu-gpu-minimal-mobile.png'),fullPage:true});
+  await page.screenshot({path:resolve(out,'cpu-gpu-task-flow-mobile.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('CPU/GPU minimal 3D verified: clean label-only scene, three shots, live WebGL, mobile and frame controls.');
+  console.log('CPU/GPU task-flow WebGL QA passed: source, working cores, dyed output, replay, player, mobile.');
 }catch(error){
   await writeFile(resolve(out,'cpu-gpu-failure.log'),(error?.stack??String(error))+'\n'+errors.join('\n'));
   try{await page.screenshot({path:resolve(out,'cpu-gpu-failure.png'),fullPage:true});}catch{}
