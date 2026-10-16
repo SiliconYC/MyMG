@@ -71,12 +71,12 @@ try{
   const rear=await checkShot(12,'rear','observe','clock-rear.png');
   assert.ok(rear.current.z< -6);
   assert.ok(!front.png.equals(rear.png));
-  const entry=await checkShot(24,'contact','observe','clock-entry-contact.png');
-  const exit=await checkShot(25,'contact','observe','clock-exit-contact.png');
+  const entry=await checkShot(24.4,'contact','observe','clock-entry-contact.png');
+  const exit=await checkShot(25.4,'contact','observe','clock-exit-contact.png');
   assert.equal(entry.current.side,'entry');
   assert.equal(exit.current.side,'exit');
-  assert.ok(entry.current.leftGap<.06,'entry wedge follows gear flank on rigid pendulum arc');
-  assert.ok(exit.current.rightGap<.06,'exit wedge follows gear flank on rigid pendulum arc');
+  assert.ok(entry.current.leftGap<.02,'entry wedge meets tooth on release threshold');
+  assert.ok(exit.current.rightGap<.02,'exit wedge meets tooth on release threshold');
   assert.equal(entry.current.x,exit.current.x,'same macro camera for both contacts');
   assert.equal(entry.current.z,exit.current.z,'no frantic macro switch');
   assert.ok(!entry.png.equals(exit.png),'alternate lock has distinct visible frame');

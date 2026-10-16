@@ -8,7 +8,8 @@ import {
 } from '../animations/pendulum-clock/web/src/clock-model.ts';
 import {cameraAtFrame, SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
 import {palletPose, palletLocalTip, palletWorldTip, contactDistance,
-  flankAt, PITCH, PALLET_CLEARANCE, PIVOT_Y} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
+  flankAt, PITCH, PALLET_CLEARANCE, PIVOT_Y,
+  palletLocalBase, palletWorldBase, palletOrientation, PALLET_BASE_HEIGHT} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
 
 const frame=(seconds)=>Math.round(seconds*FPS);
 
@@ -183,7 +184,54 @@ test('wheel progress is a function of oscillator crossing angles, not independen
         'no second oscillator/motor controls the escapement wheel');
     }
   }
-  assert.equal(PENDULUM_AMPLITUDE,.115);
+  assert.equal(PENDULUM_AMPLITUDE,.145);
+});
+
+test('fork rods terminate at shoe BASE not tooth-catching nose',()=>{
+  const src=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  assert.match(src,/b=\{\[\.\.\.palletLocalBase\(pose\.side\),-\.13\]\}/,
+    'connecting rod should end at pallet base');
+  assert.doesNotMatch(src,/b=\{\[\.\.\.palletLocalTip\(pose\.side\),-\.13\]\}/,
+    'old bug: rod attached to sharp tooth tip');
+  for(const side of ['entry','exit']){
+    const tip=palletLocalTip(side),base=palletLocalBase(side);
+    const length=Math.hypot(base[0]-tip[0],base[1]-tip[1]);
+    assert.ok(Math.abs(length-PALLET_BASE_HEIGHT)<1e-12);
+    assert.ok(Math.hypot(...base)<Math.hypot(...tip)-.18,
+      'shoe base must point back to the main anchor pivot');
+    assert.ok(Math.abs(palletOrientation(side))>.6);
+    for(const n of [0,7,13,27,42]){
+      const state=clockAtFrame(n);
+      const rotated=palletWorldBase(side,state.pendulumAngle);
+      const pose=palletPose(side,state);
+      assert.ok(Math.hypot(rotated[0]-pose.mounting[0],
+        rotated[1]-pose.mounting[1])<1e-11);
+      assert.ok(Math.abs(Math.hypot(rotated[0],rotated[1]-PIVOT_Y)-
+        Math.hypot(...base))<1e-11);
+    }
+  }
+});
+
+test('both working pallets swap lock without jamming each other',()=>{
+  assert.ok(PENDULUM_AMPLITUDE>.14,
+    'pendulum and fork need visibly wider swing to clear tooth shoulders');
+  for(let beat=0;beat<59;beat++){
+    const incoming=clockAtFrame(frame(beat+.4));
+    const active=incoming.lock;
+    const other=active==='entry'?'exit':'entry';
+    assert.ok(contactDistance(active,incoming)<.02,
+      'working flank must have contact at the release threshold');
+    assert.ok(contactDistance(other,incoming)>.075,
+      'inactive flank must be clearly withdrawn, not simultaneously jammed');
+    const after=clockAtFrame(frame(beat+.8));
+    const catching=after.lock;
+    const escaping=catching==='entry'?'exit':'entry';
+    assert.ok(contactDistance(catching,after)<.06,
+      'catching shoe is near the next tooth');
+    assert.ok(contactDistance(escaping,after)>.07,
+      'released shoe must clear the opposing flank by at least 0.07');
+  }
 });
 
 test('one shared swinging fork exchanges locking pallets while wheel steps',()=>{
