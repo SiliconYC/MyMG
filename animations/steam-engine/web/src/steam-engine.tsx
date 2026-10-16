@@ -438,27 +438,35 @@ const Pedestals: React.FC = () => <group>
   </mesh>
 </group>;
 
+/** One shared camera track for WebGL and accurate 3D-anchored callouts. */
+const cameraPose = (t:number) => {
+  const inspect=smoothstep((t-.78)/.43);
+  const governorView=smoothstep((t-4.80)/.53);
+  const valveView=smoothstep((t-8.85)/.48);
+  const eye:V3=[
+    6.6-.7*inspect+.10*governorView,
+    4.0-.35*inspect+.65*governorView,
+    13-1.05*inspect-1.0*governorView,
+  ];
+  const target:V3=[
+    -1.3*inspect+2.58*governorView-.14*valveView,
+    .06+.12*inspect+.93*governorView+.13*valveView,
+    -.22*governorView,
+  ];
+  return {eye,target,zoom:85+25*inspect+15*governorView+7*valveView};
+};
+
 const World: React.FC<{s: SteamFrame}> = ({s}) => {
   const camera=useThree(state=>state.camera);
-  const inspect=smoothstep((s.time-.78)/.43);
-  const governorView=smoothstep((s.time-4.80)/.53);
-  const valveView=smoothstep((s.time-8.85)/.48);
-  // A fast camera transfer followed by long enough stationary inspection:
-  // 0–.8 whole engine, 1.2–4.8 exposed cylinder, 5.4–8.8 balls,
-  // 9.3–14 both valve and governor. No dead four-second flyover.
   useEffect(()=>{
-    const focusX=-1.3*inspect+2.58*governorView-.14*valveView;
-    const focusY=.06+.12*inspect+.93*governorView+.13*valveView;
-    const eyeX=6.6-.7*inspect+.10*governorView;
-    const eyeY=4.0-.35*inspect+.65*governorView;
-    const eyeZ=13-1.05*inspect-1.0*governorView;
-    camera.position.set(eyeX,eyeY,eyeZ);
-    camera.lookAt(focusX,focusY,-.22*governorView);
+    const pose=cameraPose(s.time);
+    camera.position.set(...pose.eye);
+    camera.lookAt(...pose.target);
     if(camera instanceof THREE.OrthographicCamera){
-      camera.zoom=85+25*inspect+15*governorView+7*valveView;
+      camera.zoom=pose.zoom;
       camera.updateProjectionMatrix();
     }
-  },[camera,inspect,governorView,valveView]);
+  },[camera,s.time]);
   const clipPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, -1), 1.42), []);
   clipPlane.constant = s.cutZ;
   return <>
@@ -484,10 +492,7 @@ const World: React.FC<{s: SteamFrame}> = ({s}) => {
 const CHAPTERS = [
   {start:.15, end:1.02, title:'蒸汽机'},
   {start:1.34, end:2.85, title:'气缸剖面'},
-  {start:4.40, end:5.42, title:'飞轮带动调速器'},
-  {start:5.70, end:6.52, title:'离心调速器'},
-  {start:7.18, end:8.74, title:'转快，重锤张开'},
-  {start:9.25, end:10.92, title:'关小进汽，转速回落'},
+  // The governor is taught with one spatial leader-line callout at a time.
 ] as const;
 
 const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
@@ -502,6 +507,77 @@ const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
     fontSize:36, fontWeight:750, letterSpacing:1.2, color:'#f2eee8',
     textShadow:'0 2px 19px rgba(8,21,33,.65)',
   }}>{chapter.title}</div>;
+};
+
+/**
+ * Restrained in-frame annotations. Each short line points at a REAL moving
+ * mechanism, using the same Three.js camera track as the rendered scene.
+ * Only one card and one guide line are visible at any moment.
+ */
+const TEACHING_BEATS = [
+  {start:5.42,end:6.56,part:'belt',lines:['飞轮带动皮带','调速器跟着旋转']},
+  {start:6.62,end:7.90,part:'balls',lines:['转速越快','两颗重锤甩得越开']},
+  {start:7.94,end:9.13,part:'sleeve',lines:['重锤抬高套筒','连杆跟着移动']},
+  {start:9.19,end:11.49,part:'valve',lines:['节流阀关小，进汽减少','飞轮逐渐慢下来']},
+  {start:11.56,end:13.55,part:'flywheel',lines:['转速回到稳定','这就是负反馈']},
+] as const;
+
+type TeachingPart = typeof TEACHING_BEATS[number]['part'];
+const anchoredPoint = (part:TeachingPart,s:SteamFrame):V3 => {
+  if(part==='belt') return [(GOV_X+CRANK_X)/2,-.28,GOV_Z];
+  if(part==='sleeve') return [GOV_X,s.governor.sleeveY-.28,GOV_Z];
+  if(part==='valve') return [THROTTLE_X,THROTTLE_Y-.28,THROTTLE_Z];
+  if(part==='flywheel') return [CRANK_X,-.28,.17];
+  const radius=GOV_ARM*Math.sin(s.governor.angle);
+  const phase=s.governor.spindlePhase;
+  return [
+    GOV_X+radius*Math.cos(phase),
+    GOV_PIVOT_Y-GOV_ARM*Math.cos(s.governor.angle)-.28,
+    GOV_Z+radius*Math.sin(phase),
+  ];
+};
+const projectOnCanvas = (t:number,point:V3) => {
+  const pose=cameraPose(t);
+  // Matches the 1280x720 orthographic frustum of <ThreeCanvas>.
+  const camera=new THREE.OrthographicCamera(-640,640,360,-360,.1,100);
+  camera.position.set(...pose.eye);
+  camera.lookAt(...pose.target);
+  camera.zoom=pose.zoom;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
+  const vector=new THREE.Vector3(...point).project(camera);
+  return {x:(vector.x+1)*640,y:(1-vector.y)*360};
+};
+
+const TeachingCallout: React.FC<{s:SteamFrame}> = ({s}) => {
+  const beat=TEACHING_BEATS.find(b=>s.time>=b.start&&s.time<b.end);
+  if(!beat) return null;
+  const point=projectOnCanvas(s.time,anchoredPoint(beat.part,s));
+  const opacity=smoothstep((s.time-beat.start)/.18)
+    *(1-smoothstep((s.time-beat.end+.18)/.18));
+  return <div data-testid="steam-callout" data-callout-part={beat.part}
+    data-anchor-x={point.x.toFixed(1)} data-anchor-y={point.y.toFixed(1)}
+    aria-hidden="true" style={{position:'absolute',inset:0,
+      opacity,pointerEvents:'none'}}>
+    <svg width="1280" height="720" viewBox="0 0 1280 720"
+      style={{position:'absolute',inset:0,width:'100%',height:'100%'}}>
+      <path d={`M 365 490 L 402 490 L ${(point.x-18).toFixed(1)} ${point.y.toFixed(1)} L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`}
+        stroke="#e9c189" strokeWidth="1.6" strokeLinecap="round"
+        strokeLinejoin="round" fill="none" opacity=".90"/>
+      <circle cx={point.x} cy={point.y} r="6.2" stroke="#ffdc9c"
+        strokeWidth="1.5" fill="#152b38"/>
+      <circle cx={point.x} cy={point.y} r="2.3" fill="#ffce84"/>
+    </svg>
+    <div style={{position:'absolute',left:55,top:436,width:310,
+      boxSizing:'border-box',padding:'14px 12px 16px 18px',
+      fontFamily:'"Noto Sans CJK SC","Microsoft YaHei","PingFang SC",system-ui,sans-serif',
+      borderLeft:'3px solid #f2c17c',background:'rgba(12,27,38,.79)',
+      borderRadius:'0 7px 7px 0',boxShadow:'0 7px 28px rgba(7,16,28,.18)',
+      color:'#f3f0e8',fontSize:22,fontWeight:670,letterSpacing:.4,
+      lineHeight:1.48}}>
+      {beat.lines.map((line,i)=><div key={i}>{line}</div>)}
+    </div>
+  </div>;
 };
 
 export const SteamEngineScene: React.FC = () => {
@@ -528,5 +604,6 @@ export const SteamEngineScene: React.FC = () => {
       <World s={s}/>
     </ThreeCanvas>
     <ChapterTitle frame={frame}/>
+    <TeachingCallout s={s}/>
   </AbsoluteFill>;
 };
