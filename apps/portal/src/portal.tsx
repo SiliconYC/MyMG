@@ -26,10 +26,25 @@ const HbmArtwork: React.FC = () => (
   </div>
 );
 
+const CpuGpuArtwork: React.FC = () => (
+  <div className="artwork artwork-cpu-gpu" aria-hidden="true">
+    <div className="mini-die mini-cpu">
+      {Array.from({length:4},(_,i)=><i key={i}/>)}
+    </div>
+    <div className="mini-vs">/</div>
+    <div className="mini-die mini-gpu">
+      {Array.from({length:80},(_,i)=><i key={i}/>)}
+    </div>
+    <div className="mini-labels"><b>CPU</b><b>GPU</b></div>
+    <span className="artwork-label">CONTROL / THROUGHPUT</span>
+  </div>
+);
+
 const ProjectCard: React.FC<{project: MgProject; index: number}> = ({project, index}) => (
   <a className="project-card" href={`#/${encodeURIComponent(project.id)}`} data-testid={`project-${project.id}`}>
     <div className="project-art">
       {project.cover?.type === 'hbm' ? <HbmArtwork /> :
+        project.cover?.type === 'cpu-gpu' ? <CpuGpuArtwork /> :
         project.cover?.type === 'image' ?
           <img className="artwork-cover" src={project.cover.src} alt={project.cover.alt} loading="lazy" /> :
           <div className="artwork artwork-placeholder" aria-hidden="true">
