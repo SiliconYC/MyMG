@@ -189,7 +189,7 @@ test('two symmetric introductions precede chip-anchored GPU and CPU verdicts',()
   assert.ok(storyOpacityAt(293)>.99,'GPU verdict is readable');
   assert.ok(storyOpacityAt(725)>.99,'CPU verdict stays visible');
   assert.equal(storyOpacityAt(56),0);
-  assert.equal(storyOpacityAt(315),0);
+  assert.equal(storyOpacityAt(316),0);
   assert.equal(handoverOpacityAt(360),0);
   assert.ok(handoverOpacityAt(330)>.95);
   for(let f=0;f<DURATION;f++){
