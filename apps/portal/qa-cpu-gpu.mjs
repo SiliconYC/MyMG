@@ -35,6 +35,8 @@ try{
   const marker=page.getByTestId('cpu-gpu-native-scene');
   await marker.waitFor();
   assert.equal(await marker.getAttribute('data-renderer'),'react-threejs-webgl');
+  assert.equal(await marker.getAttribute('data-chip-design'),'package-with-exposed-silicon',
+    'CPU/GPU must now use actual processor package and exposed silicon die geometry');
   assert.equal(await page.locator('video').count(),0);
   assert.equal(await marker.locator('img').count(),0);
   const canvas=marker.locator('canvas').first();
@@ -57,9 +59,18 @@ try{
     assert.ok(png.byteLength>6000,'Expected populated 3D screenshot at '+frame);
   };
   await shot(40,'task',0,0,0,0);
+  // Package first, then its lid travels away revealing real core sizes.
+  await seek(94);
+  const closedCpu=await marker.screenshot({path:resolve(out,'cpu-package-lid-closed.png')});
+  await seek(115);
+  const openCpu=await marker.screenshot({path:resolve(out,'cpu-package-lid-retracting.png')});
+  assert.ok(Buffer.compare(closedCpu,openCpu)!==0,'CPU chip cover must physically move');
   await shot(140,'cpu',0,0,4,0);
   await shot(164,'cpu',4,0,0,0);
   await shot(280,'cpu',16,0,0,0);
+  await seek(314);
+  const gpuOpening=await marker.screenshot({path:resolve(out,'gpu-silicon-reveal.png')});
+  assert.ok(gpuOpening.byteLength>8000,'GPU array must be visible while lid lifts');
   await shot(352,'gpu',16,0,0,16);
   await shot(380,'gpu',16,16,0,0);
   await shot(430,'compare',0,0,0,0);
