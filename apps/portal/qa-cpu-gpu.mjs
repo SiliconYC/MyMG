@@ -104,7 +104,7 @@ try{
 
   await original(197,'gpu',16,0,0,16);
   await original(226,'gpu',16,16,0,0);
-  await original(274,'compare',16,16,0,0);
+  await original(273,'compare',16,16,0,0);
   assert.equal(await scene.getAttribute('data-story-beat'),'none');
   const gpuVictory=await original(292,'compare',16,16,0,0);
   assert.equal(await scene.getAttribute('data-story-beat'),'gpu-wins');
