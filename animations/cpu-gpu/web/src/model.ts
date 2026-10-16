@@ -104,7 +104,7 @@ export const taskAt=(frame:number,kind:Kind,index:number)=>{
 export const taskOpacity=(frame:number,kind:Kind,index:number)=>
   kind==='cpu'&&index>0 ? smooth((frame-63)/15) : 1;
 export const taskScale=(frame:number,kind:Kind,index:number)=>
-  kind==='cpu'&&index===0 ? 1+.45*(1-smooth((frame-60)/14)) : 1;
+  kind==='cpu'&&index===0 ? 1+1.50*(1-smooth((frame-39)/25)) : 1;
 
 export const completedCount=(frame:number,kind:Kind)=>
   Array.from({length:TASKS},(_,i)=>taskAt(frame,kind,i).phase)
