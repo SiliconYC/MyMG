@@ -26,7 +26,8 @@ const Box:React.FC<BoxProps>=({
     <boxGeometry args={size}/>
     <meshStandardMaterial color={color} metalness={metal} roughness={.51}
       emissive={glow} emissiveIntensity={power}
-      transparent={opacity<1} opacity={opacity}/>
+      transparent={opacity<1} opacity={opacity}
+      depthWrite={opacity>=.999}/>
   </mesh>
 );
 
