@@ -207,8 +207,8 @@ test('WebGL neutral cell is opaque and shares physical task motion with the core
   assert.match(scene,/data-camera-projection="perspective"/);
   assert.match(scene,/data-camera-fov/);
   assert.match(scene,/data-camera-distance/);
-  assert.match(scene,/THREE\\.PerspectiveCamera/);
-  assert.doesNotMatch(scene,/<ThreeCanvas\\s+orthographic|THREE\\.OrthographicCamera/);
+  assert.ok(scene.includes('THREE.PerspectiveCamera'));
+  assert.ok(!scene.includes('<ThreeCanvas orthographic') && !scene.includes('THREE.OrthographicCamera'));
   assert.match(scene,/Math\.sin\(yaw\)/);
   assert.match(scene,/Math\.sin\(pitch\)/);
   assert.match(scene,/ThreeCanvas/);
