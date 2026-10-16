@@ -37,7 +37,7 @@ export const cameraAt = (frame:number) => {
   const gpu=smooth((frame-263)/65);
   const together=smooth((frame-387)/72);
   return {
-    focusX:-6.5+13*gpu-6.5*together,
+    focusX:-8.4+16.8*gpu-8.4*together,
     zoom:67-27*together,
     angle:.07*smooth((frame-90)/65)-.07*together,
     targetY:.15,
@@ -86,6 +86,12 @@ export const taskPositions = (kind:Kind,index:number): {
 /** A raised package cover briefly slides away, revealing the real die layout. */
 export const lidOpening = (frame:number,kind:Kind) =>
   smooth((frame-(kind==='cpu'?56:291))/42);
+
+/** Even if a browser mishandles transparent opacity, the fully-open lid
+ * physically shrinks to a zero-size silhouette instead of hanging over cores.
+ * The shrink starts only after the cover has lifted away from the die. */
+export const lidScale = (frame:number,kind:Kind) =>
+  1-smooth((lidOpening(frame,kind)-.53)/.47);
 
 const lerp = (a:number,b:number,k:number) => a+(b-a)*k;
 export const taskAt = (frame:number,kind:Kind,index:number) => {
