@@ -18,20 +18,22 @@
 - `@remotion/player` 在浏览器预览逐帧确定性动画；并不启动 Remotion MP4 渲染。
 - 播放器独立于 3D 图形，3D 场景仍需具备 WebGL。CI 可使用 Playwright Chromium 软件渲染测试。
 
-## 首次启用和限制
+## 站点配置和限制
 
 - 工作流 `pages.yml` 使用官方 `configure-pages`, `upload-pages-artifact`, `deploy-pages`；**只配置已经创建的 Pages 站点**，不再用受限 `GITHUB_TOKEN` 尝试首次创建。
-- 若未启用或 GitHub 限制自动启用，需要到仓库 Settings → Pages → Build and deployment → Source 选择 GitHub Actions。
-- GitHub Pages 私人仓库须满足相应订阅权限；传统个人 Pages 站点通常公开可见，不代表私有预览。
+- **已完成管理员初始化：** Source = GitHub Actions；现为公开仓库，REST `has_pages=true`。如果未来站点被禁用，才需要管理员重新启用。
+- 此仓库目前为 public，Pages 公开可访问；不要将私人材料上传到静态资源。
 - Chat 沙盒此前无法连接 NPM registry；首次依赖安装和最终 WebGL 页面验收交由经授权的 GitHub Runner 执行。
-- 先运行 `pnpm install --no-frozen-lockfile`，获得真实锁文件后提交根目录 `pnpm-lock.yaml`，不要手工编造。
+- 已生成并提交真实 `pnpm-lock.yaml`；Runner 使用 `pnpm install --frozen-lockfile`。
 
 ## 验收
 
 PR Workflow 会：安装依赖 → `pnpm check` → `pnpm build:portal` → Playwright 截图首页和 HBM 播放页 → 上传截图 Artifact。任何 E2E 尚未在 Runner 实际执行前不能算通过。
 
-已确认 2026-10-15 的部署运行 [38776289894](https://github.com/SiliconYC/MyMG/actions/runs/38776289894) 在 configure-pages 步骤失败（后续步骤未执行），原因是站点首次启用权限不足。
+**正式部署已经成功：** [Pages run #38843210375](https://github.com/SiliconYC/MyMG/actions/runs/38843210375) 的 `configure-pages`、构建、`deploy-pages` 和公开网址 HTML/资源验证全部成功。
 
-**唯一需要仓库管理员操作：** 打开 [Settings → Pages](https://github.com/SiliconYC/MyMG/settings/pages)，在 Build and deployment → Source 中选择 **GitHub Actions** 并保存。必须看到 Pages 已启用，不能仅凭 gh-pages 分支存在认定成功。之后使用 Actions 的 [MyMG Pages 工作流](https://github.com/SiliconYC/MyMG/actions/workflows/pages.yml) 手动运行一次，选择 dev。工作流将产生发布记录，并检查线上 HTML/静态资源。
+**公开网站端到端测试已经成功：** [Live QA run #38851346908](https://github.com/SiliconYC/MyMG/actions/runs/38851346908) 在真实 `https://siliconyc.github.io/MyMG/` 上使用 Chromium：验证首页，`/#/hbm` 的 WebGL、播放/暂停/单帧步进、六个时间点的像素差异，及 `/#/demo` 的独立二维场景与手机视口。截图与指标保存于 Actions artifact `mymg-pages-live-qa`。对应 [Issue #9](https://github.com/SiliconYC/MyMG/issues/9) 已关闭。
 
-没有管理员初始化及成功部署记录时，状态一律标记 **BLOCKED**，不得宣称 Pages 已正常。
+**独立网页不需要逐个初始化 Pages。** `/#/hbm` 和 `/#/demo` 是同一静态网站的 hash 路由，新增作品只需更新 `catalog.ts` 后按需部署。`apps/studio` 为内部制作工具，不是另一个 Pages 站点。
+
+新的线上回归 `.github/workflows/pages-live-qa.yml` 只支持手动执行或其工作流文件变动时自动执行，避免日常开发每次调用浏览器 Runner。
