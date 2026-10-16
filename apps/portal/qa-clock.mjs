@@ -56,6 +56,7 @@ try{
     rightGap:Number(el.getAttribute('data-exit-contact-distance')),
     wheelPlane:Number(el.getAttribute('data-wheel-plane-z')),
     palletPlane:Number(el.getAttribute('data-pallet-plane-z')),
+    forkArmPlane:Number(el.getAttribute('data-fork-arm-plane-z')),
     shaftThroughBearing:Number(el.getAttribute('data-wheel-bearing-axial-overlap')),
     radialRunningClearance:Number(el.getAttribute('data-wheel-bearing-running-clearance')),
   }));
@@ -76,6 +77,8 @@ try{
   assert.ok(side.current.x>5,'side shot must expose axial wheel/pallet relation');
   assert.equal(side.current.wheelPlane,side.current.palletPlane,
     'wheel teeth and both pallets must occupy the same 3D working plane');
+  assert.equal(side.current.forkArmPlane,side.current.wheelPlane,
+    'the ENTIRE fork arm must be coplanar with the wheel, not just its pallet tip');
   assert.ok(side.current.shaftThroughBearing>=.22-1e-5,
     'rear axle must cross the full bearing width, not float in free space');
   assert.ok(side.current.radialRunningClearance>.005 &&
