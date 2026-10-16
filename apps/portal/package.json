@@ -12,6 +12,7 @@
     "qa:react": "node qa-react.mjs"
   },
   "dependencies": {
+    "@mymg/demo": "workspace:*",
     "@mymg/hbm": "workspace:*",
     "@mymg/mg": "workspace:*",
     "@remotion/player": "4.0.534",

@@ -1,6 +1,6 @@
 import type {ComponentType} from 'react';
 import {HbmInfrastructureCheck} from '@mymg/hbm';
-import {DemoScene} from '../../../animations/demo/web/src/demo';
+import {DemoScene} from '@mymg/demo';
 // @mymg-generator-imports
 
 /** Single catalog powers all portal cards and player routes. */

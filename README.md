@@ -59,7 +59,7 @@ pnpm check
 
 ## 新作品接入（单注册表）
 
-`node tooling/new-mg.mjs sample-title "我的动画"` 自动创建 `animations/sample-title/web/src/sample-title.tsx` 并在 `apps/portal/src/catalog.ts` 登记。门户与 Studio **共用同一份 catalog**；无须第二次手工登记，也不用复制门户。轻量模板暂不创建独立 workspace package，故新增简单 MG 不改 pnpm 锁文件；需要第三方依赖时再建立包并重新生成 lock/离线 Release。
+`node tooling/new-mg.mjs sample-title "我的动画"` 自动创建 `animations/sample-title/web/src/sample-title.tsx` 并在 `apps/portal/src/catalog.ts` 登记。门户与 Studio **共用同一份 catalog**；无须第二次手工登记，也不用复制门户。脚手架自动生成独立 workspace package，注册两个应用的工作区依赖，并运行 `pnpm install --lockfile-only --offline` 真正更新锁文件；锁文件更新后按需重建离线 Release。
 
 可参考非 HBM 的 `animations/demo/web/src/demo.tsx`。每个作品支持 `/#/<id>`、暂停/播放、时间轴及逐帧。封面按项目的 `cover` 字段显示专属图片或 HBM 插画；未配置时自动使用通用封面。图片需是已授权的仓库内相对路径，不提交字体或未经授权素材。
 
