@@ -275,6 +275,122 @@ const EngineMechanics: React.FC<{s: SteamFrame}> = ({s}) => <group>
   <Flywheel s={s}/>
 </group>;
 
+
+/**
+ * Watt's centrifugal governor. Two balls ride the SAME rotating spindle.
+ * Geometry is constrained by the angular opening of two equal upper/lower
+ * links; the central sliding sleeve feeds back into an intake butterfly valve.
+ */
+const GOV_X = 4.82;
+const GOV_PIVOT_Y = 2.36;
+const GOV_ARM = .92;
+const GovernorAssembly: React.FC<{s: SteamFrame}> = ({s}) => {
+  const g=s.governor;
+  const radius=GOV_ARM*Math.sin(g.angle);
+  const ballY=GOV_PIVOT_Y-GOV_ARM*Math.cos(g.angle);
+  const beltPhase=s.theta;
+  return <group position={[GOV_X,-.28,0]} data-testid="watt-governor-assembly">
+    {/* Stationary frame, spindle bearing and vertical shaft. */}
+    <mesh position={[0,-1.30,0]}>
+      <boxGeometry args={[1.28,.22,1.22]}/>
+      <meshStandardMaterial color="#445968" metalness={.65} roughness={.4}/>
+    </mesh>
+    <mesh position={[0,-1.00,0]}>
+      <cylinderGeometry args={[.27,.35,.44,28]}/>
+      <meshStandardMaterial color="#647a86" metalness={.77} roughness={.32}/>
+    </mesh>
+    <Rod from={[0,-1.2,0]} to={[0,2.60,0]} radius={.073} color="#c2c6c8"/>
+    <mesh position={[0,GOV_PIVOT_Y,0]}>
+      <sphereGeometry args={[.16,18,12]}/>
+      <meshStandardMaterial color="#dec18e" metalness={.86} roughness={.27}/>
+    </mesh>
+    <group rotation={[0,g.spindlePhase,0]}>
+      {[-1,1].map(sign => <group key={sign}>
+        <Rod from={[0,GOV_PIVOT_Y,0]} to={[sign*radius,ballY,0]}
+          radius={.053} color="#e1bd80"/>
+        <Rod from={[sign*radius,ballY,0]} to={[0,g.sleeveY,0]}
+          radius={.043} color="#bdc6c8"/>
+        <mesh position={[sign*radius,ballY,0]} castShadow>
+          <sphereGeometry args={[.20,32,24]}/>
+          <meshStandardMaterial color="#d7a56a" metalness={.84} roughness={.23}/>
+        </mesh>
+        <mesh position={[sign*radius,ballY,0]}>
+          <sphereGeometry args={[.206,24,16]}/>
+          <meshStandardMaterial color="#f6dfb7" metalness={.55} roughness={.42}
+            transparent opacity={.12}/>
+        </mesh>
+      </group>)}
+    </group>
+    {/* Sliding sleeve rises geometrically with the opening angle. */}
+    <mesh position={[0,g.sleeveY,0]}>
+      <cylinderGeometry args={[.21,.21,.29,32]}/>
+      <meshStandardMaterial color="#bdcdd0" metalness={.80} roughness={.28}/>
+    </mesh>
+    <mesh position={[0,g.sleeveY,0]}>
+      <torusGeometry args={[.22,.035,12,32]}/>
+      <meshStandardMaterial color="#e7b976" metalness={.83} roughness={.26}/>
+    </mesh>
+    {/* Sleeve -> bell crank -> throttle spindle, shown by slender steel links. */}
+    <Rod from={[-.22,g.sleeveY,.12]} to={[-.72,1.00,.15]}
+      radius={.038} color="#c2cace"/>
+    <mesh position={[-.72,1.00,.15]}>
+      <sphereGeometry args={[.086,16,12]}/>
+      <meshStandardMaterial color="#d3ba8b" metalness={.8} roughness={.33}/>
+    </mesh>
+    <Rod from={[-.72,1.00,.15]} to={[-.72,2.68,.15]}
+      radius={.036} color="#8195a1"/>
+    {/* Flywheel takes power to the spindle through belt and right-angle gearbox. */}
+    <group position={[0,-.45,-.65]} rotation={[0,0,beltPhase]}>
+      <mesh>
+        <torusGeometry args={[.28,.07,12,32]}/>
+        <meshStandardMaterial color="#b69867" metalness={.78} roughness={.33}/>
+      </mesh>
+      <Rod from={[-.25,0,.01]} to={[.25,0,.01]} radius={.028} color="#e6c58e"/>
+    </group>
+    <group position={[0,-.49,-.29]} rotation={[0,g.spindlePhase,0]}>
+      <mesh>
+        <cylinderGeometry args={[.19,.27,.22,22]}/>
+        <meshStandardMaterial color="#cfb184" metalness={.78} roughness={.31}/>
+      </mesh>
+    </group>
+  </group>;
+};
+
+/** Long, quiet pipe and a single functional butterfly throttle. */
+const GovernorThrottle: React.FC<{s: SteamFrame}> = ({s}) => {
+  const opening=s.governor.throttle;
+  return <group>
+    <Pipe points={[[-2.12,2.44,-.10],[-1.1,2.73,-.55],
+      [2.78,2.73,-.55],[4.10,2.68,-.55],[4.34,2.68,-.55]]}
+      color="#bb855a" radius={.078}/>
+    <mesh position={[4.10,2.68,-.55]} rotation={[0,opening*Math.PI/2,0]}>
+      <boxGeometry args={[.044,.34,.39]}/>
+      <meshStandardMaterial color="#e6bf83" metalness={.85} roughness={.29}
+        side={THREE.DoubleSide}/>
+    </mesh>
+    <mesh position={[4.10,2.68,-.55]}>
+      <torusGeometry args={[.24,.052,12,32]}/>
+      <meshStandardMaterial color="#8194a0" metalness={.8} roughness={.32}/>
+    </mesh>
+    <Rod from={[4.10,2.68,-.35]} to={[4.10,1.72,-.35]}
+      radius={.038} color="#bcc5c9"/>
+  </group>;
+};
+
+/** Driven belt moves with the flywheel; both pulleys rotate from model phase. */
+const GovernorDrive: React.FC<{s: SteamFrame}> = ({s}) => <group>
+  <group position={[CRANK_X,-.73,-.65]} rotation={[0,0,s.theta]}>
+    <mesh>
+      <torusGeometry args={[.28,.060,12,40]}/>
+      <meshStandardMaterial color="#be9a69" metalness={.74} roughness={.32}/>
+    </mesh>
+  </group>
+  <Rod from={[CRANK_X,-.45,-.65]} to={[GOV_X,-.45,-.65]}
+    radius={.023} color="#3d4550" metallic={.1}/>
+  <Rod from={[CRANK_X,-1.01,-.65]} to={[GOV_X,-1.01,-.65]}
+    radius={.023} color="#3d4550" metallic={.1}/>
+</group>;
+
 const Pedestals: React.FC = () => <group>
   {[-2.65, -.55].map(x =>
     <group key={x}>
@@ -299,6 +415,17 @@ const Pedestals: React.FC = () => <group>
 </group>;
 
 const World: React.FC<{s: SteamFrame}> = ({s}) => {
+  const camera=useThree(state=>state.camera);
+  const reveal=smoothstep((s.time-18.2)/2.1);
+  // Genuine 3D camera pan / orbit / dolly; the model is not a flattened slide.
+  useEffect(()=>{
+    camera.position.set(6.6+2.0*reveal,4.0+.85*reveal,13-1.7*reveal);
+    camera.lookAt(2.2*reveal,.55*reveal,0);
+    if(camera instanceof THREE.OrthographicCamera){
+      camera.zoom=86+19*reveal;
+      camera.updateProjectionMatrix();
+    }
+  },[camera,reveal]);
   const clipPlane = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 0, -1), 1.42), []);
   clipPlane.constant = s.cutZ;
   return <>
@@ -313,6 +440,9 @@ const World: React.FC<{s: SteamFrame}> = ({s}) => {
       <EngineMechanics s={s}/>
       <CylinderShell plane={clipPlane} s={s}/>
       <ValveAssembly s={s} plane={clipPlane}/>
+      <GovernorDrive s={s}/>
+      <GovernorAssembly s={s}/>
+      <GovernorThrottle s={s}/>
     </group>
   </>;
 };
@@ -323,6 +453,9 @@ const CHAPTERS = [
   {start:3.0, end:5.25, title:'剖开气缸'},
   {start:7.2, end:9.5, title:'蒸汽推动活塞'},
   {start:12.55, end:14.85, title:'往复变成旋转'},
+  {start:18.55, end:20.60, title:'离心调速器'},
+  {start:21.65, end:23.60, title:'转快，重锤张开'},
+  {start:24.10, end:26.15, title:'节流，恢复转速'},
 ] as const;
 
 const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
@@ -347,6 +480,10 @@ export const SteamEngineScene: React.FC = () => {
     data-cut-progress={s.cut.toFixed(4)}
     data-piston-x={s.pistonX.toFixed(4)}
     data-crank-angle={s.theta.toFixed(4)}
+    data-governor-speed={s.governor.relativeSpeed.toFixed(4)}
+    data-governor-angle={s.governor.angle.toFixed(4)}
+    data-governor-sleeve={s.governor.sleeveY.toFixed(4)}
+    data-governor-throttle={s.governor.throttle.toFixed(4)}
     style={{background:'radial-gradient(ellipse at 54% 48%,#213d50 0%,#0e1e2d 67%,#08111d 100%)',
       overflow:'hidden'}}>
     <ThreeCanvas width={1280} height={720} orthographic
