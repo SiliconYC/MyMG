@@ -4,7 +4,7 @@
 
 ## Where the governor belongs
 
-The two-ball centrifugal regulator now sits on the engine bed directly above and **behind the flywheel drive**, rather than on a detached stand to its far right. The flywheel shaft drives a pair of belt pulleys; the governor's foot has schematic bevel gearing which turns the belt's horizontal rotation into a vertical spindle. A collar slides on that spindle, driving a distinct pivoted bell crank and pull rod that turn a **butterfly valve inline on the boiler-to-steam-chest inlet**. All the rods end on their actual connected joints.
+The two-ball centrifugal regulator now sits on the engine bed directly above and **in front of the flywheel drive and the inlet pipe**, rather than on a detached stand to its far right. The flywheel shaft drives a pair of belt pulleys; the governor's foot has schematic bevel gearing which turns the belt's horizontal rotation into a vertical spindle. A collar slides on that spindle, driving a distinct pivoted bell crank and pull rod that turn a **butterfly valve inline on the boiler-to-steam-chest inlet**. All the rods end on their actual connected joints.
 
 This is a conceptually representative industrial engine layout, not an exact dimensional replica of any particular Watt machine. Primary historical references:
 - Smithsonian history of centrifugal governors, including the 1819 Holloway governor and the Boulton & Watt arrangement: https://repository.si.edu/server/api/core/bitstreams/c0083579-4f8a-46bc-8bc7-198268fb772b/content
@@ -33,5 +33,12 @@ Viewer: https://siliconyc.github.io/MyMG/#/steam-engine
 
 - The boiler steam supply stays connected through a visible flanged, transparent butterfly-valve housing and directly into the steam chest; the upper exhaust reaches a proper open vent. No isolated rounded caps or gaps posing as pipes.
 - Five brief, one-at-a-time annotations point to the belt, a moving centrifugal ball, the sliding sleeve, the inlet throttle and the recovering flywheel. A thin leader line and small marker follow each part in projected screen coordinates.
-- Both the labels and engine use exactly the same camera track, so the pointers survive true 3D movement, pause and frame seeking. The first cylinder sequence keeps its sparse chapter titles; the governor segment uses explanatory pointers instead of stacked titles.
+- Both the labels and engine use exactly the same **orbiting yaw/pitch** camera track, so the pointers survive true 3D movement, pause and frame seeking. The first cylinder sequence keeps its sparse chapter titles; the governor segment uses explanatory pointers instead of stacked titles.
 - No new project, UI dashboard or prerecorded sequence is introduced.
+
+## Rounded elbow & camera improvements
+
+- Intake and exhaust now use tangent-continuous straight/rounded-bezier tube sections with exactly matching 3D endpoints. The boiler feed continues through both valve flanges and into the valve chest; there are no intersecting open straight stubs at corners.
+- The governor has been moved forward to `z=+1.20` while the inlet pipe stays behind at `z=-0.28`; the drive axle and mounting bed are extended to physically support the new layout.
+- Camera works in a real 3D orbital coordinate system. During the governor reveal it turns over 45 degrees in azimuth and adjusts elevation, then takes another angle on the throttle. The 3D-to-2D callout markers reuse exactly the same pose each frame.
+- These are geometry and optics changes, not an MP4/video substitution, and preserve the existing 14-second sequence.
