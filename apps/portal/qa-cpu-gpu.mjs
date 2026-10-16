@@ -49,6 +49,12 @@ try{
     await seek(frame);
     assert.equal(await marker.getAttribute('data-workload'),stage);
     assert.equal(Number(await marker.getAttribute('data-task-count')),16);
+    if(frame>=100)
+      assert.equal(Number(await marker.getAttribute('data-cpu-lid-scale')),0,
+        'CPU cover must fully clear silicon during core processing');
+    if(frame>=334)
+      assert.equal(Number(await marker.getAttribute('data-gpu-lid-scale')),0,
+        'GPU cover must fully clear silicon during lane processing');
     assert.equal(Number(await marker.getAttribute('data-cpu-done')),doneCpu);
     assert.equal(Number(await marker.getAttribute('data-gpu-done')),doneGpu);
     assert.equal(Number(await marker.getAttribute('data-cpu-working')),workingCpu);
@@ -83,6 +89,8 @@ try{
     await seek(f);
     const zoom=Number(await marker.getAttribute('data-camera-zoom'));
     const cpuDone=Number(await marker.getAttribute('data-cpu-done'));
+    if(f>=100)assert.equal(Number(await marker.getAttribute('data-cpu-lid-scale')),0);
+    if(f>=334)assert.equal(Number(await marker.getAttribute('data-gpu-lid-scale')),0);
     const gpuDone=Number(await marker.getAttribute('data-gpu-done'));
     assert.ok(zoom>=40&&zoom<=67&&720/zoom>10.5,
       'Camera clips the top/bottom of processor package at frame '+f);
