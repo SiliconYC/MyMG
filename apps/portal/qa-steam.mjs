@@ -84,6 +84,8 @@ try {
     angle:Number(el.getAttribute('data-governor-angle')),
     sleeve:Number(el.getAttribute('data-governor-sleeve')),
     throttle:Number(el.getAttribute('data-governor-throttle')),
+    gate:Number(el.getAttribute('data-gate-y')),
+    yoke:Number(el.getAttribute('data-yoke-length')),
     camera:Number(el.getAttribute('data-camera-shift')),
     zoom:Number(el.getAttribute('data-camera-zoom')),
   }));
@@ -106,6 +108,10 @@ try {
   assert.ok(govFrames[360].sleeve>govFrames[225].sleeve+.70,
     'collar height needs substantial visible travel');
   assert.ok(govFrames[360].throttle<govFrames[225].throttle-.38);
+  assert.ok(govFrames[360].gate>govFrames[225].gate+.70,
+    'sliding gate must rise when sleeve lifts, instead of spinning about a wrong axle');
+  assert.equal(govFrames[225].yoke,govFrames[360].yoke,
+    'governor-to-valve linkage cannot change length under speed');
   assert.ok(Math.abs(govFrames[480].speed-1)<.04,
     'negative feedback returns speed toward nominal');
   assert.ok(govFrames[480].throttle>govFrames[360].throttle+.38);

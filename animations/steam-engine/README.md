@@ -1,55 +1,31 @@
-# Steam engine / Three.js governor & cutaway
+# 蒸汽机：气缸剖切与离心调速器
 
-20-second, 600-frame native React + Remotion + Three.js teaching animation. No video, still-frame sequence or prerecorded media.
+20 秒、600 帧的原生 React + Remotion + Three.js 动画。可拖动、暂停、逐帧检查；没有 MP4 或预渲染帧替代。
 
-## Where the governor belongs
+播放器：https://siliconyc.github.io/MyMG/#/steam-engine
 
-The two-ball centrifugal regulator now sits on the engine bed directly above and **in front of the flywheel drive and the inlet pipe**, rather than on a detached stand to its far right. The flywheel shaft drives a pair of belt pulleys; the governor's foot has schematic bevel gearing which turns the belt's horizontal rotation into a vertical spindle. A collar slides on that spindle, driving a distinct pivoted bell crank and pull rod that turn a **butterfly valve inline on the boiler-to-steam-chest inlet**. All the rods end on their actual connected joints.
+## 结构与机构（Issue #62）
 
-This is a conceptually representative industrial engine layout, not an exact dimensional replica of any particular Watt machine. Primary historical references:
-- Smithsonian history of centrifugal governors, including the 1819 Holloway governor and the Boulton & Watt arrangement: https://repository.si.edu/server/api/core/bitstreams/c0083579-4f8a-46bc-8bc7-198268fb772b/content
-- Powerhouse Museum, Boulton & Watt brewery rotative engine: https://artsandculture.google.com/asset/boulton-and-watt-steam-engine-boulton-and-watt/vwHNf6ooYEol1A
-- Birmingham Museums, flyball governor and steam cutoff: https://www.birminghammuseums.org.uk/objects/agricultural-engine-1825
+- **气缸裸露**：删除气缸正上方大块矩形配汽盒与附属细饰。铜色进汽管直接嵌入气缸左端的上后侧壁；蓝色排汽管从气缸右端的另一侧壁引出，两者不在空中终止。
+- **一只连续管路上的滑动节流阀**：锅炉进汽 → 铜管 → 圆筒阀体 → 铜管 → 气缸。阀体左右各有可见法兰，阀片在透明阀体内沿竖直导向移动，没有不符合轴向关系的旋转蝶阀。
+- **固定长度传动**：离心球随轴转、滑套只升降；与滑套连接的非旋转横向连杆同步带动阀杆，二端销轴共享同一高度。滑套升高时阀片向上进入蒸汽通道、关小进汽；滑套下降时阀片退回。移除旧的会变长的叉杆、浮动摇臂及悬空长连杆。
+- **严格共用坐标**：气缸两端接口、进汽管、排汽管、阀法兰与连杆位置都由 `web/src/steam-plumbing.ts` 提供。回归测试检查各个管路端点及 600 帧的传动杆长度与阀片行程。
 
-## Cut-to-cut editorial timeline (14 s)
+**真实性边界**：这是便于看清因果关系的机械示意，非某一年代/型号的逐零件历史复原。气缸仍以抽象交替压力显示做功，尚未建模真实双作用蒸汽机的配汽阀时序；滑动节流阀也不是特指某一古典瓦特发动机的部件。不能将此示意当作完整工业工程图。
 
-- **0–0.8 s** – whole steam engine, flywheel and governor.
-- **0.8–2.8 s** – rapid move to the cylinder; advancing spatial cutting plane reveals the working piston.
-- **2.8–4.0 s** – detailed held cut, mechanical action remains continuous.
-- **4.0–4.85 s** – shell retracts; the drive remains visible.
-- **4.8–5.4 s** – swift lateral and upward 3D camera move to the flywheel / mounted governor.
-- **5.4–7.25 s** – power-transmission detail; camera moves into a much tighter governor close-up.
-- **7.25–10.75 s** – long, readable overspeed shot. 7.6 s load reduction raises shaft speed and flyballs spread, with a faint radius trace.
-- **10.75–13.35 s** – hold on the sleeve/guide; the rising collar mechanically closes the throttle, while the disturbance fades.
-- **13.35–16.3 s** – focus on the restriction and decelerating wheel.
-- **16.3–20 s** – see balls contract, sleeve return and speed stabilize; complete the feedback explanation.
+## 时间线
 
-The operating model `web/src/governor-model.ts` integrates the rotor speed from load and steam torque. Its governor equilibrium, finite lag, sleeve displacement and throttle restriction are calculated from one state. Crank/piston and flyballs are coupled to that integrated shaft angle, not separately keyframed.
+- 0–0.8 秒：整机、飞轮、调速器。
+- 0.8–4.8 秒：推进剖切，气缸内部的活塞、连杆持续工作，再收回外壳。
+- 4.8–7.25 秒：迅速转向皮带与调速器。
+- 7.25–10.75 秒：负载降低，转速增加、飞球张开。
+- 10.75–13.35 秒：滑套上升、连杆带动阀片。
+- 13.35–16.3 秒：阀片关小蒸汽入口，飞轮减速。
+- 16.3–20 秒：球体收拢、套筒回落、速度恢复稳定。
 
-The cylinder's outer shell is actually clipped by Three.js; piston/steam internals never freeze. Browser QA covers moving section geometry, governor mounting position, live feedback, brief camera transition, labels and mobile controls.
+模型在 `governor-model.ts` 中积分求解轴角、转速、飞球角与进汽反馈；剖切、摄影机、标注由帧时间确定，拖动时间轴仍可复现。
 
-Viewer: https://siliconyc.github.io/MyMG/#/steam-engine
+## 参考
 
-## Connected piping and focused teaching pointers
-
-- The boiler steam supply stays connected through a visible flanged, transparent butterfly-valve housing and directly into the steam chest; the upper exhaust reaches a proper open vent. No isolated rounded caps or gaps posing as pipes.
-- Five 1.8–3.5-second, one-at-a-time annotations point exclusively to stationary components: drive bearing, governor head bearing, fixed sleeve guide, inlet valve body and flywheel axle bearing. Never chase rapidly spinning balls or wheel spokes. A thin leader line and small marker follow each part in projected screen coordinates.
-- Both the labels and engine use exactly the same **orbiting yaw/pitch** camera track, so the pointers survive true 3D movement, pause and frame seeking. The first cylinder sequence keeps its sparse chapter titles; the governor segment uses explanatory pointers instead of stacked titles.
-- No new project, UI dashboard or prerecorded sequence is introduced.
-
-## Rounded elbow & camera improvements
-
-- Intake and exhaust now use tangent-continuous straight/rounded-bezier tube sections with exactly matching 3D endpoints. The boiler feed continues through both valve flanges and into the valve chest; there are no intersecting open straight stubs at corners.
-- The governor has been moved forward to `z=+1.20` while the inlet pipe stays behind at `z=-0.28`; the drive axle and mounting bed are extended to physically support the new layout.
-- Camera works in a real 3D orbital coordinate system. During the governor reveal it turns over 45 degrees in azimuth and adjusts elevation, then takes another angle on the throttle. The 3D-to-2D callout markers reuse exactly the same pose each frame.
-- These are geometry and optics changes, not an MP4/video substitution, and use a focused 20-second sequence with longer close-ups rather than rushed explanation.
-
-## Legibility and historical placement review
-
-- Valve chest is now a lighter, distinct cast-metal housing, with a brighter top cap, front rim and visible inlet/exhaust seats. It no longer disappears into the navy background.
-- Copper supply is a short rear-fed drop plus one straight delivery to the steam chest. Blue exhaust is rerouted separately along the far left rear, eliminating the two complex snakes crossing over the flyball silhouette.
-- The governor remains on a separate stand just **above and left of the flywheel**, belt-driven from the crank. This is an authentic common layout, rather than asserting that governors must be fixed to the cylinder roof. Historical examples vary: the Smithsonian documents a belt/rope-driven governor mounted on the floor above the engine, and control-system teaching references show a governor above-left of the flywheel.
-  - Smithsonian, *Steam Engine Governors*, figure 4: https://repository.si.edu/server/api/core/bitstreams/c0083579-4f8a-46bc-8bc7-198268fb772b/content
-  - Åström/Murray, *Feedback Systems*, figure 1.2: https://www.cds.caltech.edu/~murray/books/AM08/pdf/fbs-copyedit_24Apr20.pdf
-- The drive is still one deterministic closed-loop integration, but the unload/overspeed is more conspicuous (roughly 1.7x peak speed, substantially higher sleeve), and the engine settles without individually keyframing the masses or valve.
-- The frame-driven camera now dwells close to the governor for several seconds before turning toward the throttle. All fine leader lines terminate on **fixed** bearing/guide/valve-body anchors, never the flyballs.
+- Smithsonian — *Steam Engine Governors*：https://repository.si.edu/server/api/core/bitstreams/c0083579-4f8a-46bc-8bc7-198268fb772b/content
+- Birmingham Museums — *Agricultural Engine (1825)*：https://www.birminghammuseums.org.uk/objects/agricultural-engine-1825

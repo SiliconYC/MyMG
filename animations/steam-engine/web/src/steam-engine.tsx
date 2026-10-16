@@ -4,6 +4,11 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {pipeSections} from './pipe-path.ts';
+import {
+  GOV_X,GOV_Z,GOV_PIVOT_Y,GOV_ARM,THROTTLE_X,THROTTLE_Y,THROTTLE_Z,
+  THROTTLE_LEFT,THROTTLE_RIGHT,INLET_PORT,EXHAUST_PORT,
+  BOILER_TO_VALVE,VALVE_TO_CYLINDER,CYLINDER_TO_EXHAUST,throttleLinkage,
+} from './steam-plumbing.ts';
 import {cameraPose} from './camera-path.ts';
 import {
   steamAtFrame, CYLINDER_LEFT, CYLINDER_RIGHT, CYLINDER_OUTER_RADIUS,
@@ -168,62 +173,20 @@ const SteamParticles: React.FC<{s: SteamFrame}> = ({s}) => {
   </group>;
 };
 
-const ValveAssembly: React.FC<{s: SteamFrame; plane: THREE.Plane}> = ({s, plane}) => {
-  const spoolX = -1.65 + .53 * Math.cos(s.theta + Math.PI / 2);
-  return <group>
-    <mesh position={[-1.65, 1.37, 0]} castShadow>
-      <boxGeometry args={[2.28, .70, .92]}/>
-      <meshStandardMaterial color="#91aebb" metalness={.67} roughness={.34}
-        clippingPlanes={[plane]}/>
-    </mesh>
-    <mesh position={[-1.65, 1.37, -.02]}>
-      <boxGeometry args={[1.94, .38, .60]}/>
-      <meshStandardMaterial color="#5d7c8d" metalness={.55} roughness={.35}/>
-    </mesh>
-    <Rod from={[-2.64, 1.36, 0]} to={[-.63, 1.36, 0]}
-      radius={.072} color="#d7ac62"/>
-    <mesh position={[spoolX, 1.36, 0]}>
-      <boxGeometry args={[.63, .33, .46]}/>
-      <meshStandardMaterial color="#f2b85b" metalness={.82} roughness={.21}/>
-    </mesh>
-    {[-2.53, -.77].map((x, i) => <group key={i}>
-      <mesh position={[x, 1.02, -.26]}>
-        <boxGeometry args={[.20, .45, .21]}/>
-        <meshStandardMaterial color={(i === 0) === (s.motion === 'right') ? '#d67d3a' : '#4eb9c9'}
-          emissive={(i === 0) === (s.motion === 'right') ? '#9a3a14' : '#145a68'} emissiveIntensity={.38}/>
-      </mesh>
-    </group>)}
-    {/* Cast-metal upper cover, cool-toned lip and visible steam flange seats.
-        The box is part of the machine, not a hole in the dark background. */}
-    <mesh position={[-1.65,1.75,0]} castShadow>
-      <boxGeometry args={[2.34,.13,1.01]}/>
-      <meshStandardMaterial color="#a2bbc6" metalness={.71} roughness={.27}
-        clippingPlanes={[plane]}/>
-    </mesh>
-    <mesh position={[-1.65,1.72,.53]}>
-      <boxGeometry args={[2.30,.055,.055]}/>
-      <meshStandardMaterial color="#cdd6d7" metalness={.79} roughness={.25}/>
-    </mesh>
-    {[-2.43,-.87].map(x=><mesh key={x} position={[x,1.78,.42]}>
-      <sphereGeometry args={[.072,12,10]}/>
-      <meshStandardMaterial color="#d7c49f" metalness={.86} roughness={.26}/>
+/** The copper and blue tubes terminate INSIDE the cast cylinder wall, with
+ * small matching metal collars. No long rectangular box sits on the cylinder. */
+const CylinderPorts:React.FC=()=> <group>
+  <Pipe points={CYLINDER_TO_EXHAUST} color="#63aabb" radius={.104}/>
+  {[{point:INLET_PORT,color:'#c68a57'}, {point:EXHAUST_PORT,color:'#63aabb'}]
+    .map(({point,color},i)=><mesh key={i} position={point} castShadow>
+      <sphereGeometry args={[.145,24,16]}/>
+      <meshStandardMaterial color={color} metalness={.76} roughness={.30}/>
     </mesh>)}
-    {[-2.12,-1.16].map(x=><mesh key={x}
-      position={[x,1.87,-.12]} rotation={[Math.PI/2,0,0]}>
-      <torusGeometry args={[.157,.042,12,32]}/>
-      <meshStandardMaterial color="#d9b680" metalness={.79} roughness={.31}/>
-    </mesh>)}
-    {/* Exhaust runs BEHIND the chest before rising at the far-left rear.
-        It must not zigzag across the two copper supply lines or the balls. */}
-    <Pipe points={[[-1.16,1.76,-.13],[-1.16,2.06,-.88],
-      [-3.24,2.06,-.88],[-3.24,3.08,-.88]]}
-      color="#63aabb" radius={.104}/>
-    <mesh position={[-3.24,3.08,-.88]} rotation={[Math.PI/2,0,0]}>
-      <torusGeometry args={[.116,.043,12,32]}/>
-      <meshStandardMaterial color="#a4c7d0" metalness={.75} roughness={.29}/>
-    </mesh>
-  </group>;
-};
+  <mesh position={CYLINDER_TO_EXHAUST.at(-1)!} rotation={[Math.PI/2,0,0]}>
+    <torusGeometry args={[.116,.043,12,32]}/>
+    <meshStandardMaterial color="#a4c7d0" metalness={.75} roughness={.29}/>
+  </mesh>
+</group>;
 
 const Flywheel: React.FC<{s: SteamFrame}> = ({s}) => {
   return <group>
@@ -308,35 +271,15 @@ const EngineMechanics: React.FC<{s: SteamFrame}> = ({s}) => <group>
 
 
 /**
- * This governor is directly above and behind the flywheel bearing, not an
- * isolated object to the right of the engine. Same rear drive shaft drives
- * the belt pulley at the spindle foot; bevel gearing turns the vertical shaft.
- * A bell crank links the rising sleeve to the inline steam inlet butterfly.
- * Arrangement based on Watt flyball drawings (Smithsonian / Powerhouse).
+ * The flyballs and sliding collar remain on their driven spindle. A single
+ * rigid yoke transfers the sleeve's vertical travel to the inlet gate.
+ * Unlike the previous long free-floating bellcrank rods, its length is fixed.
  */
-const GOV_X = 1.72;
-const GOV_Z = 1.20;
-const GOV_PIVOT_Y = 2.73;
-const GOV_ARM = .88;
-const THROTTLE_X = .12;
-const THROTTLE_Y = 2.33;
-const THROTTLE_Z = -.28;
-const governorValveAngle = (s:SteamFrame) => s.governor.throttle * Math.PI/2;
-const valveLinkEnd = (s:SteamFrame):V3 => {
-  const a=governorValveAngle(s);
-  return [THROTTLE_X-.35*Math.sin(a),THROTTLE_Y,THROTTLE_Z-.35*Math.cos(a)];
-};
-
 const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
   const g=s.governor;
   const radial=GOV_ARM*Math.sin(g.angle);
   const ballY=GOV_PIVOT_Y-GOV_ARM*Math.cos(g.angle);
-  const pivot:V3=[.90,1.48,GOV_Z];
-  const rockerAngle=-.14+.55*(g.angle-.70);
-  const input:V3=[pivot[0]+.44*Math.cos(rockerAngle),
-    pivot[1]+.44*Math.sin(rockerAngle),GOV_Z];
-  const output:V3=[pivot[0]-.36*Math.sin(rockerAngle),
-    pivot[1]+.36*Math.cos(rockerAngle),GOV_Z];
+  const linkage=throttleLinkage(g.sleeveY);
   return <group>
     {/* Spindle stands on the engine bed immediately behind the flywheel. */}
     <mesh position={[GOV_X,-1.34,GOV_Z]}>
@@ -374,66 +317,65 @@ const GovernorAssembly: React.FC<{s:SteamFrame}> = ({s}) => {
       <meshBasicMaterial color="#d6b474" transparent opacity={.28}
         depthWrite={false}/>
     </mesh>
-    {/* The sleeve collar does not rotate with the shaft: the fork and rocker
-        can lift the throttle while the flyball spindle is spinning. */}
+    {/* Sleeve is a stationary sliding bearing; its two-pin horizontal yoke
+        keeps a constant length and follows the guide without stretching. */}
     <mesh position={[GOV_X,g.sleeveY,GOV_Z]} rotation={[Math.PI/2,0,0]}>
       <torusGeometry args={[.205,.038,12,32]}/>
       <meshStandardMaterial color="#e4bc7e" metalness={.8} roughness={.25}/>
     </mesh>
-    <Rod from={[GOV_X-.21,g.sleeveY,GOV_Z]} to={input}
-      radius={.038} color="#c9d0d0"/>
-    <Rod from={pivot} to={input} radius={.045} color="#d6b781"/>
-    <Rod from={pivot} to={output} radius={.045} color="#d6b781"/>
-    <mesh position={pivot}>
-      <sphereGeometry args={[.095,18,12]}/>
-      <meshStandardMaterial color="#e3b778" metalness={.82} roughness={.27}/>
-    </mesh>
-    <Rod from={output} to={valveLinkEnd(s)} radius={.038} color="#c5ced0"/>
+    <Rod from={linkage.collarPin} to={linkage.valvePin}
+      radius={.042} color="#c9d0d0"/>
+    {[linkage.collarPin,linkage.valvePin].map((p,i)=>
+      <mesh key={i} position={p}>
+        <sphereGeometry args={[.085,16,12]}/>
+        <meshStandardMaterial color="#e1bb85" metalness={.79} roughness={.28}/>
+      </mesh>
+    )}
   </group>;
 };
 
-/** The throttle is INLINE in the boiler-to-valve-chest steam supply pipe. */
-const GovernorThrottle: React.FC<{s:SteamFrame}> = ({s}) => {
-  const a=governorValveAngle(s);
-  const left=THROTTLE_X-.28, right=THROTTLE_X+.28;
+/** Inline vertical sliding throttle: overspeed raises the solid metal gate
+ * across the steam passage. The polished stem is pinned directly to the
+ * sleeve yoke; there is no wrong-axis butterfly lever or floating rod. */
+const GovernorThrottle:React.FC<{s:SteamFrame}>=({s})=>{
+  const link=throttleLinkage(s.governor.sleeveY);
   return <group>
-    {/* One uninterrupted steam path: boiler-side downcomer -> transparent
-        valve chamber -> steam-chest inlet. Pipes reach BOTH chamber flanges. */}
-    {/* Simple rear-fed vertical inlet, tucked LEFT of the flyball silhouette. */}
-    <Pipe points={[[.78,4.28,-.78],[.78,2.70,-.78],
-      [.78,THROTTLE_Y,THROTTLE_Z],[right,THROTTLE_Y,THROTTLE_Z]]}
-      color="#c68a57" radius={.12}/>
-    {/* The outlet continues through every elbow into the steam chest without
-        a second unattached pipe piece at its upper-right connection. */}
-    <Pipe points={[[left,THROTTLE_Y,THROTTLE_Z],
-      [-1.90,THROTTLE_Y,THROTTLE_Z],[-2.12,2.19,-.10],
-      [-2.12,1.82,-.10]]} color="#c68a57" radius={.12}/>
-    {/* Transparent body joins the copper tubes through both metal flanges.
-        This makes the rotating butterfly readable without a broken pipe. */}
+    <Pipe points={BOILER_TO_VALVE} color="#c68a57" radius={.12}/>
+    <Pipe points={VALVE_TO_CYLINDER} color="#c68a57" radius={.12}/>
+    {/* A restrained, slightly translucent cylindrical valve body spans both
+        pipe ends. The flanges and pipe axes share exact coordinates. */}
     <mesh position={[THROTTLE_X,THROTTLE_Y,THROTTLE_Z]}
       rotation={[0,0,Math.PI/2]}>
-      <cylinderGeometry args={[.175,.175,.56,36,1,true]}/>
-      <meshStandardMaterial color="#8faab1" metalness={.39} roughness={.27}
-        transparent opacity={.28} side={THREE.DoubleSide} depthWrite={false}/>
+      <cylinderGeometry args={[.184,.184,.56,36,1,true]}/>
+      <meshStandardMaterial color="#90adb6" metalness={.39} roughness={.27}
+        transparent opacity={.32} side={THREE.DoubleSide} depthWrite={false}/>
     </mesh>
-    {[left,right].map(x=>
+    {[THROTTLE_LEFT,THROTTLE_RIGHT].map(x=>
       <mesh key={x} position={[x,THROTTLE_Y,THROTTLE_Z]}
         rotation={[0,Math.PI/2,0]}>
-        <torusGeometry args={[.181,.061,12,40]}/>
+        <torusGeometry args={[.184,.058,12,36]}/>
         <meshStandardMaterial color="#bdc8ca" metalness={.83} roughness={.27}/>
       </mesh>
     )}
-    {/* A visible butterfly disc remains inside a closed, fully connected body. */}
-    <group position={[THROTTLE_X,THROTTLE_Y,THROTTLE_Z]}
-      rotation={[0,a,0]}>
-      <mesh>
-        <boxGeometry args={[.045,.32,.32]}/>
-        <meshStandardMaterial color="#e6b878" metalness={.79}
-          roughness={.27} side={THREE.DoubleSide}/>
-      </mesh>
-      <Rod from={[0,0,0]} to={[0,0,-.35]}
-        radius={.044} color="#dcc8a5"/>
-    </group>
+    {/* Round gland is fixed to the valve housing; the stem slides THROUGH it.
+        A closed gate occupies the steam bore, open gate retracts below it. */}
+    <mesh position={[THROTTLE_X,THROTTLE_Y-.27,THROTTLE_Z]}
+      rotation={[Math.PI/2,0,0]}>
+      <torusGeometry args={[.075,.030,10,28]}/>
+      <meshStandardMaterial color="#b8c8c9" metalness={.75} roughness={.34}/>
+    </mesh>
+    <Rod from={link.valvePin} to={link.gateTop}
+      radius={.034} color="#d9c8a7"/>
+    <mesh position={link.gateCenter} castShadow>
+      <boxGeometry args={[.075,.70,.31]}/>
+      <meshStandardMaterial color="#e6b878" metalness={.78} roughness={.28}/>
+    </mesh>
+    {/* Short valve bonnet encloses the upward-running gate at overspeed. */}
+    <mesh position={[THROTTLE_X,THROTTLE_Y+.29,THROTTLE_Z]}>
+      <cylinderGeometry args={[.14,.14,.55,24,1,true]}/>
+      <meshStandardMaterial color="#a0bac0" metalness={.49} roughness={.34}
+        transparent opacity={.28} side={THREE.DoubleSide} depthWrite={false}/>
+    </mesh>
   </group>;
 };
 
@@ -507,7 +449,7 @@ const World: React.FC<{s: SteamFrame}> = ({s}) => {
       <Pedestals/>
       <EngineMechanics s={s}/>
       <CylinderShell plane={clipPlane} s={s}/>
-      <ValveAssembly s={s} plane={clipPlane}/>
+      <CylinderPorts/>
       <GovernorDrive s={s}/>
       <GovernorAssembly s={s}/>
       <GovernorThrottle s={s}/>
@@ -544,8 +486,8 @@ const ChapterTitle: React.FC<{frame:number}> = ({frame}) => {
 const TEACHING_BEATS = [
   {start:5.42,end:7.23,part:'belt',lines:['飞轮带动皮带','调速器跟着转动']},
   {start:7.26,end:10.73,part:'balls',lines:['转速升高','两颗重锤向外张开']},
-  {start:10.77,end:13.31,part:'sleeve',lines:['重锤张开，套筒上升','控制连杆被拉动']},
-  {start:13.35,end:16.26,part:'valve',lines:['节流阀关小，进汽减少','发动机开始减速']},
+  {start:10.77,end:13.31,part:'sleeve',lines:['重锤张开，套筒上升','进汽阀门被直接带动']},
+  {start:13.35,end:16.26,part:'valve',lines:['节流阀片升起，进汽减少','发动机开始减速']},
   {start:16.30,end:19.72,part:'flywheel',lines:['转速降低后，重锤收回','系统自动恢复稳定']},
 ] as const;
 
@@ -618,6 +560,12 @@ export const SteamEngineScene: React.FC = () => {
     data-governor-angle={s.governor.angle.toFixed(4)}
     data-governor-sleeve={s.governor.sleeveY.toFixed(4)}
     data-governor-throttle={s.governor.throttle.toFixed(4)}
+    data-gate-y={throttleLinkage(s.governor.sleeveY).gateCenter[1].toFixed(4)}
+    data-yoke-length={Math.hypot(
+      ...throttleLinkage(s.governor.sleeveY).collarPin.map(
+        (v,i)=>v-throttleLinkage(s.governor.sleeveY).valvePin[i]
+      )
+    ).toFixed(4)}
     data-camera-shift={smoothstep((s.time-4.80)/.53).toFixed(4)}
     data-governor-x={GOV_X.toFixed(2)}
     data-governor-z={GOV_Z.toFixed(2)}
