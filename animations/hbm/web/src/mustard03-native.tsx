@@ -33,8 +33,8 @@ void main() {
 `;
 
 const hexRGBA=(hex:string,a:number):[number,number,number,number]=>{
-  const color=new THREE.Color(hex);
-  return [color.r,color.g,color.b,a];
+  return [parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,
+    parseInt(hex.slice(5,7),16)/255,a];
 };
 
 function makeTriangles(scene:Primitive[]):THREE.BufferGeometry{
