@@ -44,7 +44,7 @@ pnpm check
 ## GitHub Pages 项目门户
 
 - **入口：** `https://siliconyc.github.io/MyMG/`（已正式部署并通过线上浏览器验收）。
-- **作品链接：** `https://siliconyc.github.io/MyMG/#/hbm`。
+- **作品链接：** `https://siliconyc.github.io/MyMG/#/hbm`、`https://siliconyc.github.io/MyMG/#/pendulum-clock`。
 - **门户代码：** `apps/portal/`，所有可播放作品统一在 `apps/portal/src/catalog.ts` 登记。
 - **HBM 原生复刻：** `/#/hbm` 是 Mustard-03 的 React + Three.js WebGL 网页动画（345 帧、11.5 秒、30 FPS、1280×720）。按原 Python 3D 几何和轴测投影逐帧绘制，不使用 MP4、视频纹理或逐帧图片。
 - **体验：** 原生网页播放、暂停、时间轴拖动、单帧前后退和移动端浏览。HBM 网页本身不加载或发布 MP4；源 Python 仅作离线视觉基准。
@@ -56,6 +56,10 @@ pnpm check
 仓库已公开，Pages 由 `dev` 的官方 GitHub Actions 工作流发布，网站内容默认公开。不要提交内部机密或授权受限素材。详见 [门户说明](apps/portal/README.md)。
 
 **Pages 已初始化并发布：** [正式部署成功记录](https://github.com/SiliconYC/MyMG/actions/runs/38843210375)；[公开站点真实 Chromium / WebGL / 两个作品播放页验收通过](https://github.com/SiliconYC/MyMG/actions/runs/38851346908)，截图成果档 `mymg-pages-live-qa`。线上验收可手动启动 `pages-live-qa.yml`，不会随每次提交自动运行。`main` 未修改。
+
+## 机械摆钟 / 擒纵机构
+
+新增 \`/#/pendulum-clock\` 原生 React + Three.js 动画：30 齿擒纵轮、锚形擒纵叉、两片交替锁止的擒纵瓦、2 秒周期钟摆与联动秒针。每半摆 1 秒放行半齿距（6°），一分钟转一圈。所有运动由同一时间函数计算；可在网页暂停、拖拽、单帧研究。释放时间与摆幅为解释运动而放大的示意，不是机械物理求解。无需影片素材。详见 [实验说明](animations/pendulum-clock/README.md)。
 
 ## 新作品接入（单注册表）
 
