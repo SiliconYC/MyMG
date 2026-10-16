@@ -1,6 +1,7 @@
 import type {ComponentType} from 'react';
 import {HbmMustard03Native} from '@mymg/hbm';
 import {DemoScene} from '@mymg/demo';
+import {PendulumClockScene} from '@mymg/pendulum-clock';
 import {SteamEngineScene} from '@mymg/steam-engine';
 // @mymg-generator-imports
 
@@ -8,7 +9,7 @@ import {SteamEngineScene} from '@mymg/steam-engine';
 export type MgProject = {
   id: string;
   compositionId: string;
-  cover?: {type: 'hbm'} | {type: 'steam'} | {type: 'image'; src: string; alt: string};
+  cover?: {type: 'hbm'} | {type: 'clock'} | {type: 'steam'} | {type: 'image'; src: string; alt: string};
   title: string;
   titleEn: string;
   category: string;
@@ -58,6 +59,27 @@ export const projects: readonly MgProject[] = [
     width: 1280,
     height: 720,
     notes: ['用于验证新作品能以单一登记进入门户与 Studio。', '画面由帧号决定，无需 WebGL 或服务器。'],
+  },
+  {
+    id: 'pendulum-clock',
+    compositionId: 'PendulumClockScene',
+    cover: {type: 'clock'},
+    title: '机械摆钟 · 擒纵机构',
+    titleEn: 'ANCHOR ESCAPEMENT / REGULATOR CLOCK',
+    category: '机械 / 节奏控制',
+    description: '钟摆交替解锁擒纵轮：每秒放行半齿，秒针同步跳动一格。可以逐帧研究锁止与释放。',
+    status: 'React / Three.js 原生动画',
+    component: PendulumClockScene,
+    durationInFrames: 1800,
+    fps: 30,
+    width: 1280,
+    height: 720,
+    notes: [
+      '30 齿擒纵轮，钟摆每两秒完整往复一次；左右擒纵瓦交替锁止，轮子每秒只走 6°。',
+      '秒针与擒纵轮共用同一角度，经过 60 次节拍恰好转一整圈；暂停、拖动与逐帧状态完全一致。',
+      '擒纵轮、擒纵叉、摆杆、摆锤、钟面和指针全部由浏览器 Three.js 几何绘制，不使用 MP4 或逐帧图像。',
+      '为便于观察，齿形、摆幅及释放动作均是教学示意；并非可直接加工的物理仿真机芯。',
+    ],
   },
   {
     id: 'steam-engine',
