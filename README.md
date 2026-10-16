@@ -39,23 +39,23 @@ pnpm check
 - 每个实验允许独立实现特殊效果；经过多个项目验证后才抽取公共组件。
 - 自动化渲染与测试默认**在本地或 OpenAI 沙盒运行**，不默认使用 GitHub Actions Runner。
 
-**依赖锁文件：** `pnpm-lock.yaml` 应由首次联网的 `pnpm install` 生成后提交。请不要手工编写或使用未经验证的锁文件。
+**依赖锁文件：** 根目录的 `pnpm-lock.yaml` 已通过联网安装流程生成并提交；CI 使用 `pnpm install --frozen-lockfile`。
 
 ## GitHub Pages 项目门户
 
-- **入口：** `https://siliconyc.github.io/MyMG/`（需首次成功启用 Pages 才能访问）。
+- **入口：** `https://siliconyc.github.io/MyMG/`（已正式部署并通过线上浏览器验收）。
 - **作品链接：** `https://siliconyc.github.io/MyMG/#/hbm`。
 - **门户代码：** `apps/portal/`，所有可播放作品统一在 `apps/portal/src/catalog.ts` 登记。
-- **Web 样片：** 当前只有 HBM 三维基础设施演示，**不是**旧 Python Mustard-03 成片；后续每个 MG 都可逐步移植为浏览器作品。
+- **Web 样片：** 当前发布 `/#/hbm` 三维基础设施演示和 `/#/demo` 独立二维示例。HBM Web 样片**不是**旧 Python Mustard-03 成片。
 - **体验：** 作品页支持播放、暂停、时间轴拖动、单帧前后退和移动端浏览；不需要先导出 MP4。
 
 本地开发：在仓库根目录执行 `corepack pnpm install`、`corepack pnpm portal`。静态站点建置：`corepack pnpm build:portal`。仓库不托管生成的视频文件。
 
 部署工作流 `.github/workflows/pages.yml` 只在 `dev` 中与门户有关的路径变化时运行，或者手动触发；并不为文档、Python 实验等每个提交都调用 Runner。PR 上的截图验收工作流 `.github/workflows/portal-qa.yml` 也只在 Web 文件变化时触发。
 
-初次部署可能需要在 GitHub `Settings → Pages → Build and deployment` 选择 **GitHub Actions**。私有仓库的 Pages 可用性取决于 GitHub 计划；即使仓库私有，通常访问者也可以公开访问已发布站点。勿将内部机密或授权受限素材引入静态网站。详情见 [门户说明](apps/portal/README.md)。
+仓库已公开，Pages 由 `dev` 的官方 GitHub Actions 工作流发布，网站内容默认公开。不要提交内部机密或授权受限素材。详见 [门户说明](apps/portal/README.md)。
 
-**Pages 首次开通需要管理员一次性操作：** `Settings → Pages → Source → GitHub Actions`。首次 Runner 构建已成功，但 GitHub App 的 `GITHUB_TOKEN` 缺少创建 Pages 站点的权限（`Resource not accessible by integration`）。此操作不影响 `main` 的代码。
+**Pages 已初始化并发布：** [正式部署成功记录](https://github.com/SiliconYC/MyMG/actions/runs/38843210375)；[公开站点真实 Chromium / WebGL / 两个作品播放页验收通过](https://github.com/SiliconYC/MyMG/actions/runs/38851346908)，截图成果档 `mymg-pages-live-qa`。线上验收可手动启动 `pages-live-qa.yml`，不会随每次提交自动运行。`main` 未修改。
 
 ## 新作品接入（单注册表）
 
@@ -63,4 +63,4 @@ pnpm check
 
 可参考非 HBM 的 `animations/demo/web/src/demo.tsx`。每个作品支持 `/#/<id>`、暂停/播放、时间轴及逐帧。封面按项目的 `cover` 字段显示专属图片或 HBM 插画；未配置时自动使用通用封面。图片需是已授权的仓库内相对路径，不提交字体或未经授权素材。
 
-沙盒无 WebGL 时先运行 `pnpm check`、`pnpm build:portal` 与 `pnpm qa:portal:react`；Runner 使用严格 `pnpm qa:portal` 验证真实 WebGL、关键帧与截图。离线包详情参见 [恢复说明](tooling/offline/README.md)。GitHub Pages 首次启用依赖仓库管理员操作，参见 [Pages 说明](docs/pages.md)。
+沙盒无 WebGL 时先运行 `pnpm check`、`pnpm build:portal` 与 `pnpm qa:portal:react`；Runner 使用严格 `pnpm qa:portal` 验证真实 WebGL、关键帧与截图。离线包详情参见 [恢复说明](tooling/offline/README.md)。GitHub Pages 首次启用已完成，参见 [Pages 说明与验证记录](docs/pages.md)。

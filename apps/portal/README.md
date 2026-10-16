@@ -2,7 +2,7 @@
 
 此网站是所有 MG 项目的**唯一公开入口**。首页从 `src/catalog.ts` 渲染作品清单，项目链接使用 `/#/<project-id>` 哈希路由：刷新项目页不会产生 GitHub Pages 404。
 
-当前演示：`/#/hbm` — HBM 浏览器三维技术样片，不是原 Python Mustard-03 影片。
+当前已发布且在线验证：`/#/hbm` — HBM 浏览器三维技术样片（不是原 Python Mustard-03 影片）；`/#/demo` — 非 HBM 独立二维 MG 模板。正式网址 `https://siliconyc.github.io/MyMG/`。
 
 ## 本地开发
 
@@ -22,3 +22,7 @@
 作品播放器支持暂停、拖动进度条、逐帧前后退。不要将视频、字体文件或未经授权的素材提交到仓库。
 
 > 真实 WebGL 与关键帧严格验收在 GitHub Runner 上执行；普通 React 交互可在具备 Chromium 的 OpenAI 沙盒运行。
+
+## 线上验收
+
+2026-10-16 GitHub Pages 发布已成功，`has_pages=true`；[部署执行](https://github.com/SiliconYC/MyMG/actions/runs/38843210375) 和 [真实 Chromium / WebGL / 双作品测试](https://github.com/SiliconYC/MyMG/actions/runs/38851346908) 已通过。后续需要查线上截图时手动执行 `.github/workflows/pages-live-qa.yml`，不要每次提交都运行。
