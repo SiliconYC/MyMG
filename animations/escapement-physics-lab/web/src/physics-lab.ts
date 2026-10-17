@@ -10,8 +10,8 @@ export const STEP = 1 / 240;
 export const PARAMETERS = Object.freeze({
   gravity: -9.81,
   driveTorque: 0.8,
-  pendulumStart: 0,
-  wheelStart: -0.055,
+  pendulumStart: 0.06,
+  wheelStart: -0.14,
   wheelDamping: 0.035,
   anchorDamping: 0.015,
   restitution: 0,
@@ -61,8 +61,12 @@ export type Readout = {
   initialOverlap: boolean;
   status: 'UNVERIFIED' | 'FAILED' | 'CANDIDATE';
 };
-const leftPad: Point[] = [[-1.80, -1.58], [-1.58, -1.80], [-1.41, -1.72], [-1.61, -1.43]];
-const rightPad: Point[] = [[1.41, -1.72], [1.58, -1.80], [1.80, -1.58], [1.61, -1.43]];
+// Initial tooth/pallet geometric gap is 0.04m; a freely swinging fork must reach it.
+// Scale shoe positions radially about the gear origin; no mid-run contact snapping.
+const shoe = (points: Point[]): Point[] => points.map(([x,y]) =>
+  [x * 1.10, (y + PARAMETERS.pivotY) * 1.10 - PARAMETERS.pivotY]);
+const leftPad: Point[] = shoe([[-1.80,-1.58],[-1.58,-1.80],[-1.41,-1.72],[-1.61,-1.43]]);
+const rightPad: Point[] = shoe([[1.41,-1.72],[1.58,-1.80],[1.80,-1.58],[1.61,-1.43]]);
 const tooth = (angle: number): Point[] => {
   const at = (r: number, a: number): Point => [r * Math.cos(a), r * Math.sin(a)];
   return [at(PARAMETERS.rootRadius, angle - 0.075),
