@@ -123,7 +123,7 @@ test('full 60 s independent collision audit: physical impacts, nonpenetration an
 
 test('rear journal is a genuine bored sleeve around one rotating wheel spindle',()=>{
   assert.ok(zOverlap(bearingZRange,spindleZRange)>=BEARING_DEPTH-1e-10);
-  assert.ok(WHEEL_THICKNESS>PALLET_THICKNESS);
+  assert.ok(WHEEL_THICKNESS>0&&PALLET_THICKNESS>WHEEL_THICKNESS);
   assert.match(sceneSource(),/ring.holes.push\(bore\)/);
   assert.match(sceneSource(),/data-wheel-bearing-running-clearance=/);
 });
