@@ -74,12 +74,12 @@ export function grahamPallet(side: 'left' | 'right'): Point2[] {
     // Material lies INSIDE the entrance resting circle. The working arc
     // and the following plane are exposed; the rear edge is non-working.
     return [
-      polar(rc - .21, theta - .55 * RAD),
+      polar(rc - .21, theta - .15 * RAD),
       C,
       polar(rc, theta + .5 * lockDeg * RAD),
       G,
       H,
-      polar(rd - .21, theta + (lockDeg + liftDeg + .30) * RAD),
+      polar(rd - .21, theta + (lockDeg + liftDeg + .15) * RAD),
     ];
   }
   const E = relativeToPivot(wheel(45 + 2.5), py);
@@ -92,11 +92,11 @@ export function grahamPallet(side: 'left' | 'right'): Point2[] {
   // Material lies OUTSIDE the exit resting circle. The segment I-L
   // approximates the concave rest arc by its chord (error <0.0001m).
   return [
-    polar(rf + .21, theta - .45 * RAD),
+    polar(rf + .21, theta - .15 * RAD),
     F,
     I,
     L,
-    polar(re + .21, theta + (liftDeg + lockDeg + .35) * RAD),
+    polar(re + .21, theta + (liftDeg + lockDeg + .15) * RAD),
   ];
 }
 
