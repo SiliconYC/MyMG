@@ -53,6 +53,8 @@ try{
     mode:el.getAttribute('data-camera-mode'),
     side:el.getAttribute('data-contact-side'),
     interference:el.getAttribute('data-solid-interference'),
+    entryArmGap:Number(el.getAttribute('data-entry-fork-clearance')),
+    exitArmGap:Number(el.getAttribute('data-exit-fork-clearance')),
     leftGap:Number(el.getAttribute('data-entry-contact-distance')),
     rightGap:Number(el.getAttribute('data-exit-contact-distance')),
     wheelPlane:Number(el.getAttribute('data-wheel-plane-z')),
@@ -86,6 +88,8 @@ try{
     side.current.radialRunningClearance<.03,
     'support sleeve must have a small real radial running clearance');
   assert.equal(side.current.interference,'false','full pallet solids must not penetrate the wheel');
+  assert.ok(side.current.entryArmGap>.046 && side.current.exitArmGap>.046,
+    'both mechanical fork arms clear wheel teeth and bevels');
   const rear=await checkShot(12,'rear','observe','clock-rear.png');
   assert.ok(rear.current.z< -6);
   assert.ok(!front.png.equals(rear.png));
@@ -93,8 +97,8 @@ try{
   const exit=await checkShot(25.4,'contact','observe','clock-exit-contact.png');
   assert.equal(entry.current.side,'entry');
   assert.equal(exit.current.side,'exit');
-  assert.ok(entry.current.leftGap<.055,'entry wedge approaches tooth without solid overlap');
-  assert.ok(exit.current.rightGap<.055,'exit wedge approaches tooth without solid overlap');
+  assert.ok(entry.current.leftGap>.009&&entry.current.leftGap<.12,'entry fan wedge stays near, but out of, the wheel');
+  assert.ok(exit.current.rightGap>.009&&exit.current.rightGap<.12,'exit fan wedge stays near, but out of, the wheel');
   assert.equal(entry.current.x,exit.current.x,'same macro camera for both contacts');
   assert.equal(entry.current.z,exit.current.z,'no frantic macro switch');
   assert.ok(!entry.png.equals(exit.png),'alternate lock has distinct visible frame');
@@ -104,10 +108,10 @@ try{
   // release threshold; avoid masking disagreement by pinning tips to teeth.
   await seek(12);
   const entryThreshold=await camera();
-  assert.ok(entryThreshold.leftGap<.055,'entry tip remains close at 0.4s');
+  assert.ok(entryThreshold.leftGap>.009&&entryThreshold.leftGap<.12,'entry fan has positive solid clearance at 0.4s');
   await seek(42);
   const exitThreshold=await camera();
-  assert.ok(exitThreshold.rightGap<.055,'exit tip remains close at 1.4s');
+  assert.ok(exitThreshold.rightGap>.009&&exitThreshold.rightGap<.12,'exit fan has positive solid clearance at 1.4s');
 
   const proof=await checkShot(48,'proof','observe','clock-second-hand.png');
   assert.ok(proof.current.z>10);
