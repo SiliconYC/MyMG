@@ -32,7 +32,7 @@ export const GRAHAM = Object.freeze({
   actionDeg: 3,
   // Two tangents to the tip circle at +/- 45 degrees meet here.
   pivotY: 2.4 / Math.cos(45 * RAD),
-  startWheelDeg: -6.0, // 144° tooth begins 0.5° ahead of entrance drop C=137.5°
+  startWheelDeg: -5.4, // Clearance before first clockwise entry-tooth drop
   startAnchorDeg: 0,   // true BHI drawing datum; do not synthesize an animated beat
 });
 
@@ -42,10 +42,10 @@ export function wheelTooth(i: number): Point2[] {
   // Long, sharply tapered, UNDERCUT leading face; narrow flat tooth tip.
   // Root faces are 11° apart; 12° pitch leaves free space at the root.
   return [
-    polar(GRAHAM.rootRadius, a - 5.5 * RAD),
+    polar(GRAHAM.rootRadius, a - 9 * RAD),
     polar(GRAHAM.tipRadius, a - halfTip),
     polar(GRAHAM.tipRadius, a + halfTip),
-    polar(GRAHAM.rootRadius, a + 5.5 * RAD),
+    polar(GRAHAM.rootRadius, a + 3 * RAD),
   ];
 }
 
@@ -74,12 +74,12 @@ export function grahamPallet(side: 'left' | 'right'): Point2[] {
     // Material lies INSIDE the entrance resting circle. The working arc
     // and the following plane are exposed; the rear edge is non-working.
     return [
-      polar(rc - .21, theta - .15 * RAD),
+      polar(rc - .08, theta - .15 * RAD),
       C,
       polar(rc, theta + .5 * lockDeg * RAD),
       G,
       H,
-      polar(rd - .21, theta + (lockDeg + liftDeg + .15) * RAD),
+      polar(rd - .08, theta + (lockDeg + liftDeg + .15) * RAD),
     ];
   }
   const E = relativeToPivot(wheel(45 + 2.5), py);
@@ -92,11 +92,11 @@ export function grahamPallet(side: 'left' | 'right'): Point2[] {
   // Material lies OUTSIDE the exit resting circle. The segment I-L
   // approximates the concave rest arc by its chord (error <0.0001m).
   return [
-    polar(rf + .21, theta - .15 * RAD),
+    polar(rf + .08, theta - .15 * RAD),
     F,
     I,
     L,
-    polar(re + .21, theta + (liftDeg + lockDeg + .15) * RAD),
+    polar(re + .08, theta + (liftDeg + lockDeg + .15) * RAD),
   ];
 }
 
