@@ -8,11 +8,14 @@ import {TEETH, PENDULUM_AMPLITUDE, RELEASE_OFFSET,
 export type Side='entry'|'exit';
 export type Point=readonly [number,number];
 export const WHEEL_Y=0.6;
-export const PIVOT_Y=2.56;
+/** Scale the escapement, NOT the dial or the seconds pendulum. */
+export const WHEEL_SCALE=0.60;
+export const PIVOT_Y=WHEEL_Y+(2.56-WHEEL_Y)*WHEEL_SCALE;
 export const PITCH=2*Math.PI/TEETH;
 export const PALLET_CLEARANCE=0.006;
-const OUTER_RADIUS=1.55;
-const ROOT_RADIUS=1.32;
+export const OUTER_RADIUS=1.55*WHEEL_SCALE;
+/** Give the pallet sweep clearance at the inner tooth roots. */
+export const ROOT_RADIUS=1.20*WHEEL_SCALE;
 const FLANK_FROM=.43;
 const FLANK_TO=.69;
 /** Shift working faces closer to the tooth shoulder: the opposing tip has clearance. */
@@ -72,22 +75,29 @@ export function palletLocalTip(side:Side):Point {
   ];
   return rotate([target[0],target[1]-PIVOT_Y],angle);
 }
-/** Pallet profiles start at their contact nose (local origin). +Y is the
- * wide, non-contact BASE which faces the anchor pivot. Unlike the earlier
- * gear-radial rotation this angle makes the shoe point AWAY from its arm.
+/** Pallet meshes run from the tooth-contact nose to a transverse weld base. */
+/** The shoe is a short transverse bar, NOT a continuation of its arm.
+ * Solve b·(b-tip)=0: shoe axis (b-tip) is precisely 90° to the
+ * fork from the common anchor axle to its mounting point b.
+ * The outward-hand solution keeps the welded shoe base outside the wheel.
  */
-export const PALLET_BASE_HEIGHT=.19;
-export function palletOrientation(side:Side):number {
-  const tip=palletLocalTip(side);
-  return Math.atan2(tip[0],-tip[1]);
-}
+export const PALLET_BASE_HEIGHT=.28;
 export function palletLocalBase(side:Side):Point {
   const tip=palletLocalTip(side);
-  const angle=palletOrientation(side);
+  const radius=length(tip);
+  const ratio=PALLET_BASE_HEIGHT/radius;
+  const outward=side==='entry'?-1:1;
+  const tangential:Point=[-tip[1]/radius,tip[0]/radius];
+  const baseRadial=1-ratio*ratio;
+  const baseTangential=outward*PALLET_BASE_HEIGHT*Math.sqrt(baseRadial);
   return [
-    tip[0]-Math.sin(angle)*PALLET_BASE_HEIGHT,
-    tip[1]+Math.cos(angle)*PALLET_BASE_HEIGHT,
+    tip[0]*baseRadial+tangential[0]*baseTangential,
+    tip[1]*baseRadial+tangential[1]*baseTangential,
   ];
+}
+export function palletOrientation(side:Side):number {
+  const tip=palletLocalTip(side),base=palletLocalBase(side);
+  return Math.atan2(tip[0]-base[0],base[1]-tip[1]);
 }
 export function palletWorldBase(side:Side,pendulumAngle:number):Point {
   const base=rotate(palletLocalBase(side),-pendulumAngle);
