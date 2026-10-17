@@ -276,11 +276,11 @@ test('same WebGL clock uses engineering sectors with NO cosmetic tooth highlight
 test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  const anchor=src.split('const Anchor:')[1].split('/** Highlight only')[0];
+  const anchor=src.split('const Anchor:')[1].split('/** One pendulum physically hangs')[0];
   const pendulum=src.split('const Pendulum:')[1].split('/** A fixed cylindrical JOURNAL SLEEVE')[0];
   const coupling=src.split('function makeCouplingGeometry()')[1]
     .split('const Ring:')[0];
-  const movingJoint=src.split('ONE pivot, ONE angle')[1].split('<ContactHighlights')[0];
+  const movingJoint=src.split('ONE pivot, ONE angle')[1].split('<Dial angle=')[0];
   const support=src.split('const MinimalSupports:')[1].split('const Dial:')[0];
 
   const getNumber=name=>{
@@ -338,9 +338,9 @@ test('visible pallet shoes and escapement wheel occupy the same axial contact pl
   assert.match(scene,/depth:WHEEL_THICKNESS/);
   assert.match(scene,/geo.translate\(0,0,WHEEL_PLANE_Z-WHEEL_THICKNESS\/2\)/);
   assert.match(scene,/depth:PALLET_THICKNESS/);
-  assert.match(scene,/geometry.translate\(0,0,-PALLET_THICKNESS\/2\)/);
-  assert.match(scene,/position=\{\[\.\.\.palletLocalTip\(pose.side\),PALLET_PLANE_Z\]\}/);
-  assert.match(scene,/b=\{\[\.\.\.palletLocalBase\(pose.side\),PALLET_ARM_WELD_Z\]\}/);
+  assert.match(scene,/geometry.translate\(0,0,PALLET_PLANE_Z-PALLET_THICKNESS\/2\)/);
+  assert.match(scene,/makeSectorPallet\(side\)/);
+  assert.match(scene,/b=\{\[\.\.\.palletLocalBase\(side\),PALLET_ARM_WELD_Z\]\}/);
 });
 
 test('both full fork arms stay flat in the escapement wheel working plane',()=>{
@@ -357,10 +357,10 @@ test('both full fork arms stay flat in the escapement wheel working plane',()=>{
     'entire fork arm thickness must fit inside wheel tooth thickness');
   const src=readFileSync(resolve(import.meta.dirname,
     '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  const fork=src.split('const Anchor:')[1].split('/** Highlight only')[0];
+  const fork=src.split('const Anchor:')[1].split('/** One pendulum physically hangs')[0];
   assert.match(fork,/a=\{\[0,0,FORK_ARM_PLANE_Z\]\}/,
     'both fork roots must be at the wheel plane, never z=-.33');
-  assert.match(fork,/b=\{\[\.\.\.palletLocalBase\(pose.side\),PALLET_ARM_WELD_Z\]\}/);
+  assert.match(fork,/b=\{\[\.\.\.palletLocalBase\(side\),PALLET_ARM_WELD_Z\]\}/);
   assert.doesNotMatch(fork,/a=\{\[0,0,-\.33\]\}/);
   const coupling=src.match(/const COUPLING_CENTER_Z=(-?[\d.]+);[\s\S]*?const COUPLING_LENGTH=([\d.]+);/);
   assert.ok(coupling,'a single extended common shaft is required');
