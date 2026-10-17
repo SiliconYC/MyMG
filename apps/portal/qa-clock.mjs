@@ -90,7 +90,9 @@ try{
   const old=await scene.screenshot();
   await seek(0);
   await seek(762);
-  assert.deepEqual(await read(),samples[4],
+  const {frame:sampleFrame,...expectedState}=samples[4];
+  assert.equal(sampleFrame,762);
+  assert.deepEqual(await read(),expectedState,
     'frame seeking cannot change deterministic physical outcomes');
   assert.ok(!old.equals(await scene.screenshot()));
   await page.getByTestId('play-toggle').click();
