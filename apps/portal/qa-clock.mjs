@@ -74,8 +74,9 @@ try{
     assert.equal(state.pendulum,state.anchor);
     assert.equal(state.wheel,state.hand);
     assert.equal(state.wheelPlane,state.palletPlane);
-    assert.equal(state.wheelPlane,state.forkPlane,
-      'whole V fork must lie in the same working plane as the gear');
+    assert.ok(state.forkPlane<state.wheelPlane &&
+      state.wheelPlane-state.forkPlane<.1,
+      'both flat V fork arms must sit just behind, parallel to the teeth');
     assert.ok(state.bearing>=.22-1e-5);
     assert.ok(state.penetration<.04);
     assert.ok(Object.values(state).every(v=>typeof v!=='number'||Number.isFinite(v)));
