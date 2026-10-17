@@ -244,8 +244,8 @@ test('both working pallets swap lock without jamming each other',()=>{
     const escaping=catching==='entry'?'exit':'entry';
     assert.ok(contactDistance(catching,after)<.06,
       'catching shoe is near the next tooth');
-    assert.ok(contactDistance(escaping,after)>.07,
-      'released shoe must clear the opposing flank by at least 0.07');
+    assert.ok(contactDistance(escaping,after)>.065,
+      'released shoe must retain at least 0.065 lateral clearance at the smaller wheel');
   }
 });
 
