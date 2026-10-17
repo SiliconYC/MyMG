@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 const src=readFileSync(resolve(import.meta.dirname,'../animations/escapement-physics-lab/web/src/physics-lab.ts'),'utf8');
 const ui=readFileSync(resolve(import.meta.dirname,'../animations/escapement-physics-lab/web/src/escapement-physics-lab.tsx'),'utf8');
+const geometry=readFileSync(resolve(import.meta.dirname,'../animations/escapement-physics-lab/web/src/graham-geometry.ts'),'utf8');
 const catalog=readFileSync(resolve(import.meta.dirname,'../apps/portal/src/catalog.ts'),'utf8');
 test('issue 78 is a separate Rapier WASM experiment, not a new hand-made solver',()=>{
   assert.match(src,/from '@dimforge\/rapier2d-compat'/);
@@ -27,4 +28,17 @@ test('Lab never makes success claims before measured contacts',()=>{
   assert.match(src,/this\.alternations >= 10/);
   assert.match(src,/initialOverlap/);
   assert.match(src,/penetrationDuration/);
+});
+
+test('the open escape wheel has real collision windows, no false disk',()=>{
+  assert.match(geometry,/export function wheelRimSector/);
+  assert.match(geometry,/export function wheelSpoke/);
+  assert.match(src,/wheelRimSector\(i\)/);
+  assert.match(src,/wheelSpoke\(i\)/);
+  assert.match(src,/WHEEL_STRUCTURE\.hubRadius/);
+  assert.doesNotMatch(src,/addCircle\('hub', 'wheel', \[0, 0\], PARAMETERS\.wheelRadius/);
+  assert.match(ui,/data-wheel-structure="open-rim-six-spokes"/);
+  assert.match(ui,/data-model-part=\{solid\.name\}/);
+  assert.match(ui,/采集中 · 至少运行 10 秒后评估/);
+  assert.doesNotMatch(ui,/maxPenetration[^\n]*\*1000/);
 });
