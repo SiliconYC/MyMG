@@ -49,7 +49,7 @@ jobs:
           fi
           changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
           # #78 isolated geometry experiment: save unrelated HBM/CPU/GPU browser time.
-          if [ -n "$changed" ] && ! printf '%s\\n' "$changed" | grep -Ev '^(animations/escapement-physics-lab/|tooling/escapement-physics-lab\\.test\\.mjs$|apps/portal/src/catalog\\.ts$|apps/portal/src/portal\\.tsx$|apps/portal/package\\.json$|apps/portal/qa-escapement-physics-lab\\.mjs$|pnpm-lock\\.yaml$|\\.github/workflows/portal-qa\\.yml$)' >/dev/null; then
+          if [ -n "$changed" ] && ! printf '%s\n' "$changed" | grep -Ev '^(animations/escapement-physics-lab/|tooling/escapement-physics-lab\.test\.mjs$|apps/portal/src/catalog\.ts$|apps/portal/src/portal\.tsx$|apps/portal/package\.json$|apps/portal/qa-escapement-physics-lab\.mjs$|pnpm-lock\.yaml$|\.github/workflows/portal-qa\.yml$)' >/dev/null; then
             echo "lab_only=true" >> "$GITHUB_OUTPUT"
             echo "Isolated #78 lab PR: full check/build + focused Rapier Chromium QA + portal React smoke"
           else
