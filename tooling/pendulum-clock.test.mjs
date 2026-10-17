@@ -307,8 +307,8 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
   assert.doesNotMatch(support,/<Axle /,
     'the rear support must no longer be an opaque floating cylinder');
   assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-5\.55,0\]\}/);
-  assert.match(anchor,/a=\{\[0,0,FORK_ARM_PLANE_Z\]\}/,
-    'both fork arms begin at the shaft axis in the same plane as the wheel');
+  assert.match(anchor,/<mesh geometry=\{geometry\}/,
+    'both fork arms must be extruded with the common hub as ONE plate');
 });
 
 test('one plate has same XY working plane and Z thickness as the wheel',()=>{
