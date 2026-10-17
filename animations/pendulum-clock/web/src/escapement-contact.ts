@@ -14,29 +14,54 @@ export const ROOT_RADIUS=1.20*WHEEL_SCALE;
 /** Traditional anchor drawings place the fork axis ~1.4 wheel radii above O. */
 export const PIVOT_Y=WHEEL_Y+1.4*OUTER_RADIUS;
 export const PITCH=2*Math.PI/TEETH;
-export const PALLET_CLEARANCE=.012;
-export const PALLET_BASE_HEIGHT=.19;
 
-/** Each sector is measured about the common ANCHOR AXLE, NOT the wheel axle.
- * Different entry/exit dimensions are intentional; mirror-copying the shoe
- * geometry hides the different entry and exit impulse/locking faces.
- * radii, sweep and roots are all in clock world units / radians.
+
+/** Both arm centerlines have precisely the same pivot-to-heel length.
+ * Non-mirror symmetry is permitted ONLY in the claw flanks, not in the arm
+ * lengths. Values are measured in the anchor-pivot local XY plane.
  */
-export type PalletSector=Readonly<{
-  side:Side; centerAngle:number; halfSweep:number;
-  innerRadius:number; outerRadius:number; samples:number;
-}>;
-export const ENTRY_PALLET_DEF:PalletSector={
-  side:'entry',centerAngle:-127*Math.PI/180,halfSweep:.11,
-  innerRadius:.572,outerRadius:.762,samples:18,
-};
-export const EXIT_PALLET_DEF:PalletSector={
-  side:'exit',centerAngle:133.5*Math.PI/180,halfSweep:.105,
-  innerRadius:.395,outerRadius:.575,samples:18,
-};
-export const palletDefinition=(side:Side):PalletSector=>
-  side==='entry'?ENTRY_PALLET_DEF:EXIT_PALLET_DEF;
+export const ARM_HEEL_X=.690;
+export const ARM_HEEL_Y=-.470;
+export const ARM_LENGTH=Math.hypot(ARM_HEEL_X,ARM_HEEL_Y);
+export const ANCHOR_PLATE_THICKNESS=.12;
+export const ANCHOR_BEVEL=.003;
+export const PALLET_BASE_HEIGHT=.19;
+export const PALLET_CLEARANCE=.012;
+export const armHeel=(side:Side):Point=>[
+  side==='entry'?-ARM_HEEL_X:ARM_HEEL_X,ARM_HEEL_Y];
 
+/** Two claw noses are distinctly handed, not reflected copies.
+ * Both locking/impulse edges run upper-right from their pointed ends.
+ * The entire fork, hub and both claws are one CLOSED plate perimeter.
+ *
+ * Clockwise contour around the hub, right claw, inner V, left claw.
+ * No independent Rod or shoe solids are added to the render.
+ */
+export const ANCHOR_LOCAL_OUTLINE:readonly Point[]=[
+  [-.087,.045],[-.080,.075],[-.040,.091],[0,.098],
+  [.040,.091],[.080,.075],[.087,.045],
+  [.725,-.440],[.830,-.450],[1.030,-.630],
+  [.910,-.700],[.970,-.610],[.655,-.495],
+  [.045,-.080],[0,-.090],[-.045,-.080],
+  [-.655,-.495],[-.810,-.620],[-.890,-.700],
+  [-1.030,-.650],[-.830,-.450],[-.725,-.440],
+] as const;
+export const CLAW_LOCAL_POLYGON:Readonly<Record<Side,readonly Point[]>>={
+  entry:[
+    [-.725,-.440],[-.830,-.450],[-1.030,-.650],
+    [-.890,-.700],[-.810,-.620],[-.655,-.495],
+  ],
+  exit:[
+    [.725,-.440],[.830,-.450],[1.030,-.630],
+    [.910,-.700],[.970,-.610],[.655,-.495],
+  ],
+};
+export function anchorLocalOutline():Point[]{
+  return ANCHOR_LOCAL_OUTLINE.map(p=>[p[0],p[1]]);
+}
+export function armCenterlineLength(side:Side):number{
+  return Math.hypot(...armHeel(side));
+}
 /** Polar convention matches the original wheel tooth design: 0 is +Y. */
 const polar=(r:number,a:number):Point=>[r*Math.sin(a),r*Math.cos(a)];
 const rotate=(p:Point,a:number):Point=>[
@@ -60,39 +85,44 @@ export function wheelOutline(wheelAngle:number):Point[]{
     .flat().map(([x,y]):Point=>[x,y+WHEEL_Y]);
 }
 
-/** 2D ruler-and-compass construction: two concentric arcs about the anchor
- * pivot joined by short radial ends, yielding a genuine annular FAN.
- * Not a triangular tooth, not a visual-only object, not mirrored geometry.
- */
-export function palletLocalOutline(side:Side):Point[]{
-  const p=palletDefinition(side);
-  const samples=Array.from({length:p.samples+1},(_,i)=>
-    p.centerAngle-p.halfSweep+2*p.halfSweep*i/p.samples);
-  return [
-    ...samples.map(a=>polar(p.outerRadius,a)),
-    ...samples.reverse().map(a=>polar(p.innerRadius,a)),
-  ];
-}
-export function palletOutline(side:Side,pendulumAngle:number):Point[]{
-  return palletLocalOutline(side).map(p=>{
+/** Same polygon is used for the extruded Three.js anchor and XY audit. */
+export function anchorOutline(pendulumAngle:number):Point[]{
+  return anchorLocalOutline().map(p=>{
     const q=rotate(p,-pendulumAngle);
     return [q[0],q[1]+PIVOT_Y];
   });
 }
-/** Welding land is embedded in the sector root rather than its contact tip. */
+export function palletLocalOutline(side:Side):Point[]{
+  return CLAW_LOCAL_POLYGON[side].map(p=>[p[0],p[1]]);
+}
+export function palletOutline(side:Side,angle:number):Point[]{
+  return palletLocalOutline(side).map(p=>{
+    const q=rotate(p,-angle);
+    return [q[0],q[1]+PIVOT_Y];
+  });
+}
 export function palletLocalBase(side:Side):Point{
-  const p=palletDefinition(side);
-  return polar(p.innerRadius+.018,p.centerAngle);
+  return armHeel(side);
 }
 export function palletLocalTip(side:Side):Point{
-  const p=palletDefinition(side);
-  return polar(p.outerRadius,p.centerAngle);
+  return side==='entry'?[-.890,-.700]:[.910,-.700];
+}
+/** Working-face vectors from each claw tip to its trailing land.
+ * Both point upper-right, unlike an erroneously mirrored wedge.
+ */
+export function clawWorkingDirection(side:Side):Point{
+  const tip=palletLocalTip(side);
+  const land:Point=side==='entry'?[-.810,-.620]:[.970,-.610];
+  const dx=land[0]-tip[0],dy=land[1]-tip[1];
+  const length=Math.hypot(dx,dy);
+  return [dx/length,dy/length];
 }
 export function palletOrientation(side:Side):number{
-  return palletDefinition(side).centerAngle;
+  const dir=clawWorkingDirection(side);
+  return Math.atan2(dir[0],dir[1]);
 }
 export function palletWorldBase(side:Side,angle:number):Point{
-  const q=rotate(palletLocalBase(side),-angle);
+  const q=rotate(armHeel(side),-angle);
   return [q[0],q[1]+PIVOT_Y];
 }
 export function palletWorldTip(side:Side,angle:number):Point{
@@ -166,6 +196,15 @@ export function polygonClearance(a:readonly Point[],b:readonly Point[]):number{
     }
   }
   return result;
+}
+/** Shared full-solid audit includes both arms and both claws as one body. */
+export function anchorWheelInterference(state:ClockState):boolean{
+  return polygonInterference(anchorOutline(state.pendulumAngle),
+    wheelOutline(state.wheelAngle));
+}
+export function anchorWheelClearance(state:ClockState):number{
+  return polygonClearance(anchorOutline(state.pendulumAngle),
+    wheelOutline(state.wheelAngle));
 }
 /** Swept solids, NOT a fake tooth-tip contact point. */
 export function palletWheelInterference(side:Side,state:ClockState):boolean{

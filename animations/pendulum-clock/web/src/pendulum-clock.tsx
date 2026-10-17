@@ -4,9 +4,10 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
-import {palletPose, palletLocalBase, palletLocalOutline,
+import {palletPose, anchorLocalOutline,
+  anchorWheelInterference, anchorWheelClearance,
   contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_PROFILE,
-  palletWheelInterference, forkWheelClearance, type Side} from './escapement-contact';
+  forkWheelClearance, ANCHOR_BEVEL} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
   PALLET_THICKNESS, PALLET_ARM_WELD_Z, FORK_ARM_PLANE_Z,
@@ -166,45 +167,33 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
   </group>;
 };
 
-/** A single sector solid extruded directly from the dimensioned 2D blueprint.
- * Both shoes live on the SAME moving anchor axis, with distinct silhouettes.
- * Steel stays steel even when engaged; contact is explained by motion only.
+/** ONE fabricated flat steel component: pivot hub, two equal-length
+ * tapered fork arms, and two same-handed asymmetric claws.
+ * 3D geometry directly extrudes the independently audited 2D perimeter.
+ * No decorative rods, shoe blocks, per-pallet material swaps, or seam.
  */
-function makeSectorPallet(side:Side):THREE.ExtrudeGeometry {
-  const outline=palletLocalOutline(side);
-  const profile=new THREE.Shape();
-  profile.moveTo(...outline[0]);
-  for(const point of outline.slice(1))profile.lineTo(...point);
-  profile.closePath();
-  const geometry=new THREE.ExtrudeGeometry(profile,{
-    depth:PALLET_THICKNESS,steps:1,bevelEnabled:true,
-    bevelSize:.003,bevelThickness:.004,bevelSegments:2,
+function makeOnePieceAnchor():THREE.ExtrudeGeometry {
+  const outline=anchorLocalOutline();
+  const shape=new THREE.Shape();
+  shape.moveTo(...outline[0]);
+  for(const point of outline.slice(1))shape.lineTo(...point);
+  shape.closePath();
+  const geometry=new THREE.ExtrudeGeometry(shape,{
+    depth:PALLET_THICKNESS,steps:1,
+    bevelEnabled:true,bevelSize:ANCHOR_BEVEL,
+    bevelThickness:.004,bevelSegments:2,
   });
   geometry.translate(0,0,PALLET_PLANE_Z-PALLET_THICKNESS/2);
   return geometry;
 }
-const PalletTooth:React.FC<{side:Side}>=({side})=>{
-  const geometry=useMemo(()=>makeSectorPallet(side),[side]);
+const Anchor:React.FC=()=>{
+  const geometry=useMemo(makeOnePieceAnchor,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
   return <mesh geometry={geometry} castShadow receiveShadow>
-    <meshStandardMaterial color={STEEL} metalness={.76} roughness={.29}
+    <meshStandardMaterial color={STEEL} metalness={.76} roughness={.28}
       side={THREE.DoubleSide}/>
   </mesh>;
 };
-
-/** One solid fork rotating together with the pendulum; both rods weld into
- * the INNER curved heel of their respective unequal sector pallets.
- */
-const Anchor:React.FC=()=> <group>
-  {(['entry','exit'] as const).map(side=>
-    <group key={side}>
-      <Rod a={[0,0,FORK_ARM_PLANE_Z]}
-        b={[...palletLocalBase(side),PALLET_ARM_WELD_Z]}
-        radius={.026} color={STEEL}/>
-      <PalletTooth side={side}/>
-    </group>
-  )}
-</group>;
 
 /** One pendulum physically hangs from the same anchor pivot behind the wheel. */
 const Pendulum:React.FC=()=>
@@ -352,10 +341,10 @@ export const PendulumClockScene:React.FC=()=>{
     data-contact-side={entry.engaged?'entry':exit.engaged?'exit':'free'}
     data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
+    data-anchor-clearance={anchorWheelClearance(state).toFixed(5)}
     data-entry-fork-clearance={forkWheelClearance('entry',state).toFixed(5)}
     data-exit-fork-clearance={forkWheelClearance('exit',state).toFixed(5)}
-    data-solid-interference={palletWheelInterference('entry',state)||
-      palletWheelInterference('exit',state)}
+    data-solid-interference={anchorWheelInterference(state)}
     data-wheel-plane-z={WHEEL_PLANE_Z}
     data-pallet-plane-z={PALLET_PLANE_Z}
     data-fork-arm-plane-z={FORK_ARM_PLANE_Z}
