@@ -7,16 +7,19 @@
  * the 3D alignment which a two-dimensional solver cannot detect.
  */
 export const WHEEL_PLANE_Z = -0.02;
-export const WHEEL_THICKNESS = 0.18;
-export const PALLET_THICKNESS = 0.12;
+export const WHEEL_THICKNESS = 0.04;
+export const PALLET_THICKNESS = 0.09;
 export const PALLET_PLANE_Z = WHEEL_PLANE_Z;
-export const PALLET_ARM_WELD_Z = PALLET_PLANE_Z;
-/** Entire lengths of both anchor fork arms lie in the wheel working plane.
- * This includes the end at the rotating anchor spindle, not just the shoe
- * weld. A 3D diagonal fork arm is mechanically wrong for this assembly.
+export const PALLET_ARM_WELD_Z = -0.08;
+/** Two straight, parallel fork rods mounted just behind the thin escape
+ * wheel. Their axes never slope. They are close to the wheel in profile but
+ * do NOT share its occupied Z volume; each shoe extends axially to mesh.
+ * This small 0.06 offset is mechanically necessary: physically solid parts
+ * cannot share the same X/Y sweep AND the same occupied Z range.
  */
-export const FORK_ARM_PLANE_Z = WHEEL_PLANE_Z;
-
+export const FORK_ARM_PLANE_Z = PALLET_ARM_WELD_Z;
+export const FORK_ARM_RADIUS = 0.028;
+export const forkZRange = zRange(FORK_ARM_PLANE_Z,FORK_ARM_RADIUS*2);
 export const WHEEL_SPINDLE_RADIUS = 0.13;
 export const WHEEL_SPINDLE_REAR_Z = -0.55;
 export const WHEEL_SPINDLE_FRONT_Z = 0.16;
