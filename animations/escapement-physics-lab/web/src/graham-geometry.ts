@@ -32,20 +32,21 @@ export const GRAHAM = Object.freeze({
   actionDeg: 3,
   // Two tangents to the tip circle at +/- 45 degrees meet here.
   pivotY: 2.4 / Math.cos(45 * RAD),
-  startWheelDeg: -5.4, // Clearance before first clockwise entry-tooth drop
+  startWheelDeg: -5.4, // Nominal initial phase; audited separately from shape construction
   startAnchorDeg: 0,   // true BHI drawing datum; do not synthesize an animated beat
 });
 
 export function wheelTooth(i: number): Point2[] {
   const a = i * GRAHAM.pitchDeg * RAD;
   const halfTip = GRAHAM.tipThicknessDeg * RAD / 2;
-  // Long, sharply tapered, UNDERCUT leading face; narrow flat tooth tip.
-  // Root faces are 11° apart; 12° pitch leaves free space at the root.
+  // Correct clockwise LEADING edge: tooth tip must lead its root toward
+  // lower angular coordinates; the old model leant backwards and wedged.
+  // BHI: ~6° undercut of leading flank, 0.5° tip, 12° tooth pitch.
   return [
-    polar(GRAHAM.rootRadius, a - 9 * RAD),
+    polar(GRAHAM.rootRadius, a + 6 * RAD),
     polar(GRAHAM.tipRadius, a - halfTip),
     polar(GRAHAM.tipRadius, a + halfTip),
-    polar(GRAHAM.rootRadius, a + 3 * RAD),
+    polar(GRAHAM.rootRadius, a + 11 * RAD),
   ];
 }
 
