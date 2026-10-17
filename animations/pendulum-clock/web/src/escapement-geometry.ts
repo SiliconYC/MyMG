@@ -19,7 +19,7 @@ export const WHEEL_PROFILE:ReadonlyArray<readonly [number,number]>=[
   [0,1.29],[.19,1.31],[.34,1.53],[.43,1.55],[.69,1.32],[.93,1.29],
 ];
 export const PALLET_ARC_BAND=.045;
-export const PALLET_LOCK_SWEEP=.14;
+export const PALLET_LOCK_SWEEP=.045;
 export const PALLET_SEGMENTS=7;
 export const polar=(r:number,a:number):Point=>[r*Math.sin(a),r*Math.cos(a)];
 export const rotate=(p:Point,a:number):Point=>[
@@ -66,8 +66,13 @@ function makeDeadbeat(side:Side){
   const p:Point=[ref[0],ref[1]+WHEEL_Y-PIVOT_Y];
   const radius=len(p);
   const phi=Math.atan2(p[0],-p[1]);
-  const lo=phi+(entry?.005:-PALLET_LOCK_SWEEP-.005);
-  const hi=phi+(entry?PALLET_LOCK_SWEEP+.005:-.005);
+  // Very short deadbeat holding lands near each pendulum extremum.
+  // The previous 0.14-radian arcs let both tooth flanks lock the fork
+  // simultaneously, trapping it at +0.11 rad instead of releasing.
+  const lo=phi+(entry?START_AMPLITUDE-PALLET_LOCK_SWEEP:
+    -START_AMPLITUDE-.005);
+  const hi=phi+(entry?START_AMPLITUDE+.005:
+    -START_AMPLITUDE+PALLET_LOCK_SWEEP);
   return {radius,phi,lo,hi};
 }
 const DEADBEAT={entry:makeDeadbeat('entry'),exit:makeDeadbeat('exit')};
