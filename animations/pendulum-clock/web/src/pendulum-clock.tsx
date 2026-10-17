@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
 import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
   contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_SCALE, ROOT_RADIUS,
-  OUTER_RADIUS, PALLET_BASE_HEIGHT, type PalletPose} from './escapement-contact';
+  OUTER_RADIUS, PALLET_BASE_HEIGHT, WHEEL_PROFILE, PALLET_PROFILE,
+  palletWheelInterference, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
   PALLET_THICKNESS, PALLET_ARM_WELD_Z, FORK_ARM_PLANE_Z,
@@ -122,7 +123,7 @@ function makeEscapeWheel():THREE.ExtrudeGeometry {
   const step=2*Math.PI/TEETH;
   for(let k=0;k<TEETH;k++){
     const base=k*step;
-    for(const [s,r] of [[0,ROOT_RADIUS-.02],[.19,ROOT_RADIUS],[.34,1.53*WHEEL_SCALE],[.43,OUTER_RADIUS],[.69,ROOT_RADIUS],[.93,ROOT_RADIUS-.02]]){
+    for(const [s,r] of WHEEL_PROFILE){
       const a=base+s*step;
       const x=Math.sin(a)*r,y=Math.cos(a)*r;
       if(k===0&&s===0)shape.moveTo(x,y);else shape.lineTo(x,y);
@@ -171,13 +172,8 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
  */
 function makeSlimPallet():THREE.ExtrudeGeometry {
   const profile=new THREE.Shape();
-  profile.moveTo(0,0);             // contact nose on the wheel flank
-  profile.lineTo(.008,.016);       // short locking land
-  profile.lineTo(.018,.070);       // visible working face
-  profile.lineTo(.042,PALLET_BASE_HEIGHT);
-  profile.lineTo(-.042,PALLET_BASE_HEIGHT); // transverse welded base
-  profile.lineTo(-.020,.068);
-  profile.lineTo(-.008,.016);
+  profile.moveTo(...PALLET_PROFILE[0]);
+  for(const point of PALLET_PROFILE.slice(1))profile.lineTo(...point);
   profile.closePath();
   const geometry=new THREE.ExtrudeGeometry(profile,{
     depth:PALLET_THICKNESS,steps:1,bevelEnabled:true,
@@ -392,6 +388,8 @@ export const PendulumClockScene:React.FC=()=>{
     data-contact-side={entry.engaged?'entry':exit.engaged?'exit':'free'}
     data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
+    data-solid-interference={palletWheelInterference('entry',state)||
+      palletWheelInterference('exit',state)}
     data-wheel-plane-z={WHEEL_PLANE_Z}
     data-pallet-plane-z={PALLET_PLANE_Z}
     data-fork-arm-plane-z={FORK_ARM_PLANE_Z}
