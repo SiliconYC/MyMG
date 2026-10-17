@@ -12,6 +12,9 @@ export const PARAMETERS = Object.freeze({
   gravity: -9.81,
   // Clockwise torque; BHI construction assumes clockwise rotation.
   driveTorque: -0.8,
+  // Real one-off angular impulse, simulating a human starting the pendulum.
+  // It is NOT a per-step driver, a scheduler or scripted oscillation.
+  startTorqueImpulse: 1.25,
   pendulumStart: 0.04 * Math.PI / 180,
   wheelStart: -5.9 * Math.PI / 180,
   wheelDamping: 0.035,
@@ -148,6 +151,8 @@ export class EscapementSimulation {
     // Bob and rod share the SAME rigid body as both pallets.
     this.addCircle('bob', 'anchor', [0, -PARAMETERS.pendulumLength],
       PARAMETERS.bobRadius, 1.5);
+    // Real initial excitation; thereafter only gravity and wheel impacts drive the pendulum.
+    this.anchor.applyTorqueImpulse(PARAMETERS.startTorqueImpulse, true);
     // Rapier addTorque is persistent until resetTorques; call only once.
     this.wheel.addTorque(PARAMETERS.driveTorque, true);
     this.queue = new RAPIER.EventQueue(true);
