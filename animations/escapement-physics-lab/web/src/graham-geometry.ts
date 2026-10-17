@@ -30,6 +30,9 @@ export const GRAHAM = Object.freeze({
   lockDeg: 1,
   liftDeg: 2,
   actionDeg: 3,
+  // Separate phase relief (half the 3° total pallet action). Explicitly
+  // a geometric prototype clearance, not a claim of machining accuracy.
+  palletPhaseReliefDeg: 1.5,
   // Two tangents to the tip circle at +/- 45 degrees meet here.
   pivotY: 2.4 / Math.cos(45 * RAD),
   startWheelDeg: -5.4, // Nominal initial phase; audited separately from shape construction
@@ -61,6 +64,11 @@ export function wheelTooth(i: number): Point2[] {
  * This convex polygonal approximation bounds ~0.0001m chord error on
  * 1° rest arcs; the draw shape and physics collider use the same points.
  */
+const phaseRelief = (points: Point2[], side: 'left' | 'right'): Point2[] => {
+  const a = (side === 'left' ? -1 : 1) * GRAHAM.palletPhaseReliefDeg * RAD;
+  return points.map(([x,y]): Point2 =>
+    [x*Math.cos(a)-y*Math.sin(a),x*Math.sin(a)+y*Math.cos(a)]);
+};
 export function grahamPallet(side: 'left' | 'right'): Point2[] {
   const {tipRadius: r, pivotY: py, lockDeg, liftDeg} = GRAHAM;
   const wheel = (deg: number) => polar(r, deg * RAD);
@@ -74,14 +82,14 @@ export function grahamPallet(side: 'left' | 'right'): Point2[] {
     const H = polar(rd, theta + (lockDeg + liftDeg) * RAD);
     // Material lies INSIDE the entrance resting circle. The working arc
     // and the following plane are exposed; the rear edge is non-working.
-    return [
+    return phaseRelief([
       polar(rc - .08, theta - .15 * RAD),
       C,
       polar(rc, theta + .5 * lockDeg * RAD),
       G,
       H,
       polar(rd - .08, theta + (lockDeg + liftDeg + .15) * RAD),
-    ];
+    ], side);
   }
   const E = relativeToPivot(wheel(45 + 2.5), py);
   const F = relativeToPivot(wheel(45 - 2.5), py);
@@ -92,13 +100,13 @@ export function grahamPallet(side: 'left' | 'right'): Point2[] {
   const L = polar(re, theta + (liftDeg + lockDeg) * RAD);
   // Material lies OUTSIDE the exit resting circle. The segment I-L
   // approximates the concave rest arc by its chord (error <0.0001m).
-  return [
+  return phaseRelief([
     polar(rf + .08, theta - .15 * RAD),
     F,
     I,
     L,
     polar(re + .08, theta + (liftDeg + lockDeg + .15) * RAD),
-  ];
+  ], side);
 }
 
 export function constructionAudit() {
@@ -112,5 +120,6 @@ export function constructionAudit() {
     entryLockRadius: from(polar(r,137.5*RAD),P),
     exitLockRadius: from(polar(r,47.5*RAD),P),
     diameterRatio: GRAHAM.rootRadius / GRAHAM.tipRadius,
+    palletPhaseReliefDeg: GRAHAM.palletPhaseReliefDeg,
   };
 }
