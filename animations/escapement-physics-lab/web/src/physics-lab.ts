@@ -69,9 +69,9 @@ export type Readout = {
 // Collision geometry is generated from the historical construction in
 // graham-geometry.ts. Do not replace with arbitrary symmetric shoes or redraw
 // visibly different outlines to hide a physical collision defect.
-const leftPad: Point[] = grahamPallet('left').map(p => [p[0],p[1]]);
-const rightPad: Point[] = grahamPallet('right').map(p => [p[0],p[1]]);
-const tooth = (index: number): Point[] => wheelTooth(index).map(p => [p[0],p[1]]);
+const leftPad: Point[] = grahamPallet('left').map(p => [p[0],p[1]] as Point);
+const rightPad: Point[] = grahamPallet('right').map(p => [p[0],p[1]] as Point);
+const tooth = (index: number): Point[] => wheelTooth(index).map(p => [p[0],p[1]] as Point);
 const rotate = ([x, y]: Point, a: number): Point =>
   [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 const worldPoint = (p: Point, owner: 'wheel' | 'anchor', a: number): Point => {
