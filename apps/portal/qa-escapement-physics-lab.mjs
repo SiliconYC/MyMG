@@ -59,6 +59,36 @@ try {
   console.log('OPEN-WHEEL PHYSICAL PARAMETER SCAN',
     JSON.stringify(physicalScan.sort((a,b)=>
       Number(b.accepted)-Number(a.accepted)||b.alternations-a.alternations).slice(0,35)));
+  // Long-run tuning must measure an ENTIRE 60s, not choose a phase on
+  // 10s alternations. Each entry is an independently initialized Rapier World.
+  const longRunScan = await page.evaluate(() => {
+    const choices = [
+      [-7,0,-6,-1.1],[-7,0,-4.5,-1.1],[-7,0,-3,-1.1],
+      [-7,0,-4.5,-0.8],[-7,0,-6,-0.8],
+      [-17,1.5,-4.5,-1.1],[-17,1.5,-3,-1.1],
+      [-5,1.5,-4.5,-1.1],[-5,0,-3,-1.1],[-5,0,-4.5,-1.1],
+      [-17,0,-3,-1.1],[-17,0,-4.5,-1.1],
+      [-5,1.5,-3,-0.8],[-17,0,-3,-0.8],[-5,0,-3,-0.8],
+      [-7,0,-6,-1.4],[-7,0,-4.5,-1.4],[-5,0,-4.5,-1.4],
+    ];
+    return choices.map(([wheelDeg,anchorDeg,kick,driveTorque]) => {
+      const q=window.__mymgEscapementLab.audit(60,'full',{
+        wheelStart:wheelDeg*Math.PI/180,
+        pendulumStart:anchorDeg*Math.PI/180,
+        startTorqueImpulse:kick,driveTorque,
+      });
+      return {wheelDeg,anchorDeg,kick,driveTorque,
+        initialOverlap:q.initialOverlap,accepted:q.accepted,
+        alternations:q.alternations,forward:q.forward,reverse:q.reverse,
+        longestStuck:q.longestStuck,maxPenetration:q.maxPenetration,
+        totalImpulse:q.totalImpulse,
+        lastEventTime:q.contactSequence.at(-1)?.time ?? null};
+    });
+  });
+  console.log('OPEN-WHEEL 60-SECOND PARAMETER SCAN', JSON.stringify(
+    longRunScan.sort((a,b)=>
+      Number(b.accepted)-Number(a.accepted) ||
+      b.alternations-a.alternations || a.longestStuck-b.longestStuck)));
   // Independent event-sequence review: a contact start alone does not prove
   // locking or release. Match real tooth/pallet start/end pairs, reject
   // repeated orphan events, and count alternating *completed* dwells only.
@@ -103,6 +133,10 @@ try {
     'Malformed tooth/pallet start/end event pairing');
   assert.ok(contactReview.qualifiedAlternations>=10,
     'Real completed lock/release contacts did not alternate at least ten times');
+  // Former QA bug: >=10 contacts by second 10 could conceal a wheel that
+  // physically seized for the remaining 49 seconds. This must NEVER pass.
+  assert.equal(ten.accepted,true,'10-second physical motion failed');
+  assert.equal(sixty.accepted,true,'60-second wheel stalled or otherwise failed physical motion');
   assert.ok(new Set(dwellContacts.map(x=>x.toothId)).size>=8,
     'Insufficient distinct contacted teeth: possible chattering');
 
