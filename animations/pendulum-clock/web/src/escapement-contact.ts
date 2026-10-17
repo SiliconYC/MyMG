@@ -28,11 +28,11 @@ export type PalletSector=Readonly<{
 }>;
 export const ENTRY_PALLET_DEF:PalletSector={
   side:'entry',centerAngle:-127*Math.PI/180,halfSweep:.11,
-  innerRadius:.578,outerRadius:.768,samples:18,
+  innerRadius:.572,outerRadius:.762,samples:18,
 };
 export const EXIT_PALLET_DEF:PalletSector={
-  side:'exit',centerAngle:126*Math.PI/180,halfSweep:.09,
-  innerRadius:.616,outerRadius:.816,samples:18,
+  side:'exit',centerAngle:133.5*Math.PI/180,halfSweep:.105,
+  innerRadius:.395,outerRadius:.575,samples:18,
 };
 export const palletDefinition=(side:Side):PalletSector=>
   side==='entry'?ENTRY_PALLET_DEF:EXIT_PALLET_DEF;
