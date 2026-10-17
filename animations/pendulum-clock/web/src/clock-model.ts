@@ -15,7 +15,7 @@
  */
 import {
   TEETH,PITCH,WHEEL_Y,PIVOT_Y,START_AMPLITUDE,
-  palletCollisionWorld,forkWorld,toothWorld,sub,dot,len,
+  palletCollisionWorld,forkWorld,toothWorld,sub,dot,len,unit,
   type Point,type Side,
 } from './escapement-geometry.ts';
 import {forkZRange,wheelZRange,zOverlap} from './escapement-axial.ts';
