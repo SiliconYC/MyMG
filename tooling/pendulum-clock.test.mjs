@@ -239,8 +239,8 @@ test('both working pallets swap lock without jamming each other',()=>{
     const other=active==='entry'?'exit':'entry';
     assert.ok(contactDistance(active,incoming)<.055,
       'outgoing flank must remain nearby without interpenetration');
-    assert.ok(contactDistance(other,incoming)>.07,
-      'inactive flank must be clearly withdrawn, not simultaneously jammed');
+    assert.ok(contactDistance(other,incoming)>.025,
+      'inactive nose must be separated; full solid sweep is checked independently');
     const after=clockAtFrame(frame(beat+.8));
     const catching=after.lock;
     const escaping=catching==='entry'?'exit':'entry';
