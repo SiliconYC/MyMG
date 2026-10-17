@@ -15,8 +15,8 @@ export const PARAMETERS = Object.freeze({
   // Real one-off angular impulse, simulating a human starting the pendulum.
   // It is NOT a per-step driver, a scheduler or scripted oscillation.
   startTorqueImpulse: 1.25,
-  pendulumStart: 0.04 * Math.PI / 180,
-  wheelStart: -5.9 * Math.PI / 180,
+  pendulumStart: 0.6 * Math.PI / 180,
+  wheelStart: -5.4 * Math.PI / 180,
   wheelDamping: 0.035,
   anchorDamping: 0.015,
   restitution: 0,
