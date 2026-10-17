@@ -37,7 +37,7 @@ test('gravity, wheel torque and contact impulses are integrated at fixed steps',
   assert.match(src,/DRIVE_TORQUE\/WHEEL_INERTIA/);
   assert.match(src,/polygonOverlap\(/);
   assert.match(src,/contactJacobians\(/);
-  assert.match(src,/const impulse=-(1\+CONTACT_RESTITUTION)\*rel\/inv/);
+  assert.match(src,/const impulse=-\(1\+CONTACT_RESTITUTION\)\*rel\/inv/);
   assert.doesNotMatch(src,/smoothstep|RELEASE_OFFSET|Math.cos\(Math.PI\*seconds\)|rawBeat/);
 });
 
@@ -99,6 +99,7 @@ test('clock frames are reproducible under arbitrary seeking',()=>{
 
 test('full 60 s independent collision audit: physical impacts, nonpenetration and no arm/rim crossing',()=>{
   const audit=physicsAudit();
+  console.log('CLOCK_PHYSICS_AUDIT '+JSON.stringify(audit));
   assert.equal(audit.samples,DURATION+1);
   assert.ok(audit.impacts>0,
     'wheel and pallets are not actually colliding: reject non-physical animation');
