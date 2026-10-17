@@ -112,8 +112,21 @@ test('full 60 s independent collision audit: physical impacts, nonpenetration an
   assert.equal(audit.samples,DURATION+1);
   assert.ok(audit.impacts>0,
     'wheel and pallets are not actually colliding: reject non-physical animation');
-  assert.ok(audit.wheelTravel>PITCH,
-    'driven wheel must physically advance through multiple real teeth, not remain stalled');
+  assert.ok(audit.wheelTravel>4.0&&audit.wheelTravel<9.0,
+    'one-minute display must rotate approximately once, never stall or free-spin');
+  assert.ok(audit.beats>35&&audit.beats<90,
+    'escapement must advance about one half-tooth each second');
+  assert.ok(audit.jammedFrames<FPS*10,
+    'more than ten seconds of mechanical jamming is unacceptable');
+  const mid=clockAtFrame(FPS),end=clockAtFrame(FPS*2);
+  assert.ok(mid.pendulumAngle<-.06&&end.pendulumAngle>.06,
+    'the gravity pendulum must freely reverse every second, not lock static');
+  const entryContact=Array.from({length:DURATION},(_,i)=>clockAtFrame(i))
+    .filter(p=>p.contactCount>0&&p.lock==='entry').length;
+  const exitContact=Array.from({length:DURATION},(_,i)=>clockAtFrame(i))
+    .filter(p=>p.contactCount>0&&p.lock==='exit').length;
+  assert.ok(entryContact>10&&exitContact>10,
+    'two separate shoes must actually alternate mechanical contact');
   assert.ok(audit.maxPenetration<.04,
     'solver permitted deep tooth/pallet interpenetration');
   assert.ok(audit.minArmClearance>.005,
