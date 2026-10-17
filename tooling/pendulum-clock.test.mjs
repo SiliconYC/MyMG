@@ -77,7 +77,7 @@ test('fork rods and pallet shoes are one rigid body on the same gear plane',()=>
     assert.equal(points.length,4);
     assert.ok(Math.hypot(points[1][0]-worldBase[0],points[1][1]-worldBase[1])<FORK_RADIUS+.001);
     const shoe=palletWorld(side,.06);
-    assert.equal(shoe.length,4);
+    assert.ok(shoe.length>=12,'Graham lock face needs multiple arc segments');
   }
 });
 
