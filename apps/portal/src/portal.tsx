@@ -114,6 +114,7 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
   const playerRef = useRef<PlayerRef>(null);
   const [frame,setFrame] = useState(0);
   const [playing,setPlaying] = useState(false);
+  const [slow,setSlow] = useState(false);
   useEffect(()=>{
     const player=playerRef.current;
     if(!player)return;
@@ -153,6 +154,7 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
         <Player ref={playerRef} key={project.id} component={project.component}
           compositionWidth={project.width} compositionHeight={project.height}
           fps={project.fps} durationInFrames={project.durationInFrames} loop
+          playbackRate={project.id === 'escapement-physics-lab' && slow ? 0.25 : 1}
           style={{width:'100%',aspectRatio:`${project.width} / ${project.height}`,display:'block'}}
           errorFallback={({error})=><div className="player-error" role="alert">动画渲染错误：{error.message}</div>}
         />
@@ -163,6 +165,10 @@ const ProjectPage: React.FC<{project: MgProject}> = ({project}) => {
         <input type="range" min={0} max={project.durationInFrames-1} step={1}
           value={frame} onChange={event=>seek(Number(event.currentTarget.value))}
           aria-label="播放进度" data-testid="frame-slider" />
+        {project.id === 'escapement-physics-lab' && <>
+          <button type="button" data-testid="lab-reset" onClick={()=>seek(0)}>复位</button>
+          <button type="button" data-testid="lab-slow" onClick={()=>setSlow(!slow)}>{slow ? '正常速度' : '0.25× 慢放'}</button>
+        </>}
         <output data-testid="frame-readout" aria-live="off">{frame}</output>
         <span>/ {project.durationInFrames-1} 帧</span>
       </div>

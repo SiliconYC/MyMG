@@ -1,0 +1,21 @@
+{
+  "name": "@mymg/escapement-physics-lab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/escapement-physics-lab.tsx"
+  },
+  "dependencies": {
+    "@dimforge/rapier2d-compat": "0.21.0",
+    "react": "19.2.3",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  }
+}
