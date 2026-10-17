@@ -346,7 +346,7 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
     'the wheel has exactly one fixed bearing sleeve');
   assert.doesNotMatch(support,/<Axle /,
     'the rear support must no longer be an opaque floating cylinder');
-  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-6\.28,0\]\}/);
+  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-5\.55,0\]\}/);
   assert.match(anchor,/a=\{\[0,0,FORK_ARM_PLANE_Z\]\}/,
     'both fork arms begin at the shaft axis in the same plane as the wheel');
 });
