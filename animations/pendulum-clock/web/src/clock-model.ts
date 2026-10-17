@@ -57,7 +57,7 @@ type Machine={
 const machine:Machine={
   p:START_AMPLITUDE,pv:0,w:0,wv:0,contactCount:0,
   contactImpulse:0,maxPenetration:0,contactSide:null,
-  lockedSteps:0,armClearance:Infinity,
+  lockedSteps:0,armClearance:.012,
 };
 
 /** SAT on the ACTUAL 2D convex polygons (no point/line contact proxy).
@@ -141,7 +141,16 @@ function contactJacobians(hit:Hit):readonly [number,number]{
   const ra=sub(hit.anchorContact,[0,PIVOT_Y]);
   const crossWheel:Point=[rw[1],-rw[0]];
   const crossAnchor:Point=[ra[1],-ra[0]];
-  return [-dot(hit.n,crossWheel),dot(hit.n,crossAnchor)];
+  const wheelJ=-dot(hit.n,crossWheel);
+  // Graham's deadbeat lock: the circular holding face is concentric with
+  // the anchor axis, so the normal reaction has ZERO moment about that axis.
+  // Polygonal faceting (7 strips) would otherwise invent a reaction torque
+  // that freezes the pendulum for 10 seconds. Only the radial END impulse
+  // land transmits angular momentum into the pendulum.
+  const normalRadius=Math.abs(dot(hit.n,unit(ra)));
+  const anchorJ=hit.part==='pallet'&&normalRadius>.8
+    ?0:dot(hit.n,crossAnchor);
+  return [wheelJ,anchorJ];
 }
 function advance(s:Machine):void{
   s.contactCount=0;s.contactImpulse=0;s.maxPenetration=0;s.contactSide=null;
@@ -163,7 +172,7 @@ function advance(s:Machine):void{
     // impossible geometric interference, NOT a license to teleport an angle.
     if(inv<.001){
       s.wv=0;
-      s.pv=0;
+      if(ja!==0)s.pv=0;
       break;
     }
     const rel=jw*s.wv+ja*s.pv;
