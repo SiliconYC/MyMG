@@ -28,6 +28,9 @@ try {
   assert.equal(sixty.step,14400);
   assert.equal(single.step,2400);
   assert.equal(ten.initialOverlap,false);
+  const firstContacts=ten.contactSequence.filter(e => e.event==='start' && e.time <= 2/240);
+  assert.ok(firstContacts.length<=1,
+    'Malformed escapement: simultaneous tooth contacts at startup '+JSON.stringify(firstContacts));
   assert.equal(sixty.initialOverlap,false);
   assert.equal(sixty.contactSequence.every(e =>
     Number.isInteger(e.toothId) && e.toothId>=0 && e.toothId<30
