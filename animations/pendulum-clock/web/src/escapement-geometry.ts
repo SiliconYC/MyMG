@@ -2,6 +2,7 @@
  * One world XY plane is the working plane; Z is purely the extrusion axis.
  * Positive wheel/anchor angles are clockwise when viewed from +Z.
  */
+import {FORK_ARM_RADIUS} from './escapement-axial.ts';
 export type Point=readonly [number,number];
 export type Side='entry'|'exit';
 export const TEETH=30;
@@ -12,7 +13,7 @@ export const WHEEL_ROOT_RADIUS=1.29;
 export const WHEEL_TIP_RADIUS=1.55;
 export const PENDULUM_LENGTH=6.28;
 export const PALLET_LENGTH=.27;
-export const FORK_RADIUS=.036;
+export const FORK_RADIUS=FORK_ARM_RADIUS;
 export const START_AMPLITUDE=.145;
 export const WHEEL_PROFILE:ReadonlyArray<readonly [number,number]>=[
   [0,1.29],[.19,1.31],[.34,1.53],[.43,1.55],[.69,1.32],[.93,1.29],
