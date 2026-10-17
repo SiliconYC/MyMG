@@ -188,10 +188,10 @@ test('wheel progress is a function of oscillator crossing angles, not independen
 });
 
 test('mirror-equal arm centers and same-handed claw work faces',()=>{
-  assert.deepEqual(armHeel('entry'),[-.69,-.47]);
-  assert.deepEqual(armHeel('exit'),[.69,-.47]);
+  assert.deepEqual(armHeel('entry'),[-.69,-.365]);
+  assert.deepEqual(armHeel('exit'),[.69,-.365]);
   assert.equal(armCenterlineLength('entry'),armCenterlineLength('exit'));
-  assert.ok(Math.abs(ARM_LENGTH-Math.hypot(.69,.47))<1e-12);
+  assert.ok(Math.abs(ARM_LENGTH-Math.hypot(.69,.365))<1e-12);
   for(const side of ['entry','exit']){
     const base=palletLocalBase(side);
     assert.deepEqual(base,armHeel(side));
@@ -211,7 +211,7 @@ test('mirror-equal arm centers and same-handed claw work faces',()=>{
 });
 
 test('both claw outlines are part of a continuous plate and never penetrate the wheel',()=>{
-  assert.equal(anchorLocalOutline().length,22,'exact single stamped plate perimeter');
+  assert.ok(anchorLocalOutline().length>90,'Bezier ribs and two shaped hooks need a curved stamped perimeter');
   for(let i=0;i<DURATION;i++){
     const state=clockAtFrame(i);
     for(const side of ['entry','exit']){
@@ -400,3 +400,23 @@ test('all 1,800 frames: one stamped anchor plate has true solid clearance',()=>{
   assert.ok(closest>.027,'clearance must exceed bevel plus safety margin; found '+closest);
 });
 
+
+test('photographic silhouette: narrow smooth ribs and machined hooked teeth',()=>{
+  const pts=anchorLocalOutline();
+  assert.ok(pts.length>=90,'must retain sampled Bezier curves, not giant triangular arms');
+  // Upper and lower rib boundaries are sampled from independently controlled
+  // splines; midarm must stay visually slim, even after animation updates.
+  for(const sign of [-1,1]){
+    const band=pts.filter(p=>p[0]*sign>.44&&p[0]*sign<.56);
+    assert.ok(band.length>=4,'both ribs span the same centreline region');
+    const ys=band.map(p=>p[1]),thickness=Math.max(...ys)-Math.min(...ys);
+    assert.ok(thickness<.16,'no chunky solid V plate: thickness '+thickness);
+    assert.ok(thickness>.025,'arm must remain visible as real machined steel');
+  }
+  for(const side of ['entry','exit']){
+    const profile=palletLocalOutline(side);
+    assert.ok(profile.length>=15,'each working claw needs a curved heel and distinct tip');
+    const nose=palletLocalTip(side);
+    assert.ok(nose[1]<-.53&&nose[1]>-.68,'hook nose ends near top teeth');
+  }
+});
