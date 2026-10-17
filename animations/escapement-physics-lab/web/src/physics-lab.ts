@@ -66,6 +66,7 @@ export type Readout = {
   longestStuck: number;
   wheelTravel: number;
   physicsMs: number;
+  maxSwingAngle: number;
   initialOverlap: boolean;
   status: 'UNVERIFIED' | 'FAILED' | 'CANDIDATE';
 };
@@ -90,6 +91,8 @@ export function initRapier(): Promise<void> {
   return ready;
 }
 
+export type PhysicalTrial = Partial<Pick<typeof PARAMETERS,
+  'driveTorque' | 'startTorqueImpulse' | 'wheelDamping' | 'anchorDamping'>>;
 export class EscapementSimulation {
   readonly world: RAPIER.World;
   readonly wheel: RAPIER.RigidBody;
@@ -115,10 +118,11 @@ export class EscapementSimulation {
   private stagnant = 0;
   private longestStuck = 0;
   private physicsMs = 0;
+  private maxSwingAngle = 0;
   private n = 0;
   readonly initialOverlap: boolean;
 
-  constructor(mode: Mode = 'full') {
+  constructor(mode: Mode = 'full', trial: PhysicalTrial = {}) {
     this.mode = mode;
     this.world = new RAPIER.World({x: 0, y: PARAMETERS.gravity});
     this.world.timestep = STEP;
@@ -129,12 +133,12 @@ export class EscapementSimulation {
       RAPIER.RigidBodyDesc.fixed().setTranslation(0, PARAMETERS.pivotY));
     this.wheel = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setRotation(mode === 'single' ? 137.6 * Math.PI / 180 : PARAMETERS.wheelStart)
-        .setLinearDamping(0.02).setAngularDamping(PARAMETERS.wheelDamping)
+        .setLinearDamping(0.02).setAngularDamping(trial.wheelDamping ?? PARAMETERS.wheelDamping)
         .setCcdEnabled(true));
     this.anchor = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setTranslation(0, PARAMETERS.pivotY)
         .setRotation(PARAMETERS.pendulumStart)
-        .setAngularDamping(PARAMETERS.anchorDamping).setCcdEnabled(true));
+        .setAngularDamping(trial.anchorDamping ?? PARAMETERS.anchorDamping).setCcdEnabled(true));
     const joint = RAPIER.JointData.revolute({x: 0, y: 0}, {x: 0, y: 0});
     this.world.createImpulseJoint(joint, groundWheel, this.wheel, true);
     this.world.createImpulseJoint(
@@ -152,9 +156,9 @@ export class EscapementSimulation {
     this.addCircle('bob', 'anchor', [0, -PARAMETERS.pendulumLength],
       PARAMETERS.bobRadius, 1.5);
     // Real initial excitation; thereafter only gravity and wheel impacts drive the pendulum.
-    this.anchor.applyTorqueImpulse(PARAMETERS.startTorqueImpulse, true);
+    this.anchor.applyTorqueImpulse(trial.startTorqueImpulse ?? PARAMETERS.startTorqueImpulse, true);
     // Rapier addTorque is persistent until resetTorques; call only once.
-    this.wheel.addTorque(PARAMETERS.driveTorque, true);
+    this.wheel.addTorque(trial.driveTorque ?? PARAMETERS.driveTorque, true);
     this.queue = new RAPIER.EventQueue(true);
     // Narrow-phase geometry preflight, BEFORE any integration or solver correction.
     this.initialOverlap = this.toothColliders.some(t =>
@@ -189,6 +193,7 @@ export class EscapementSimulation {
     this.world.step(this.queue);
     this.physicsMs += performance.now() - t0;
     this.n += 1;
+    this.maxSwingAngle = Math.max(this.maxSwingAngle, Math.abs(this.anchor.rotation()));
     // Rapier may normalize 2D rotations near +/-PI: unwrap per-step angular travel.
     let da = this.wheel.rotation() - was;
     if (da > Math.PI) da -= 2 * Math.PI;
@@ -266,7 +271,8 @@ export class EscapementSimulation {
       penetrationDuration: this.penetrationDuration,
       stuckTime: this.stagnant, longestStuck: this.longestStuck,
       wheelTravel: this.forward - this.reverse,
-      physicsMs: this.physicsMs, initialOverlap: this.initialOverlap, status,
+      physicsMs: this.physicsMs, maxSwingAngle: this.maxSwingAngle,
+      initialOverlap: this.initialOverlap, status,
     };
   }
   free() {this.queue.free(); this.world.free();}
@@ -276,8 +282,8 @@ export function worldVertices(s: Solid, angle: number): Point[] {
   return s.vertices.map(p => worldPoint(p, s.owner, angle));
 }
 export type Audit = Readout & {seconds: number; accepted: boolean; engine: string; parameters: typeof PARAMETERS};
-export function runAudit(seconds: 10 | 60, mode: Mode = 'full'): Audit {
-  const sim = new EscapementSimulation(mode);
+export function runAudit(seconds: 10 | 60, mode: Mode = 'full', trial: PhysicalTrial = {}): Audit {
+  const sim = new EscapementSimulation(mode,trial);
   try {
     sim.advanceToStep(Math.round(seconds / STEP));
     const result = sim.read();
