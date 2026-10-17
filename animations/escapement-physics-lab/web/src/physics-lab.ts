@@ -147,6 +147,8 @@ export class EscapementSimulation {
     // Bob and rod share the SAME rigid body as both pallets.
     this.addCircle('bob', 'anchor', [0, -PARAMETERS.pendulumLength],
       PARAMETERS.bobRadius, 1.5);
+    // Rapier addTorque is persistent until resetTorques; call only once.
+    this.wheel.addTorque(PARAMETERS.driveTorque, true);
     this.queue = new RAPIER.EventQueue(true);
     // Narrow-phase geometry preflight, BEFORE any integration or solver correction.
     this.initialOverlap = this.toothColliders.some(t =>
@@ -174,7 +176,6 @@ export class EscapementSimulation {
   }
   step() {
     const was = this.wheel.rotation();
-    this.wheel.addTorque(PARAMETERS.driveTorque, true);
     const t0 = performance.now();
     this.world.step(this.queue);
     this.physicsMs += performance.now() - t0;
