@@ -92,7 +92,10 @@ export function initRapier(): Promise<void> {
 }
 
 export type PhysicalTrial = Partial<Pick<typeof PARAMETERS,
-  'driveTorque' | 'startTorqueImpulse' | 'wheelDamping' | 'anchorDamping'>>;
+  'driveTorque' | 'startTorqueImpulse' | 'wheelDamping' | 'anchorDamping'>> & {
+    wheelStart?: number;
+    pendulumStart?: number;
+  };
 export class EscapementSimulation {
   readonly world: RAPIER.World;
   readonly wheel: RAPIER.RigidBody;
@@ -132,12 +135,12 @@ export class EscapementSimulation {
     const groundAnchor = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed().setTranslation(0, PARAMETERS.pivotY));
     this.wheel = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic().setRotation(mode === 'single' ? 137.6 * Math.PI / 180 : PARAMETERS.wheelStart)
+      RAPIER.RigidBodyDesc.dynamic().setRotation(mode === 'single' ? 137.6 * Math.PI / 180 : trial.wheelStart ?? PARAMETERS.wheelStart)
         .setLinearDamping(0.02).setAngularDamping(trial.wheelDamping ?? PARAMETERS.wheelDamping)
         .setCcdEnabled(true));
     this.anchor = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.dynamic().setTranslation(0, PARAMETERS.pivotY)
-        .setRotation(PARAMETERS.pendulumStart)
+        .setRotation(trial.pendulumStart ?? PARAMETERS.pendulumStart)
         .setAngularDamping(trial.anchorDamping ?? PARAMETERS.anchorDamping).setCcdEnabled(true));
     const joint = RAPIER.JointData.revolute({x: 0, y: 0}, {x: 0, y: 0});
     this.world.createImpulseJoint(joint, groundWheel, this.wheel, true);
