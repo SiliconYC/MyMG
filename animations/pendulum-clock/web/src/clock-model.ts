@@ -18,6 +18,7 @@ import {
   palletCollisionWorld,forkWorld,toothWorld,sub,dot,len,
   type Point,type Side,
 } from './escapement-geometry.ts';
+import {forkZRange,wheelZRange,zOverlap} from './escapement-axial.ts';
 export {TEETH} from './escapement-geometry.ts';
 
 export const FPS=30;
@@ -109,10 +110,15 @@ function contactPair(s:Machine):Hit[] {
     const fork=forkWorld(side,s.p);
     // Safety diagnostic: a long arm must not penetrate the swept rim.
     const armDistance=Math.min(...fork.map(p=>Math.hypot(p[0],p[1]-WHEEL_Y)));
-    armClearance=Math.min(armClearance,armDistance-1.55);
+    // Axially disjoint solids are not in contact merely because their
+    // projected XY silhouettes overlap in the illustration.
+    const forkAxialClearance=wheelZRange[0]-forkZRange[1];
+    armClearance=Math.min(armClearance,
+      Math.max(armDistance-1.55,forkAxialClearance));
     const parts:{part:'pallet'|'fork';polygon:Point[]}[]=
       shoes.map(polygon=>({part:'pallet',polygon}));
-    if(armDistance<1.575)parts.push({part:'fork',polygon:fork});
+    if(zOverlap(forkZRange,wheelZRange)>0&&armDistance<1.575)
+      parts.push({part:'fork',polygon:fork});
     for(const {part,polygon} of parts){
       const cx=polygon.reduce((sum,p)=>sum+p[0],0)/polygon.length;
       const cy=polygon.reduce((sum,p)=>sum+p[1],0)/polygon.length-WHEEL_Y;
