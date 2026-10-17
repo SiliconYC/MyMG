@@ -24,6 +24,46 @@ try {
   const single=await page.evaluate(()=>window.__mymgEscapementLab.audit(10,'single'));
   const ten=await page.evaluate(()=>window.__mymgEscapementLab.audit(10));
   const sixty=await page.evaluate(()=>window.__mymgEscapementLab.audit(60));
+
+  // Independent event-sequence review: a contact start alone does not prove
+  // locking or release. Match real tooth/pallet start/end pairs, reject
+  // repeated orphan events, and count alternating *completed* dwells only.
+  const livePairs=new Map();
+  const completedContacts=[];
+  let malformedEvents=0;
+  for(const event of sixty.contactSequence){
+    const key=event.side+':'+event.toothId;
+    if(event.event==='start'){
+      if(livePairs.has(key)) malformedEvents++;
+      else livePairs.set(key,event.time);
+    } else {
+      const from=livePairs.get(key);
+      if(from===undefined) malformedEvents++;
+      else {
+        completedContacts.push({side:event.side,toothId:event.toothId,
+          start:from,end:event.time,duration:event.time-from});
+        livePairs.delete(key);
+      }
+    }
+  }
+  const dwellContacts=completedContacts.filter(x=>x.duration>=0.025);
+  let completedAlternations=0,priorCompletedSide=null;
+  for(const event of dwellContacts){
+    if(priorCompletedSide!==null && event.side!==priorCompletedSide)
+      completedAlternations++;
+    priorCompletedSide=event.side;
+  }
+  const contactReview={malformedEvents,unclosedPairs:[...livePairs.keys()],
+    completedPairs:completedContacts.length,qualifiedPairs:dwellContacts.length,
+    qualifiedAlternations:completedAlternations,minimumDwellSeconds:0.025,
+    firstQualifiedPairs:dwellContacts.slice(0,16)};
+  assert.equal(contactReview.malformedEvents,0,
+    'Malformed tooth/pallet start/end event pairing');
+  assert.ok(contactReview.qualifiedAlternations>=10,
+    'Real completed lock/release contacts did not alternate at least ten times');
+  assert.ok(new Set(dwellContacts.map(x=>x.toothId)).size>=8,
+    'Insufficient distinct contacted teeth: possible chattering');
+
   // One Chromium WASM run explores real (non-scripted) physical start conditions.
   // Every case creates an independent Rapier world, with a one-off manual kick.
   const scan = await page.evaluate(()=>{
@@ -87,7 +127,7 @@ try {
   report={site,engine:await page.evaluate(()=>window.__mymgEscapementLab.version),
     initial,single,ten,sixty,resetReplays:repeats,oneFrame:afterStep,
     geometry:sixty.parameters.geometry,contactSequence:sixty.contactSequence,
-    trialSweep:scan,
+    trialSweep:scan,contactReview,
     explanation:!sixty.accepted?
       'NEGATIVE PHYSICAL EXPERIMENT: do not transfer this model to the pendulum clock':
       'CANDIDATE only: requires independent geometry and contact review'};
@@ -104,6 +144,8 @@ try {
     '- Accumulated reverse rad: '+sixty.reverse,
     '- Longest stuck s: '+sixty.longestStuck,
     '- Real tooth/pallet start/end events: '+sixty.contactSequence.length,
+    '- Independently paired/dwell-qualified alternations: '+contactReview.qualifiedAlternations,
+    '- Unmatched/malformed contact events: '+contactReview.malformedEvents,
     '- Result: '+(sixty.accepted?'CANDIDATE, NOT CERTIFIED':'EXPERIMENT NOT PHYSICALLY VERIFIED'),
     '',
     'All measurements are gathered from running Rapier WASM in Chromium, not preset animation curves.',
@@ -113,7 +155,7 @@ try {
     singleImpulse:single.totalImpulse,tenAlternations:ten.alternations,
     sixtyAlternations:sixty.alternations,maxPenetration:sixty.maxPenetration,
     reverse:sixty.reverse,initialOverlap:sixty.initialOverlap,
-    toothEvents:sixty.contactSequence.length,
+    toothEvents:sixty.contactSequence.length,contactReview,
     contactSequence:sixty.contactSequence.slice(0,24),
     tenState:{wheelAngle:ten.wheelAngle,anchorAngle:ten.anchorAngle,forward:ten.forward,reverse:ten.reverse,
       wheelOmega:ten.wheelOmega,anchorOmega:ten.anchorOmega,longestStuck:ten.longestStuck,
