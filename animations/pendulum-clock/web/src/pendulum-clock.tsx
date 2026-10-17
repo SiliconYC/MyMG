@@ -4,9 +4,9 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
-import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
-  contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_PROFILE, PALLET_PROFILE,
-  palletWheelInterference, type PalletPose} from './escapement-contact';
+import {palletPose, palletLocalBase, palletLocalOutline,
+  contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_PROFILE,
+  palletWheelInterference, forkWheelClearance, type Side} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
   PALLET_THICKNESS, PALLET_ARM_WELD_Z, FORK_ARM_PLANE_Z,
@@ -166,78 +166,45 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
   </group>;
 };
 
-/** Transverse escapement shoe: its axis is perpendicular to its fork arm.
- * Nose is the true contact point; base is the machined weld at +Y.
+/** A single sector solid extruded directly from the dimensioned 2D blueprint.
+ * Both shoes live on the SAME moving anchor axis, with distinct silhouettes.
+ * Steel stays steel even when engaged; contact is explained by motion only.
  */
-function makeSlimPallet():THREE.ExtrudeGeometry {
+function makeSectorPallet(side:Side):THREE.ExtrudeGeometry {
+  const outline=palletLocalOutline(side);
   const profile=new THREE.Shape();
-  profile.moveTo(...PALLET_PROFILE[0]);
-  for(const point of PALLET_PROFILE.slice(1))profile.lineTo(...point);
+  profile.moveTo(...outline[0]);
+  for(const point of outline.slice(1))profile.lineTo(...point);
   profile.closePath();
   const geometry=new THREE.ExtrudeGeometry(profile,{
     depth:PALLET_THICKNESS,steps:1,bevelEnabled:true,
-    bevelSize:.004,bevelThickness:.006,bevelSegments:2,
+    bevelSize:.003,bevelThickness:.004,bevelSegments:2,
   });
-  geometry.translate(0,0,-PALLET_THICKNESS/2);
+  geometry.translate(0,0,PALLET_PLANE_Z-PALLET_THICKNESS/2);
   return geometry;
 }
-
-const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
-  const geometry=useMemo(makeSlimPallet,[]);
+const PalletTooth:React.FC<{side:Side}>=({side})=>{
+  const geometry=useMemo(()=>makeSectorPallet(side),[side]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
-  return <group position={[...palletLocalTip(pose.side),PALLET_PLANE_Z]}
-    rotation={[0,0,palletOrientation(pose.side)]}>
-    <mesh geometry={geometry} castShadow receiveShadow>
-      <meshStandardMaterial color={pose.engaged?GOLD:STEEL}
-        metalness={.75} roughness={.24}
-        emissive={pose.engaged?'#8b6033':'#000000'}
-        emissiveIntensity={pose.engaged?0.12:0}/>
-    </mesh>
-    {/* The visible edge of the actual short locking face. */}
-    <Rod a={[0,0,-PALLET_THICKNESS/2-.004]} b={[.008,.016,-PALLET_THICKNESS/2-.004]}
-      radius={.006} color="#f3dbb0"/>
-    {/* The angled impulse face is much longer than the locking land. */}
-    <Rod a={[.008,.016,-PALLET_THICKNESS/2-.004]} b={[.018,.070,-PALLET_THICKNESS/2-.004]}
-      radius={.006} color={BRASS}/>
-  </group>;
+  return <mesh geometry={geometry} castShadow receiveShadow>
+    <meshStandardMaterial color={STEEL} metalness={.76} roughness={.29}
+      side={THREE.DoubleSide}/>
+  </mesh>;
 };
 
-/** An anchor is an EXTENSION of the pendulum's own rigid shaft.
- * It has no independent rotation, time base, positional interpolation, or
- * animated piston. Geometry here is in PIVOT-LOCAL coordinates; the only
- * group rotation exists in EscapementPendulumAssembly below.
+/** One solid fork rotating together with the pendulum; both rods weld into
+ * the INNER curved heel of their respective unequal sector pallets.
  */
-const Anchor:React.FC<{state:ClockState}>=({state})=>{
-  const entry=palletPose('entry',state);
-  const exit=palletPose('exit',state);
-  return <group>
-    {([entry,exit] as PalletPose[]).map(pose=>
-      <group key={pose.side}>
-        {/* Both ends are in the wheel XY plane, and seated INSIDE the
-            central shaft / pallet base respectively. No Z-sloping arm. */}
-        <Rod a={[0,0,FORK_ARM_PLANE_Z]}
-          b={[...palletLocalBase(pose.side),PALLET_ARM_WELD_Z]}
-          radius={.026} color={STEEL}/>
-        <PalletTooth pose={pose}/>
-      </group>
-    )}
-  </group>;
-};
-
-/** Highlight only the REAL rotating tooth flank, never fabricate a bridge. */
-const ContactHighlights:React.FC<{state:ClockState;showDetail:boolean}>=
-({state,showDetail})=>{
-  if(!showDetail)return null;
-  return <group>
-    {(['entry','exit'] as const).map(side=>{
-      const p=palletPose(side,state);
-      return p.engaged?<Rod key={side}
-        a={[p.flankStart[0],p.flankStart[1],-.155]}
-        b={[p.flankEnd[0],p.flankEnd[1],-.155]}
-        radius={.018} color="#fff0c4"/>:null;
-    })}
-  </group>;
-};
+const Anchor:React.FC=()=> <group>
+  {(['entry','exit'] as const).map(side=>
+    <group key={side}>
+      <Rod a={[0,0,FORK_ARM_PLANE_Z]}
+        b={[...palletLocalBase(side),PALLET_ARM_WELD_Z]}
+        radius={.026} color={STEEL}/>
+      <PalletTooth side={side}/>
+    </group>
+  )}
+</group>;
 
 /** One pendulum physically hangs from the same anchor pivot behind the wheel. */
 const Pendulum:React.FC=()=>
@@ -326,7 +293,6 @@ const CinematicCamera:React.FC<{frame:number}>=({frame})=>{
 
 const Movement:React.FC<{frame:number}>=({frame})=>{
   const state=clockAtFrame(frame);
-  const shot=cameraAtFrame(frame);
   return <ThreeCanvas width={1280} height={720}
     camera={{position:[0,1.2,14.5],fov:35,near:.1,far:95}}
     gl={{alpha:false,antialias:true,preserveDrawingBuffer:true}}
@@ -347,10 +313,9 @@ const Movement:React.FC<{frame:number}>=({frame})=>{
             inside it, with rounded shoulders on both exposed ends. */}
         <PendulumAnchorCoupling/>
         <Pendulum/>
-        <Anchor state={state}/>
+        <Anchor/>
       </group>
-      <ContactHighlights state={state}
-        showDetail={shot.chapter==='contact'||shot.chapter==='rear'}/>
+
       <Dial angle={state.secondHandAngle}/>
     </group>
   </ThreeCanvas>;
@@ -387,6 +352,8 @@ export const PendulumClockScene:React.FC=()=>{
     data-contact-side={entry.engaged?'entry':exit.engaged?'exit':'free'}
     data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
+    data-entry-fork-clearance={forkWheelClearance('entry',state).toFixed(5)}
+    data-exit-fork-clearance={forkWheelClearance('exit',state).toFixed(5)}
     data-solid-interference={palletWheelInterference('entry',state)||
       palletWheelInterference('exit',state)}
     data-wheel-plane-z={WHEEL_PLANE_Z}
