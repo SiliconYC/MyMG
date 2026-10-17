@@ -6,8 +6,7 @@ import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
 import {palletPose, palletLocalBase, palletLocalOutline,
   contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_PROFILE,
-  palletWheelInterference, forkWheelClearance, type Side,
-  type PalletPose} from './escapement-contact';
+  palletWheelInterference, forkWheelClearance, type Side} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
   PALLET_THICKNESS, PALLET_ARM_WELD_Z, FORK_ARM_PLANE_Z,
