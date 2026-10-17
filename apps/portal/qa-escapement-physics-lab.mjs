@@ -35,6 +35,30 @@ try {
   const ten=await page.evaluate(()=>window.__mymgEscapementLab.audit(10));
   const sixty=await page.evaluate(()=>window.__mymgEscapementLab.audit(60));
 
+  // Run a bounded physical search after geometry mass/inertia changes.
+  // Never force angular positions during integration or pick successes from
+  // overlapping initial bodies. This is diagnostic; no implicit tuning.
+  const physicalScan = await page.evaluate(() => {
+    const all=[];
+    for (const wheelDeg of [-17,-13,-9,-7,-5])
+      for (const anchorDeg of [0,1.5])
+        for (const kick of [-3,-4.5,-6])
+          for (const driveTorque of [-0.8,-1.1]) {
+            const q=window.__mymgEscapementLab.audit(10,'full',{
+              wheelStart:wheelDeg*Math.PI/180,
+              pendulumStart:anchorDeg*Math.PI/180,
+              startTorqueImpulse:kick,driveTorque,
+            });
+            all.push({wheelDeg,anchorDeg,kick,driveTorque,
+              overlap:q.initialOverlap,alternations:q.alternations,
+              stuck:q.longestStuck,reverse:q.reverse,impulse:q.totalImpulse,
+              accepted:q.accepted});
+          }
+    return all;
+  });
+  console.log('OPEN-WHEEL PHYSICAL PARAMETER SCAN',
+    JSON.stringify(physicalScan.sort((a,b)=>
+      Number(b.accepted)-Number(a.accepted)||b.alternations-a.alternations).slice(0,35)));
   // Independent event-sequence review: a contact start alone does not prove
   // locking or release. Match real tooth/pallet start/end pairs, reject
   // repeated orphan events, and count alternating *completed* dwells only.
