@@ -64,6 +64,25 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
+  animations/escapement-physics-lab/web:
+    dependencies:
+      '@dimforge/rapier2d-compat':
+        specifier: 0.21.0
+        version: 0.21.0
+      react:
+        specifier: 19.2.3
+        version: 19.2.3
+      remotion:
+        specifier: 4.0.534
+        version: 4.0.534(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.2.0
+        version: 19.3.0
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
   animations/demo/web:
     dependencies:
       react:
@@ -169,6 +188,9 @@ importers:
 
   apps/portal:
     dependencies:
+      '@mymg/escapement-physics-lab':
+        specifier: workspace:*
+        version: link:../../animations/escapement-physics-lab/web
       '@mymg/automatic-fire':
         specifier: workspace:*
         version: link:../../animations/automatic-fire/web
@@ -318,6 +340,9 @@ importers:
         version: 5.9.3
 
 packages:
+
+  '@dimforge/rapier2d-compat@0.21.0':
+    resolution: {tarball: https://registry.npmjs.org/@dimforge/rapier2d-compat/-/rapier2d-compat-0.21.0.tgz}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -2117,6 +2142,8 @@ packages:
         optional: true
 
 snapshots:
+
+  '@dimforge/rapier2d-compat@0.21.0': {}
 
   '@babel/code-frame@7.29.7':
     dependencies:
