@@ -52,6 +52,7 @@ try{
     chapter:el.getAttribute('data-camera-chapter'),
     mode:el.getAttribute('data-camera-mode'),
     side:el.getAttribute('data-contact-side'),
+    interference:el.getAttribute('data-solid-interference'),
     leftGap:Number(el.getAttribute('data-entry-contact-distance')),
     rightGap:Number(el.getAttribute('data-exit-contact-distance')),
     wheelPlane:Number(el.getAttribute('data-wheel-plane-z')),
@@ -84,6 +85,7 @@ try{
   assert.ok(side.current.radialRunningClearance>.005 &&
     side.current.radialRunningClearance<.03,
     'support sleeve must have a small real radial running clearance');
+  assert.equal(side.current.interference,'false','full pallet solids must not penetrate the wheel');
   const rear=await checkShot(12,'rear','observe','clock-rear.png');
   assert.ok(rear.current.z< -6);
   assert.ok(!front.png.equals(rear.png));
@@ -91,8 +93,8 @@ try{
   const exit=await checkShot(25.4,'contact','observe','clock-exit-contact.png');
   assert.equal(entry.current.side,'entry');
   assert.equal(exit.current.side,'exit');
-  assert.ok(entry.current.leftGap<.02,'entry wedge meets tooth on release threshold');
-  assert.ok(exit.current.rightGap<.02,'exit wedge meets tooth on release threshold');
+  assert.ok(entry.current.leftGap<.055,'entry wedge approaches tooth without solid overlap');
+  assert.ok(exit.current.rightGap<.055,'exit wedge approaches tooth without solid overlap');
   assert.equal(entry.current.x,exit.current.x,'same macro camera for both contacts');
   assert.equal(entry.current.z,exit.current.z,'no frantic macro switch');
   assert.ok(!entry.png.equals(exit.png),'alternate lock has distinct visible frame');
@@ -102,10 +104,10 @@ try{
   // release threshold; avoid masking disagreement by pinning tips to teeth.
   await seek(12);
   const entryThreshold=await camera();
-  assert.ok(entryThreshold.leftGap<.02,'entry tip meets tooth at 0.4s');
+  assert.ok(entryThreshold.leftGap<.055,'entry tip remains close at 0.4s');
   await seek(42);
   const exitThreshold=await camera();
-  assert.ok(exitThreshold.rightGap<.02,'exit tip meets tooth at 1.4s');
+  assert.ok(exitThreshold.rightGap<.055,'exit tip remains close at 1.4s');
 
   const proof=await checkShot(48,'proof','observe','clock-second-hand.png');
   assert.ok(proof.current.z>10);
@@ -117,6 +119,7 @@ try{
     await seek(frame);
     await page.waitForTimeout(110);
     states[frame]=await read();
+    assert.equal((await camera()).interference,'false','no shoe-wheel clipping at '+frame);
     assert.equal(states[frame].hand,states[frame].wheel,'shared shaft angle at frame '+frame);
     assert.equal(states[frame].pendulum,states[frame].anchor,
       'anchor MUST follow pendulum at frame '+frame);
