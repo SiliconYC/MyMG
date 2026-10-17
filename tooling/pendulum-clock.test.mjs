@@ -212,7 +212,10 @@ test('fork rods terminate at shoe BASE not tooth-catching nose',()=>{
     assert.ok(Math.abs(base[0]*(base[0]-tip[0])+
       base[1]*(base[1]-tip[1]))<1e-12,
       'shoe length must be PERPENDICULAR to the actual rod ending at its base');
-    assert.ok(Math.abs(palletOrientation(side))>.6);
+    const axis=[base[0]-tip[0],base[1]-tip[1]];
+    const orientation=palletOrientation(side);
+    assert.ok(Math.abs(axis[0]+Math.sin(orientation)*PALLET_BASE_HEIGHT)<1e-12);
+    assert.ok(Math.abs(axis[1]-Math.cos(orientation)*PALLET_BASE_HEIGHT)<1e-12);
     for(const n of [0,7,13,27,42]){
       const state=clockAtFrame(n);
       const rotated=palletWorldBase(side,state.pendulumAngle);
