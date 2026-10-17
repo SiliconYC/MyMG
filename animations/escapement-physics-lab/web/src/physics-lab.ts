@@ -180,7 +180,10 @@ export class EscapementSimulation {
     this.world.step(this.queue);
     this.physicsMs += performance.now() - t0;
     this.n += 1;
-    const da = this.wheel.rotation() - was;
+    // Rapier may normalize 2D rotations near +/-PI: unwrap per-step angular travel.
+    let da = this.wheel.rotation() - was;
+    if (da > Math.PI) da -= 2 * Math.PI;
+    if (da < -Math.PI) da += 2 * Math.PI;
     if (da > 0) this.forward += da;
     else this.reverse -= da;
     // Count only actual Rapier collision transitions between a wheel and a pallet.
@@ -248,7 +251,7 @@ export class EscapementSimulation {
       totalImpulse: this.totalImpulse, maxPenetration: this.maxPenetration,
       penetrationDuration: this.penetrationDuration,
       stuckTime: this.stagnant, longestStuck: this.longestStuck,
-      wheelTravel: wheelAngle - (this.mode === 'single' ? 2.13 : PARAMETERS.wheelStart),
+      wheelTravel: this.forward - this.reverse,
       physicsMs: this.physicsMs, initialOverlap: this.initialOverlap, status,
     };
   }
