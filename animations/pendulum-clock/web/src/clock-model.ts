@@ -191,16 +191,16 @@ function advance(s:Machine):void{
       CONTACT_CORRECTION/inv;
     const dw=correction*jw/WHEEL_INERTIA;
     const da=correction*ja/PENDULUM_INERTIA;
-    // A single solver iteration may only correct a microscopic rotation;
-    // if the shape cannot be resolved at this scale it must STALL and FAIL
-    // the penetration audit, not spin through 40 radians in one timestep.
-    if(Math.abs(dw)>.007||Math.abs(da)>.007){
-      s.wv=0;
-      s.pv=0;
-      break;
-    }
-    s.w+=dw;
-    s.p+=da;
+    // Keep positional stabilization bounded without inventing a rigid
+    // brake on either shaft. Killing both velocities on a large overlap
+    // trapped the anchor at +0.14 rad, then let the wheel freewheel once
+    // the contact geometry slipped past the tooth.
+    // This cap bounds one *solver correction*, not the wheel's rotation,
+    // velocity, clock timing or integrated dynamics.
+    const maximumCorrection=Math.max(Math.abs(dw),Math.abs(da));
+    const correctionScale=maximumCorrection>.007?.007/maximumCorrection:1;
+    s.w+=dw*correctionScale;
+    s.p+=da*correctionScale;
   }
   if(s.contactCount&&Math.abs(s.wv)<.01)s.lockedSteps++;
   else s.lockedSteps=0;
