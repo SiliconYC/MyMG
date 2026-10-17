@@ -100,6 +100,10 @@ test('clock frames are reproducible under arbitrary seeking',()=>{
 test('full 60 s independent collision audit: physical impacts, nonpenetration and no arm/rim crossing',()=>{
   const audit=physicsAudit();
   console.log('CLOCK_PHYSICS_AUDIT '+JSON.stringify(audit));
+  console.log('CLOCK_SAMPLES '+JSON.stringify([0,12,24,30,48,60,90,120,180,300,600,1200,1799].map(
+    frame=>{const p=clockAtFrame(frame);return {t:p.seconds,w:p.wheelAngle,a:p.pendulumAngle,
+      wv:p.wheelVelocity,av:p.pendulumVelocity,contact:p.contactCount,
+      lock:p.lock,impact:p.contactImpulse,clearance:p.armClearance};})));
   assert.equal(audit.samples,DURATION+1);
   assert.ok(audit.impacts>0,
     'wheel and pallets are not actually colliding: reject non-physical animation');
