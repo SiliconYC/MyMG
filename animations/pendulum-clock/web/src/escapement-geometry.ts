@@ -68,7 +68,15 @@ function makePallet(side:Side):{
   // A short working nose dips into the swept tooth band; its backside and
   // mounting arm are OUTSIDE the 1.55 wheel tip radius.
   const tipWheel=add(ref,scale(radial,.014));
-  const localTip=rotate(sub(add(tipWheel,[0,WHEEL_Y]),[0,PIVOT_Y]),pendAngle);
+  // Clear the opposite (idle) tooth arc: the original symmetric wedge
+  // intersected tooth #4 at the FIRST frame, freezing the whole mechanism.
+  // This axial-free tangential adjustment was selected using two-pose SAT
+  // tests including BOTH full fork arm solids, not only their noses.
+  const trim:Point=entry?[0,0]:[-.20,.275];
+  const localTip=add(
+    rotate(sub(add(tipWheel,[0,WHEEL_Y]),[0,PIVOT_Y]),pendAngle),
+    trim,
+  );
   const tangent:Point=[-radial[1],radial[0]];
   const outLocal=rotate(radial,pendAngle);
   const tanLocal=rotate(tangent,pendAngle);
