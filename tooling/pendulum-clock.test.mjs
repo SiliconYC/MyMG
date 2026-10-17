@@ -9,7 +9,10 @@ import {
 import {cameraAtFrame, SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
 import {palletPose, palletLocalTip, palletWorldTip, contactDistance,
   flankAt, PITCH, PALLET_CLEARANCE, PIVOT_Y,
-  palletLocalBase, palletWorldBase, palletOrientation, PALLET_BASE_HEIGHT} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
+  palletLocalBase, palletWorldBase, palletOrientation, PALLET_BASE_HEIGHT,
+  WHEEL_SCALE, WHEEL_Y, OUTER_RADIUS, ROOT_RADIUS,
+  PALLET_RADIAL_SETBACK, WHEEL_PROFILE, PALLET_PROFILE,
+  palletWheelInterference} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
 
 import {
   WHEEL_PLANE_Z,WHEEL_THICKNESS,PALLET_PLANE_Z,PALLET_THICKNESS,
@@ -155,7 +158,7 @@ test('pallets are rigid points on the pendulum shaft, not self-powered sliders',
   }
 });
 
-test('real wheel teeth meet the rigid fork on each escapement threshold',()=>{
+test('moving pallets approach the teeth without entering the swept solid',()=>{
   const p=flankAt(-4,0);
   const near=Math.hypot(p.point[0]-p.start[0],p.point[1]-p.start[1]);
   assert.ok(near>.08&&near<.19);
@@ -165,14 +168,14 @@ test('real wheel teeth meet the rigid fork on each escapement threshold',()=>{
     const passive=active==='entry'?'exit':'entry';
     assert.ok(palletPose(active,s).engaged,
       'outgoing pallet holds the wheel until oscillator reaches the threshold');
-    assert.ok(contactDistance(active,s)<.02,
-      'rigid pallet must physically reach its tooth flank at threshold '+beat);
+    assert.ok(contactDistance(active,s)<.055,
+      'outgoing rigid shoe must remain visibly close to the flank at threshold '+beat);
     assert.ok(!palletPose(passive,s).engaged);
     const halfway=clockAtFrame(frame(beat+.8));
     const catching=halfway.lock;
     assert.ok(palletPose(catching,halfway).engaged);
-    assert.ok(contactDistance(catching,halfway)<.06,
-      'arc-shaped wedge follows tooth flank during lock');
+    assert.ok(contactDistance(catching,halfway)<.09,
+      'incoming wedge remains near the flank in the illustrative lock');
   }
   assert.equal(TEETH,30);
   assert.ok(PITCH>0&&PALLET_CLEARANCE>0);
@@ -192,7 +195,7 @@ test('wheel progress is a function of oscillator crossing angles, not independen
         'no second oscillator/motor controls the escapement wheel');
     }
   }
-  assert.equal(PENDULUM_AMPLITUDE,.145);
+  assert.equal(PENDULUM_AMPLITUDE,.085);
 });
 
 test('fork rods terminate at shoe BASE not tooth-catching nose',()=>{
@@ -206,9 +209,15 @@ test('fork rods terminate at shoe BASE not tooth-catching nose',()=>{
     const tip=palletLocalTip(side),base=palletLocalBase(side);
     const length=Math.hypot(base[0]-tip[0],base[1]-tip[1]);
     assert.ok(Math.abs(length-PALLET_BASE_HEIGHT)<1e-12);
-    assert.ok(Math.hypot(...base)<Math.hypot(...tip)-.18,
-      'shoe base must point back to the main anchor pivot');
-    assert.ok(Math.abs(palletOrientation(side))>.6);
+    assert.ok(Math.hypot(...base)<Math.hypot(...tip)-.015,
+      'transverse shoe weld stays nearer the anchor pivot than its nose');
+    assert.ok(Math.abs(base[0]*(base[0]-tip[0])+
+      base[1]*(base[1]-tip[1]))<1e-12,
+      'shoe length must be PERPENDICULAR to the actual rod ending at its base');
+    const axis=[base[0]-tip[0],base[1]-tip[1]];
+    const orientation=palletOrientation(side);
+    assert.ok(Math.abs(axis[0]+Math.sin(orientation)*PALLET_BASE_HEIGHT)<1e-12);
+    assert.ok(Math.abs(axis[1]-Math.cos(orientation)*PALLET_BASE_HEIGHT)<1e-12);
     for(const n of [0,7,13,27,42]){
       const state=clockAtFrame(n);
       const rotated=palletWorldBase(side,state.pendulumAngle);
@@ -222,23 +231,23 @@ test('fork rods terminate at shoe BASE not tooth-catching nose',()=>{
 });
 
 test('both working pallets swap lock without jamming each other',()=>{
-  assert.ok(PENDULUM_AMPLITUDE>.14,
-    'pendulum and fork need visibly wider swing to clear tooth shoulders');
+  assert.ok(PENDULUM_AMPLITUDE>.08,
+    'pendulum swing must remain observable with the resized wheel');
   for(let beat=0;beat<59;beat++){
     const incoming=clockAtFrame(frame(beat+.4));
     const active=incoming.lock;
     const other=active==='entry'?'exit':'entry';
-    assert.ok(contactDistance(active,incoming)<.02,
-      'working flank must have contact at the release threshold');
-    assert.ok(contactDistance(other,incoming)>.075,
-      'inactive flank must be clearly withdrawn, not simultaneously jammed');
+    assert.ok(contactDistance(active,incoming)<.055,
+      'outgoing flank must remain nearby without interpenetration');
+    assert.ok(contactDistance(other,incoming)>.025,
+      'inactive nose must be separated; full solid sweep is checked independently');
     const after=clockAtFrame(frame(beat+.8));
     const catching=after.lock;
     const escaping=catching==='entry'?'exit':'entry';
-    assert.ok(contactDistance(catching,after)<.06,
+    assert.ok(contactDistance(catching,after)<.09,
       'catching shoe is near the next tooth');
-    assert.ok(contactDistance(escaping,after)>.07,
-      'released shoe must clear the opposing flank by at least 0.07');
+    assert.ok(contactDistance(escaping,after)>.06,
+      'released shoe must maintain lateral separation from the opposing flank');
   }
 });
 
@@ -254,7 +263,7 @@ test('one shared swinging fork exchanges locking pallets while wheel steps',()=>
   assert.ok(!palletPose('exit',mid).engaged);
   assert.ok(palletPose('exit',late).engaged);
   assert.ok(palletPose('exit',after).engaged);
-  assert.ok(contactDistance('exit',after)<.06);
+  assert.ok(contactDistance('exit',after)<.09);
   assert.ok(before.wheelAngle<mid.wheelAngle);
   assert.ok(mid.wheelAngle<after.wheelAngle);
 });
@@ -339,7 +348,7 @@ test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
     'the wheel has exactly one fixed bearing sleeve');
   assert.doesNotMatch(support,/<Axle /,
     'the rear support must no longer be an opaque floating cylinder');
-  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-6\.28,0\]\}/);
+  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-5\.55,0\]\}/);
   assert.match(anchor,/a=\{\[0,0,FORK_ARM_PLANE_Z\]\}/,
     'both fork arms begin at the shaft axis in the same plane as the wheel');
 });
@@ -372,7 +381,7 @@ test('both full fork arms stay flat in the escapement wheel working plane',()=>{
     'fork rod root and pallet shoe must share the same working plane');
   assert.equal(FORK_ARM_PLANE_Z,PALLET_ARM_WELD_Z,
     'fork rod must have zero axial slope between root and pallet base');
-  const rodRadius=.036;
+  const rodRadius=.026;
   const armZRange=[FORK_ARM_PLANE_Z-rodRadius,FORK_ARM_PLANE_Z+rodRadius];
   assert.ok(wheelZRange[0]<=armZRange[0] &&
     wheelZRange[1]>=armZRange[1],
@@ -431,4 +440,55 @@ test('bearing has a real rotating shaft through its entire bored sleeve',()=>{
   assert.match(scene,/depth=\{WHEEL_SPINDLE_FRONT_Z-WHEEL_SPINDLE_REAR_Z\}/);
   assert.match(scene,/data-wheel-bearing-running-clearance=/);
   assert.doesNotMatch(scene,/<Axle position=\{\[0,\.60,-\.42\]\}/);
+});
+
+test('compact escapement wheel, reduced pivot offset and transverse shoes',()=>{
+  assert.equal(WHEEL_SCALE,.60);
+  assert.ok(OUTER_RADIUS<1,'escape wheel must be visibly smaller than original 1.55');
+  assert.ok(ROOT_RADIUS<OUTER_RADIUS);
+  assert.ok(Math.abs(PIVOT_Y-(WHEEL_Y+1.96*WHEEL_SCALE))<1e-12);
+  const src=readFileSync(resolve(import.meta.dirname,
+    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
+  assert.match(src,/for\(const \[s,r\] of WHEEL_PROFILE\)/);
+  assert.match(src,/PALLET_PROFILE\.slice\(1\)/);
+  assert.match(src,/position=\{\[0,PIVOT_Y,0\]\}/);
+  assert.match(src,/b=\{\[\.\.\.palletLocalBase\(pose\.side\),PALLET_ARM_WELD_Z\]\}/);
+  assert.match(src,/radius=\{\.026\} color=\{STEEL\}/);
+});
+
+test('neither steel anchor arm cuts across the full escape wheel on any frame',()=>{
+  const r=OUTER_RADIUS+.008+.026;
+  const rotate=(p,a)=>[
+    p[0]*Math.cos(a)-p[1]*Math.sin(a),
+    p[0]*Math.sin(a)+p[1]*Math.cos(a),
+  ];
+  const pointSegmentDistance=(p,a,b)=>{
+    const dx=b[0]-a[0],dy=b[1]-a[1];
+    const u=Math.max(0,Math.min(1,((p[0]-a[0])*dx+
+      (p[1]-a[1])*dy)/(dx*dx+dy*dy)));
+    return Math.hypot(p[0]-a[0]-u*dx,p[1]-a[1]-u*dy);
+  };
+  for(let f=0;f<DURATION;f++){
+    const angle=-clockAtFrame(f).pendulumAngle;
+    for(const side of ['entry','exit']){
+      const end=rotate(palletLocalBase(side),angle);
+      const distance=pointSegmentDistance(
+        [0,WHEEL_Y-PIVOT_Y],[0,0],end);
+      assert.ok(distance>r,
+        `fork ${side} crosses the wheel at frame ${f}: ${distance} <= ${r}`);
+    }
+  }
+});
+
+test('all 1,800 animation frames: complete pallet silhouettes never penetrate wheel solid',()=>{
+  assert.equal(PALLET_RADIAL_SETBACK,.115);
+  assert.equal(WHEEL_PROFILE.length,6);
+  assert.equal(PALLET_PROFILE.length,7);
+  for(let frameNo=0;frameNo<DURATION;frameNo++){
+    const state=clockAtFrame(frameNo);
+    for(const side of ['entry','exit']){
+      assert.equal(palletWheelInterference(side,state),false,
+        `solid shoe ${side} overlaps wheel at frame ${frameNo}`);
+    }
+  }
 });

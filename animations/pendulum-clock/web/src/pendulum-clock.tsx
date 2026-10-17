@@ -5,7 +5,8 @@ import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
 import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
-  contactDistance, type PalletPose} from './escapement-contact';
+  contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_PROFILE, PALLET_PROFILE,
+  palletWheelInterference, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
   PALLET_THICKNESS, PALLET_ARM_WELD_Z, FORK_ARM_PLANE_Z,
@@ -121,7 +122,7 @@ function makeEscapeWheel():THREE.ExtrudeGeometry {
   const step=2*Math.PI/TEETH;
   for(let k=0;k<TEETH;k++){
     const base=k*step;
-    for(const [s,r] of [[0,1.29],[.19,1.31],[.34,1.53],[.43,1.55],[.69,1.32],[.93,1.29]]){
+    for(const [s,r] of WHEEL_PROFILE){
       const a=base+s*step;
       const x=Math.sin(a)*r,y=Math.cos(a)*r;
       if(k===0&&s===0)shape.moveTo(x,y);else shape.lineTo(x,y);
@@ -129,11 +130,11 @@ function makeEscapeWheel():THREE.ExtrudeGeometry {
   }
   shape.closePath();
   const hole=new THREE.Path();
-  hole.absarc(0,0,.55,0,Math.PI*2,true);
+  hole.absarc(0,0,.47,0,Math.PI*2,true);
   shape.holes.push(hole);
   const geo=new THREE.ExtrudeGeometry(shape,{
-    depth:WHEEL_THICKNESS,steps:1,bevelEnabled:true,bevelSize:.018,
-    bevelThickness:.012,bevelSegments:2,curveSegments:48,
+    depth:WHEEL_THICKNESS,steps:1,bevelEnabled:true,bevelSize:.008,
+    bevelThickness:.006,bevelSegments:2,curveSegments:48,
   });
   geo.translate(0,0,WHEEL_PLANE_Z-WHEEL_THICKNESS/2);
   return geo;
@@ -142,7 +143,7 @@ function makeEscapeWheel():THREE.ExtrudeGeometry {
 const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
   const geom=useMemo(makeEscapeWheel,[]);
   useLayoutEffect(()=>()=>geom.dispose(),[geom]);
-  return <group position={[0,.6,0]} rotation={[0,0,-angle]}>
+  return <group position={[0,WHEEL_Y,0]} rotation={[0,0,-angle]}>
     <mesh geometry={geom} castShadow receiveShadow>
       <meshStandardMaterial color={BRASS} metalness={.78} roughness={.26}
         side={THREE.DoubleSide}/>
@@ -155,29 +156,23 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
     {Array.from({length:6},(_,i)=>{
       const a=i*Math.PI/3;
       return <Rod key={i}
-        a={[.27*Math.sin(a),.27*Math.cos(a),.09]}
-        b={[1.28*Math.sin(a),1.28*Math.cos(a),.09]}
-        radius={.067} color={GOLD}/>;
+        a={[.22*Math.sin(a),.22*Math.cos(a),.065]}
+        b={[.69*Math.sin(a),.69*Math.cos(a),.065]}
+        radius={.038} color={GOLD}/>;
     })}
-    <Axle position={[0,0,.13]} radius={.32} depth={.24} color={METAL}/>
+    <Axle position={[0,0,.13]} radius={.25} depth={.24} color={METAL}/>
     <Axle position={[0,0,.29]} radius={.125} depth={.17} color={GOLD}/>
-    <Ring position={[0,0,.245]} radius={.36} tube={.027} color={GOLD}/>
+    <Ring position={[0,0,.245]} radius={.27} tube={.021} color={GOLD}/>
   </group>;
 };
 
-/** Small, outward-pointing escapement shoe. The contact NOSE is (0,0).
- * Its wide BASE is at (0,.19), where the fork arm is welded; the former
- * mesh attached the arm to the nose, creating a visibly impossible joint.
+/** Transverse escapement shoe: its axis is perpendicular to its fork arm.
+ * Nose is the true contact point; base is the machined weld at +Y.
  */
 function makeSlimPallet():THREE.ExtrudeGeometry {
   const profile=new THREE.Shape();
-  profile.moveTo(0,0);             // ONLY tooth-catching nose, never fork attachment
-  profile.lineTo(.017,.027);       // locking land
-  profile.lineTo(.023,.080);       // sloping impulse face
-  profile.lineTo(.050,.19);        // broad mounting base
-  profile.lineTo(-.050,.19);
-  profile.lineTo(-.023,.075);
-  profile.lineTo(-.010,.023);
+  profile.moveTo(...PALLET_PROFILE[0]);
+  for(const point of PALLET_PROFILE.slice(1))profile.lineTo(...point);
   profile.closePath();
   const geometry=new THREE.ExtrudeGeometry(profile,{
     depth:PALLET_THICKNESS,steps:1,bevelEnabled:true,
@@ -199,11 +194,11 @@ const PalletTooth:React.FC<{pose:PalletPose}>=({pose})=>{
         emissiveIntensity={pose.engaged?0.12:0}/>
     </mesh>
     {/* The visible edge of the actual short locking face. */}
-    <Rod a={[0,0,-PALLET_THICKNESS/2-.004]} b={[.017,.027,-PALLET_THICKNESS/2-.004]}
-      radius={.008} color="#f3dbb0"/>
+    <Rod a={[0,0,-PALLET_THICKNESS/2-.004]} b={[.008,.016,-PALLET_THICKNESS/2-.004]}
+      radius={.006} color="#f3dbb0"/>
     {/* The angled impulse face is much longer than the locking land. */}
-    <Rod a={[.017,.027,-PALLET_THICKNESS/2-.004]} b={[.023,.080,-PALLET_THICKNESS/2-.004]}
-      radius={.008} color={BRASS}/>
+    <Rod a={[.008,.016,-PALLET_THICKNESS/2-.004]} b={[.018,.070,-PALLET_THICKNESS/2-.004]}
+      radius={.006} color={BRASS}/>
   </group>;
 };
 
@@ -222,7 +217,7 @@ const Anchor:React.FC<{state:ClockState}>=({state})=>{
             central shaft / pallet base respectively. No Z-sloping arm. */}
         <Rod a={[0,0,FORK_ARM_PLANE_Z]}
           b={[...palletLocalBase(pose.side),PALLET_ARM_WELD_Z]}
-          radius={.036} color={STEEL}/>
+          radius={.026} color={STEEL}/>
         <PalletTooth pose={pose}/>
       </group>
     )}
@@ -247,8 +242,8 @@ const ContactHighlights:React.FC<{state:ClockState;showDetail:boolean}>=
 /** One pendulum physically hangs from the same anchor pivot behind the wheel. */
 const Pendulum:React.FC=()=>
   <group position={[0,0,-.91]}>
-    <Rod a={[0,0,0]} b={[0,-6.28,0]} radius={.044} color={STEEL}/>
-    <mesh position={[0,-6.28,0]} scale={[1,1.18,.33]} castShadow>
+    <Rod a={[0,0,0]} b={[0,-5.55,0]} radius={.044} color={STEEL}/>
+    <mesh position={[0,-5.55,0]} scale={[1,1.18,.33]} castShadow>
       <sphereGeometry args={[.55,48,32]}/>
       <meshStandardMaterial color={BRASS} metalness={.74} roughness={.22}/>
     </mesh>
@@ -273,7 +268,7 @@ function makeWheelBearing():THREE.ExtrudeGeometry {
 const WheelBearing:React.FC=()=>{
   const geometry=useMemo(makeWheelBearing,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
-  return <mesh geometry={geometry} position={[0,.60,BEARING_CENTER_Z]}
+  return <mesh geometry={geometry} position={[0,WHEEL_Y,BEARING_CENTER_Z]}
     castShadow receiveShadow>
     <meshStandardMaterial color={METAL} metalness={.69} roughness={.28}
       side={THREE.DoubleSide}/>
@@ -286,7 +281,7 @@ const MinimalSupports:React.FC=()=> <group>
 
 /** Porcelain seconds dial is ON THE SAME COAXIAL SHAFT as the escape wheel. */
 const Dial:React.FC<{angle:number}>=({angle})=>{
-  const dialY=.60;
+  const dialY=WHEEL_Y;
   return <group position={[0,dialY,0]}>
     {/* The shaft crosses the real 3D gap from the wheel to the clock face. */}
     <Rod a={[0,0,.20]} b={[0,0,2.36]} radius={.073} color={BRASS}/>
@@ -347,7 +342,7 @@ const Movement:React.FC<{frame:number}>=({frame})=>{
       <EscapeWheel angle={state.wheelAngle}/>
       {/* ONE pivot, ONE angle: pendulum rod, pendulum bob and both pallets
           form a single physically connected rotating Three.js assembly. */}
-      <group position={[0,2.56,0]} rotation={[0,0,-state.pendulumAngle]}>
+      <group position={[0,PIVOT_Y,0]} rotation={[0,0,-state.pendulumAngle]}>
         {/* One lathed cylindrical coupling; the rod ends are submerged
             inside it, with rounded shoulders on both exposed ends. */}
         <PendulumAnchorCoupling/>
@@ -392,6 +387,8 @@ export const PendulumClockScene:React.FC=()=>{
     data-contact-side={entry.engaged?'entry':exit.engaged?'exit':'free'}
     data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
+    data-solid-interference={palletWheelInterference('entry',state)||
+      palletWheelInterference('exit',state)}
     data-wheel-plane-z={WHEEL_PLANE_Z}
     data-pallet-plane-z={PALLET_PLANE_Z}
     data-fork-arm-plane-z={FORK_ARM_PLANE_Z}
