@@ -92,6 +92,13 @@ try {
     sixtyAlternations:sixty.alternations,maxPenetration:sixty.maxPenetration,
     reverse:sixty.reverse,initialOverlap:sixty.initialOverlap,
     toothEvents:sixty.contactSequence.length,
+    contactSequence:sixty.contactSequence.slice(0,24),
+    tenState:{wheelAngle:ten.wheelAngle,anchorAngle:ten.anchorAngle,forward:ten.forward,reverse:ten.reverse,
+      wheelOmega:ten.wheelOmega,anchorOmega:ten.anchorOmega,longestStuck:ten.longestStuck,
+      contacts:ten.contactCount,impulse:ten.totalImpulse},
+    sixtyState:{wheelAngle:sixty.wheelAngle,anchorAngle:sixty.anchorAngle,forward:sixty.forward,reverse:sixty.reverse,
+      wheelOmega:sixty.wheelOmega,anchorOmega:sixty.anchorOmega,longestStuck:sixty.longestStuck,
+      contacts:sixty.contactCount,impulse:sixty.totalImpulse},
   }));
 } catch(e) {
   await writeFile(resolve(out,'failure.txt'),(e.stack??String(e))+'\n'+errors.join('\n'));
