@@ -53,6 +53,7 @@ try{
     mode:el.getAttribute('data-camera-mode'),
     side:el.getAttribute('data-contact-side'),
     interference:el.getAttribute('data-solid-interference'),
+    anchorClearance:Number(el.getAttribute('data-anchor-clearance')),
     entryArmGap:Number(el.getAttribute('data-entry-fork-clearance')),
     exitArmGap:Number(el.getAttribute('data-exit-fork-clearance')),
     leftGap:Number(el.getAttribute('data-entry-contact-distance')),
@@ -87,7 +88,8 @@ try{
   assert.ok(side.current.radialRunningClearance>.005 &&
     side.current.radialRunningClearance<.03,
     'support sleeve must have a small real radial running clearance');
-  assert.equal(side.current.interference,'false','full pallet solids must not penetrate the wheel');
+  assert.equal(side.current.interference,'false','the ONE-PIECE anchor must not penetrate the wheel');
+  assert.ok(side.current.anchorClearance>.027,'the entire steel plate clears the wheel');
   assert.ok(side.current.entryArmGap>.046 && side.current.exitArmGap>.046,
     'both mechanical fork arms clear wheel teeth and bevels');
   const rear=await checkShot(12,'rear','observe','clock-rear.png');
@@ -97,8 +99,8 @@ try{
   const exit=await checkShot(25.4,'contact','observe','clock-exit-contact.png');
   assert.equal(entry.current.side,'entry');
   assert.equal(exit.current.side,'exit');
-  assert.ok(entry.current.leftGap>.009&&entry.current.leftGap<.12,'entry fan wedge stays near, but out of, the wheel');
-  assert.ok(exit.current.rightGap>.009&&exit.current.rightGap<.12,'exit fan wedge stays near, but out of, the wheel');
+  assert.ok(entry.current.leftGap>.009&&entry.current.leftGap<.20,'entry claw wedge stays near, but out of, the wheel');
+  assert.ok(exit.current.rightGap>.009&&exit.current.rightGap<.20,'exit claw wedge stays near, but out of, the wheel');
   assert.equal(entry.current.x,exit.current.x,'same macro camera for both contacts');
   assert.equal(entry.current.z,exit.current.z,'no frantic macro switch');
   assert.ok(!entry.png.equals(exit.png),'alternate lock has distinct visible frame');
@@ -108,10 +110,10 @@ try{
   // release threshold; avoid masking disagreement by pinning tips to teeth.
   await seek(12);
   const entryThreshold=await camera();
-  assert.ok(entryThreshold.leftGap>.009&&entryThreshold.leftGap<.12,'entry fan has positive solid clearance at 0.4s');
+  assert.ok(entryThreshold.leftGap>.009&&entryThreshold.leftGap<.20,'entry claw has positive solid clearance at 0.4s');
   await seek(42);
   const exitThreshold=await camera();
-  assert.ok(exitThreshold.rightGap>.009&&exitThreshold.rightGap<.12,'exit fan has positive solid clearance at 1.4s');
+  assert.ok(exitThreshold.rightGap>.009&&exitThreshold.rightGap<.20,'exit claw has positive solid clearance at 1.4s');
 
   const proof=await checkShot(48,'proof','observe','clock-second-hand.png');
   assert.ok(proof.current.z>10);
@@ -123,7 +125,8 @@ try{
     await seek(frame);
     await page.waitForTimeout(110);
     states[frame]=await read();
-    assert.equal((await camera()).interference,'false','no shoe-wheel clipping at '+frame);
+    assert.equal((await camera()).interference,'false','no anchor-wheel clipping at '+frame);
+    assert.ok((await camera()).anchorClearance>.027,'full plate gap at frame '+frame);
     assert.equal(states[frame].hand,states[frame].wheel,'shared shaft angle at frame '+frame);
     assert.equal(states[frame].pendulum,states[frame].anchor,
       'anchor MUST follow pendulum at frame '+frame);
