@@ -62,13 +62,22 @@ const anchorPolar=(radius:number,phi:number):Point=>
   [radius*Math.sin(phi),-radius*Math.cos(phi)];
 function makeDeadbeat(side:Side){
   const entry=side==='entry';
-  const ref=originalFlankPoint(entry?-4:3,entry?0:PITCH/2);
-  const p:Point=[ref[0],ref[1]+WHEEL_Y-PIVOT_Y];
-  const radius=len(p);
-  const phi=Math.atan2(p[0],-p[1]);
-  // Very short deadbeat holding lands near each pendulum extremum.
-  // The previous 0.14-radian arcs let both tooth flanks lock the fork
-  // simultaneously, trapping it at +0.11 rad instead of releasing.
+  const index=entry?-4:3;
+  const initialWheel=entry?0:PITCH/2;
+  const vertices=toothWorld(index,initialWheel);
+  // Lock against the NEAREST wheel-to-pivot perimeter, not a point halfway
+  // along the tooth flank. The latter put the shoe 0.10-0.15 units INSIDE
+  // the solid tooth body and made a physical release impossible.
+  const closest=vertices.reduce((a,b)=>len(sub(a,[0,PIVOT_Y]))<
+    len(sub(b,[0,PIVOT_Y]))?a:b);
+  const p=sub(closest,[0,PIVOT_Y]);
+  const rootRadius=len(p);
+  const rootAngle=Math.atan2(p[0],-p[1]);
+  // Calibrated to real polygon swept-volume collisions: at the beginning
+  // of a lock the wheel can turn into the arc but it cannot start inside
+  // adjacent tooth material; the next 0.05 rad of fork movement clears it.
+  const radius=rootRadius+(entry?.005:-.005);
+  const phi=rootAngle+(entry?-.005:.01);
   const lo=phi+(entry?START_AMPLITUDE-PALLET_LOCK_SWEEP:
     -START_AMPLITUDE-.005);
   const hi=phi+(entry?START_AMPLITUDE+.005:
