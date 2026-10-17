@@ -23,8 +23,8 @@ import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
  *
  * Layout, back -> front along z:
  *   pendulum and steel chassis  z=-0.98
- *   both fork arms             z=-0.02 throughout (no axial slope)
- *   BOTH pallets and wheel    same z=-0.02 working plane
+ *   both fork arms             z=-0.08 throughout (parallel to wheel)
+ *   both pallet faces          overlap thin wheel working plane z=-0.02
  *   rotating escape spindle   z=-0.55..0.16 through the rear bearing
  *   dial support / dial        z=1.65..2.15
  *   red seconds hand           z=2.37
@@ -155,8 +155,8 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
     {Array.from({length:6},(_,i)=>{
       const a=i*Math.PI/3;
       return <Rod key={i}
-        a={[.27*Math.sin(a),.27*Math.cos(a),.09]}
-        b={[1.28*Math.sin(a),1.28*Math.cos(a),.09]}
+        a={[.27*Math.sin(a),.27*Math.cos(a),.04]}
+        b={[1.28*Math.sin(a),1.28*Math.cos(a),.04]}
         radius={.067} color={GOLD}/>;
     })}
     <Axle position={[0,0,.13]} radius={.32} depth={.24} color={METAL}/>
