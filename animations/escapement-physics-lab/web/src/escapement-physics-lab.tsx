@@ -7,8 +7,8 @@ import {grahamPallet} from './graham-geometry';
 // Anchor arms connect to the BACK of the actual working pallets, not their tips.
 const entryPallet = grahamPallet('left');
 const exitPallet = grahamPallet('right');
-const X = (x: number) => 640 + 93 * x;
-const Y = (y: number) => 405 - 93 * y;
+const X = (x: number) => 640 + 88 * x;
+const Y = (y: number) => 388 - 88 * y;
 const fmt = (x: number, digits = 3) => Number.isFinite(x) ? x.toFixed(digits) : 'NaN';
 const path = (points: readonly Point[]) =>
   points.map((p, i) => (i === 0 ? 'M' : 'L') + X(p[0]).toFixed(2) + ' ' + Y(p[1]).toFixed(2)).join(' ') + ' Z';
@@ -24,15 +24,20 @@ function circlePosition(p: Point, angle: number, anchor: boolean): Point {
 }
 function SolidShape({solid, angle, contact}: {solid: Solid; angle: number; contact: boolean}) {
   const isAnchor = solid.owner === 'anchor';
-  const material = solid.side ? (contact ? '#ffc875' : '#75d3c6') :
-    solid.name === 'bob' ? '#dab785' : solid.name === 'hub' ? '#263d50' : '#8caac0';
+  const material = solid.side ? (contact ? '#ffc875' : '#83d7c8') :
+    solid.name === 'bob' ? '#d4ac73' :
+    solid.name === 'hub' ? '#c6aa7f' :
+    solid.name.startsWith('rim-') ? '#a88962' :
+    solid.name.startsWith('spoke-') ? '#bda079' : '#e5c08d';
   if (solid.kind === 'circle' && solid.center && solid.radius) {
     const point = circlePosition(solid.center, angle, isAnchor);
-    return <circle cx={X(point[0])} cy={Y(point[1])} r={solid.radius * 93}
-      fill={material} stroke="#c9d8df" strokeWidth={1.1}/>;
+    return <circle data-model-part={solid.name} cx={X(point[0])} cy={Y(point[1])} r={solid.radius * 88}
+      fill={material} stroke="#f5d9a8" strokeWidth={solid.name === 'hub' ? 1.8 : 1.1}/>;
   }
-  return <path d={path(solid.vertices ?? [])} transform={transform(solid, angle)}
-    fill={material} stroke={solid.side ? '#d2f7ed' : '#c4d3df'} strokeWidth={1.6} />;
+  const rim = solid.name.startsWith('rim-');
+  return <path data-model-part={solid.name} d={path(solid.vertices ?? [])} transform={transform(solid, angle)}
+    fill={material} stroke={rim ? 'none' : solid.side ? '#d2f7ed' : '#edd6b6'}
+    strokeWidth={rim ? 0 : solid.side ? 1.6 : 0.75} />;
 }
 declare global {
   interface Window {
@@ -105,12 +110,16 @@ export const EscapementLabScene: React.FC = () => {
   const baseRight = a(exitPallet[3]);
   const pivot: Point = [0, PARAMETERS.pivotY];
   const bob = a([0, -PARAMETERS.pendulumLength]);
-  const passed = state?.status === 'CANDIDATE' ? '待复核（连续接触候选）' : '实验未通过物理验证';
+  const passed = mode === 'single' ? '单齿碰撞夹具 · 不代表完整机构' :
+    state?.status === 'CANDIDATE' ? '接触实验达到候选门槛 · 尚非机械认证' :
+    state?.status === 'FAILED' ? '物理实验失败 · 实验未通过物理验证' :
+    '采集中 · 至少运行 10 秒后评估';
   return <div data-testid="escapement-physics-lab-scene"
     data-physics-engine={LAB_VERSION}
     data-lab-step={state?.step ?? 0}
     data-lab-alternations={state?.alternations ?? 0}
     data-lab-status={state?.status ?? 'UNVERIFIED'}
+    data-wheel-structure="open-rim-six-spokes"
     style={{width:'100%',height:'100%',background:'#091721',position:'relative',color:'#e8f0f2',
       fontFamily:'system-ui, sans-serif',overflow:'hidden'}}>
     <svg viewBox="0 0 1280 720" width="100%" height="100%" role="img"
@@ -125,9 +134,9 @@ export const EscapementLabScene: React.FC = () => {
         <path d={`M ${X(pivot[0])} ${Y(pivot[1])} L ${X(bob[0])} ${Y(bob[1])}`}
           stroke="#7a8496" strokeDasharray="10 5" strokeWidth="5"/>
         <path d={`M ${X(pivot[0])} ${Y(pivot[1])} L ${X(baseLeft[0])} ${Y(baseLeft[1])}`}
-          stroke="#b9d7da" strokeWidth="9"/>
+          stroke="#a9d2ce" strokeWidth="13" strokeLinecap="square"/>
         {mode === 'full' && <path d={`M ${X(pivot[0])} ${Y(pivot[1])} L ${X(baseRight[0])} ${Y(baseRight[1])}`}
-          stroke="#b9d7da" strokeWidth="9"/>}
+          stroke="#a9d2ce" strokeWidth="13" strokeLinecap="square"/>}
       </g>
       <g>
         {solids.filter(s => s.owner === 'wheel').map(s =>
@@ -140,7 +149,7 @@ export const EscapementLabScene: React.FC = () => {
       </g>
       <g fontSize="15" fill="#87a7ba">
         <text x="782" y="143">共用摆轴 / REVOLUTE</text>
-        <text x="800" y="444">30 齿驱动轮</text>
+        <text x="932" y="444">30 齿擒纵轮</text>
       </g>
       <g fontSize="17" fill="#cad6df">
         <text x="40" y="148">轮角度  {fmt(angleWheel * 180 / Math.PI,2)}°</text>
@@ -151,12 +160,12 @@ export const EscapementLabScene: React.FC = () => {
         <text x="40" y="313">右瓦接触  {state?.contactCount.right ?? 0}</text>
         <text x="40" y="344">左右交替  {state?.alternations ?? 0}</text>
         <text x="40" y="385">总冲量  {fmt(state?.totalImpulse ?? 0,5)} N·s</text>
-        <text x="40" y="418">最大穿透  {fmt((state?.maxPenetration ?? 0)*1000,2)} mm</text>
+        <text x="40" y="418">最大穿透  {fmt(state?.maxPenetration ?? 0,5)} 模型单位</text>
         <text x="40" y="461">持续锁停  {fmt(state?.longestStuck ?? 0,2)} s</text>
         <text x="40" y="494">倒转累计  {fmt(state?.reverse ?? 0,3)} rad</text>
       </g>
       <rect x="38" y="630" width="555" height="55" rx="6" fill="#142430" stroke="#3c5b68"/>
-      <text x="53" y="653" fill="#ffb68d" fontSize="18">{passed}</text>
+      <text x="53" y="653" fill={state?.status === 'FAILED' ? '#ffb68d' : '#a8e0cd'} fontSize="18">{passed}</text>
       <text x="53" y="674" fill="#8eacbc" fontSize="13">
         {state ? `${fmt(state.time,2)} s / 60 s · ${state.step} steps · ${mode === 'single' ? '单齿夹具' : '完整机构'}` : 'Rapier WASM 初始化中…'}
       </text>

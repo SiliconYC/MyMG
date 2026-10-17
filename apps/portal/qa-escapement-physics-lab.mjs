@@ -19,7 +19,17 @@ try {
   assert.equal(initial.step,0);
   // Geometric assembly MUST NOT start with tooth/pallet interpenetration.
   assert.equal(initial.initialOverlap,false,'Graham geometry starts interpenetrating');
-  await page.getByText('实验未通过物理验证').waitFor({timeout:20_000});
+  // Before ten seconds it is collecting data, not a false failure claim.
+  await page.getByText('采集中 · 至少运行 10 秒后评估').waitFor({timeout:20_000});
+  assert.equal(initial.status,'UNVERIFIED');
+  // Each visible structural member comes from an actual Rapier collider.
+  assert.equal(await page.locator('[data-wheel-structure="open-rim-six-spokes"]').count(),1);
+  assert.equal(await page.locator('[data-model-part^="rim-"]').count(),30);
+  assert.equal(await page.locator('[data-model-part^="spoke-"]').count(),6);
+  const hubRadius=Number(await page.locator('[data-model-part="hub"]').getAttribute('r'));
+  assert.ok(hubRadius < 30,'huge solid hub still blocks the inner escape wheel');
+  assert.ok(Math.abs(hubRadius-0.24*88)<0.01);
+  assert.equal(await page.locator('[data-model-part^="tooth-"]').count(),30);
   await page.screenshot({path:resolve(out,'full-initial.png'),fullPage:true});
   const single=await page.evaluate(()=>window.__mymgEscapementLab.audit(10,'single'));
   const ten=await page.evaluate(()=>window.__mymgEscapementLab.audit(10));
@@ -61,6 +71,10 @@ try {
     'Malformed tooth/pallet start/end event pairing');
   assert.ok(contactReview.qualifiedAlternations>=10,
     'Real completed lock/release contacts did not alternate at least ten times');
+  // Former QA bug: >=10 contacts by second 10 could conceal a wheel that
+  // physically seized for the remaining 49 seconds. This must NEVER pass.
+  assert.equal(ten.accepted,true,'10-second physical motion failed');
+  assert.equal(sixty.accepted,true,'60-second wheel stalled or otherwise failed physical motion');
   assert.ok(new Set(dwellContacts.map(x=>x.toothId)).size>=8,
     'Insufficient distinct contacted teeth: possible chattering');
 
@@ -99,6 +113,8 @@ try {
   assert.ok(sixty.parameters.geometry.leftTangentDot<1e-8);
   assert.ok(sixty.parameters.geometry.rightTangentDot<1e-8);
   assert.equal(sixty.parameters.geometry.diameterRatio,0.75);
+  assert.equal(sixty.parameters.structure.spokes,6);
+  assert.equal(sixty.parameters.structure.hubRadius,0.24);
   for (const x of [single,ten,sixty]) {
     for (const k of ['wheelAngle','anchorAngle','forward','reverse','totalImpulse','maxPenetration','alternations','longestStuck','physicsMs'])
       assert.ok(Number.isFinite(x[k]),x.mode+' invalid '+k);
