@@ -97,8 +97,8 @@ export const EscapementLabScene: React.FC = () => {
   const angleWheel = state?.wheelAngle ?? 0;
   const angleAnchor = state?.anchorAngle ?? 0;
   const a = ([x,y]: Point): Point => circlePosition([x,y], angleAnchor, true);
-  const baseLeft = a([-1.70, -1.60]);
-  const baseRight = a([1.70,-1.60]);
+  const baseLeft = a([-1.771, -1.228]);
+  const baseRight = a([1.771,-1.228]);
   const pivot: Point = [0, PARAMETERS.pivotY];
   const bob = a([0, -PARAMETERS.pendulumLength]);
   const passed = state?.status === 'CANDIDATE' ? '待复核（连续接触候选）' : '实验未通过物理验证';
