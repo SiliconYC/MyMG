@@ -4,26 +4,29 @@
  * Coordinates: +Y up, metres (illustrative). Rendering reads THESE colliders.
  */
 import RAPIER from '@dimforge/rapier2d-compat';
+import {GRAHAM, wheelTooth, grahamPallet, constructionAudit} from './graham-geometry';
 
 export const LAB_VERSION = 'Rapier 2D 0.21.0';
 export const STEP = 1 / 240;
 export const PARAMETERS = Object.freeze({
   gravity: -9.81,
-  driveTorque: 0.8,
-  pendulumStart: 0.06,
-  wheelStart: -0.14,
+  // Clockwise torque; BHI construction assumes clockwise rotation.
+  driveTorque: -0.8,
+  pendulumStart: 0.04 * Math.PI / 180,
+  wheelStart: -5.9 * Math.PI / 180,
   wheelDamping: 0.035,
   anchorDamping: 0.015,
   restitution: 0,
   friction: 0.18,
-  wheelRadius: 2.18,
-  rootRadius: 2.18,
-  tipRadius: 2.47,
-  pivotY: 3.45,
+  wheelRadius: GRAHAM.rootRadius,
+  rootRadius: GRAHAM.rootRadius,
+  tipRadius: GRAHAM.tipRadius,
+  pivotY: GRAHAM.pivotY,
   pendulumLength: 6.4,
   bobRadius: 0.27,
   solverIterations: 12,
-  teeth: 30,
+  teeth: GRAHAM.teeth,
+  geometry: constructionAudit(),
 });
 export type Side = 'left' | 'right';
 export type Mode = 'single' | 'full';
@@ -50,6 +53,8 @@ export type Readout = {
   contactCount: Record<Side, number>;
   alternations: number;
   contactNow: Record<Side, boolean>;
+  // Tooth-to-pallet contact transitions only; wheel core is deliberately ignored.
+  contactSequence: {time: number; side: Side; toothId: number; event: 'start' | 'end'}[];
   impulse: Record<Side, number>;
   totalImpulse: number;
   maxPenetration: number;
@@ -61,18 +66,12 @@ export type Readout = {
   initialOverlap: boolean;
   status: 'UNVERIFIED' | 'FAILED' | 'CANDIDATE';
 };
-// Initial tooth/pallet geometric gap is 0.04m; a freely swinging fork must reach it.
-// Scale shoe positions radially about the gear origin; no mid-run contact snapping.
-const shoe = (points: Point[]): Point[] => points.map(([x,y]) =>
-  [x * 1.10, (y + PARAMETERS.pivotY) * 1.10 - PARAMETERS.pivotY]);
-const leftPad: Point[] = shoe([[-1.80,-1.58],[-1.58,-1.80],[-1.41,-1.72],[-1.61,-1.43]]);
-const rightPad: Point[] = shoe([[1.41,-1.72],[1.58,-1.80],[1.80,-1.58],[1.61,-1.43]]);
-const tooth = (angle: number): Point[] => {
-  const at = (r: number, a: number): Point => [r * Math.cos(a), r * Math.sin(a)];
-  return [at(PARAMETERS.rootRadius, angle - 0.075),
-    at(PARAMETERS.tipRadius, angle + 0.008),
-    at(PARAMETERS.rootRadius, angle + 0.073)];
-};
+// Collision geometry is generated from the historical construction in
+// graham-geometry.ts. Do not replace with arbitrary symmetric shoes or redraw
+// visibly different outlines to hide a physical collision defect.
+const leftPad: Point[] = grahamPallet('left').map(p => [p[0],p[1]]);
+const rightPad: Point[] = grahamPallet('right').map(p => [p[0],p[1]]);
+const tooth = (index: number): Point[] => wheelTooth(index).map(p => [p[0],p[1]]);
 const rotate = ([x, y]: Point, a: number): Point =>
   [x * Math.cos(a) - y * Math.sin(a), x * Math.sin(a) + y * Math.cos(a)];
 const worldPoint = (p: Point, owner: 'wheel' | 'anchor', a: number): Point => {
@@ -98,6 +97,8 @@ export class EscapementSimulation {
   private sides = new Map<number, Side>();
   private palletColliders: RAPIER.Collider[] = [];
   private toothColliders: RAPIER.Collider[] = [];
+  private toothIds = new Map<number, number>();
+  private contactSequence: Readout['contactSequence'] = [];
   private contact = {left: false, right: false};
   private counts = {left: 0, right: 0};
   private impulses = {left: 0, right: 0};
@@ -124,7 +125,7 @@ export class EscapementSimulation {
     const groundAnchor = this.world.createRigidBody(
       RAPIER.RigidBodyDesc.fixed().setTranslation(0, PARAMETERS.pivotY));
     this.wheel = this.world.createRigidBody(
-      RAPIER.RigidBodyDesc.dynamic().setRotation(mode === 'single' ? 2.13 : PARAMETERS.wheelStart)
+      RAPIER.RigidBodyDesc.dynamic().setRotation(mode === 'single' ? 137.6 * Math.PI / 180 : PARAMETERS.wheelStart)
         .setLinearDamping(0.02).setAngularDamping(PARAMETERS.wheelDamping)
         .setCcdEnabled(true));
     this.anchor = this.world.createRigidBody(
@@ -139,7 +140,7 @@ export class EscapementSimulation {
     this.addCircle('hub', 'wheel', [0, 0], PARAMETERS.wheelRadius, 0.12);
     const teeth = mode === 'single' ? 1 : PARAMETERS.teeth;
     for (let i = 0; i < teeth; ++i) {
-      const points = tooth(i * 2 * Math.PI / PARAMETERS.teeth);
+      const points = tooth(i);
       this.addPoly('tooth-' + i, 'wheel', points, 0.13);
     }
     this.addPoly('pallet-left', 'anchor', leftPad, 0.8, 'left');
@@ -164,7 +165,10 @@ export class EscapementSimulation {
       .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS |
         RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS), owner === 'wheel' ? this.wheel : this.anchor);
     if (side) {this.sides.set(collider.handle, side); this.palletColliders.push(collider);}
-    if (name.startsWith('tooth')) this.toothColliders.push(collider);
+    if (name.startsWith('tooth-')) {
+      this.toothColliders.push(collider);
+      this.toothIds.set(collider.handle, Number(name.slice('tooth-'.length)));
+    }
     this.solids.push({name, owner, kind: 'poly', vertices, side});
   }
   private addCircle(name: string, owner: 'wheel' | 'anchor',
@@ -184,23 +188,27 @@ export class EscapementSimulation {
     let da = this.wheel.rotation() - was;
     if (da > Math.PI) da -= 2 * Math.PI;
     if (da < -Math.PI) da += 2 * Math.PI;
-    if (da > 0) this.forward += da;
-    else this.reverse -= da;
-    // Count only actual Rapier collision transitions between a wheel and a pallet.
+    // Forward is clockwise (negative signed angle), as in the BHI diagram.
+    if (da < 0) this.forward -= da;
+    else this.reverse += da;
+    // Only tooth-ID/pallet-ID collision transitions count as escapement events.
+    // Earlier code mistakenly counted arbitrary wheel-hub vs pallet contacts.
     this.queue.drainCollisionEvents((a, b, started) => {
       const side = this.sides.get(a) ?? this.sides.get(b);
-      if (!side) return;
-      // Ignore same-body contacts: wheel and anchor are different dynamic bodies.
-      if (started && !this.contact[side]) {
+      const toothId = this.toothIds.get(a) ?? this.toothIds.get(b);
+      if (!side || toothId === undefined) return;
+      if (started) {
         this.counts[side]++;
         if (this.lastSide && this.lastSide !== side) this.alternations++;
         this.lastSide = side;
       }
-      this.contact[side] = started;
+      if (this.contactSequence.length < 500)
+        this.contactSequence.push({time: this.n * STEP,side,toothId,event:started?'start':'end'});
     });
     this.queue.drainContactForceEvents(e => {
       const side = this.sides.get(e.collider1()) ?? this.sides.get(e.collider2());
-      if (!side) return;
+      const toothId = this.toothIds.get(e.collider1()) ?? this.toothIds.get(e.collider2());
+      if (!side || toothId === undefined) return;
       const impulse = e.totalForceMagnitude() * STEP;
       this.impulses[side] += impulse;
       this.totalImpulse += impulse;
@@ -212,7 +220,7 @@ export class EscapementSimulation {
       const c = this.world.getCollider(handle);
       if (!c) continue;
       this.world.contactPairsWith(c, other => {
-        if (other.parent()?.handle !== this.wheel.handle) return;
+        if (!this.toothIds.has(other.handle)) return;
         this.world.contactPair(c, other, manifold => {
           for (let i = 0; i < manifold.numContacts(); i++) {
             const depth = Math.max(0, -manifold.contactDist(i));
@@ -247,7 +255,8 @@ export class EscapementSimulation {
       wheelOmega: this.wheel.angvel(), anchorOmega: this.anchor.angvel(),
       forward: this.forward, reverse: this.reverse,
       contactCount: {...this.counts}, alternations: this.alternations,
-      contactNow: {...this.contact}, impulse: {...this.impulses},
+      contactNow: {...this.contact}, contactSequence: [...this.contactSequence],
+      impulse: {...this.impulses},
       totalImpulse: this.totalImpulse, maxPenetration: this.maxPenetration,
       penetrationDuration: this.penetrationDuration,
       stuckTime: this.stagnant, longestStuck: this.longestStuck,
@@ -269,6 +278,7 @@ export function runAudit(seconds: 10 | 60, mode: Mode = 'full'): Audit {
     const result = sim.read();
     return {...result, seconds, accepted: mode === 'full' &&
       !result.initialOverlap && result.alternations >= 10 &&
+      result.forward > result.reverse &&
       result.totalImpulse > .0001 && result.reverse < .5 &&
       result.maxPenetration < .03 && result.longestStuck < 3,
       engine: LAB_VERSION, parameters: PARAMETERS};
