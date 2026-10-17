@@ -67,6 +67,14 @@ try {
     completedPairs:completedContacts.length,qualifiedPairs:dwellContacts.length,
     qualifiedAlternations:completedAlternations,minimumDwellSeconds:0.025,
     firstQualifiedPairs:dwellContacts.slice(0,16)};
+  console.log('OPEN-WHEEL DYNAMICS DIAGNOSTIC', JSON.stringify({
+    ten:{accepted:ten.accepted,alternations:ten.alternations,forward:ten.forward,
+      reverse:ten.reverse,stuck:ten.longestStuck,impulse:ten.totalImpulse},
+    sixty:{accepted:sixty.accepted,alternations:sixty.alternations,forward:sixty.forward,
+      reverse:sixty.reverse,stuck:sixty.longestStuck,impulse:sixty.totalImpulse,
+      maximumPenetration:sixty.maxPenetration,maxSwing:sixty.maxSwingAngle},
+    contactReview,
+  }));
   assert.equal(contactReview.malformedEvents,0,
     'Malformed tooth/pallet start/end event pairing');
   assert.ok(contactReview.qualifiedAlternations>=10,
