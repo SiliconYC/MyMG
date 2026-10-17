@@ -16,12 +16,14 @@ export const PIVOT_Y=WHEEL_Y+1.4*OUTER_RADIUS;
 export const PITCH=2*Math.PI/TEETH;
 
 
-/** Both arm centerlines have precisely the same pivot-to-heel length.
- * Non-mirror symmetry is permitted ONLY in the claw flanks, not in the arm
- * lengths. Values are measured in the anchor-pivot local XY plane.
+/** Optical / mechanical construction follows the original thin curved
+ * anchor, not a triangular V plate. Both reference arm heels are reflections
+ * through the vertical pivot axis: their distances are EXACTLY equal.
+ * The working claws are deliberately handed, with both impulse faces running
+ * upward/right. The shoe shape is NEVER used to vary either arm length.
  */
 export const ARM_HEEL_X=.690;
-export const ARM_HEEL_Y=-.470;
+export const ARM_HEEL_Y=-.365;
 export const ARM_LENGTH=Math.hypot(ARM_HEEL_X,ARM_HEEL_Y);
 export const ANCHOR_PLATE_THICKNESS=.12;
 export const ANCHOR_BEVEL=.003;
@@ -30,31 +32,75 @@ export const PALLET_CLEARANCE=.012;
 export const armHeel=(side:Side):Point=>[
   side==='entry'?-ARM_HEEL_X:ARM_HEEL_X,ARM_HEEL_Y];
 
-/** Two claw noses are distinctly handed, not reflected copies.
- * Both locking/impulse edges run upper-right from their pointed ends.
- * The entire fork, hub and both claws are one CLOSED plate perimeter.
- *
- * Clockwise contour around the hub, right claw, inner V, left claw.
- * No independent Rod or shoe solids are added to the render.
+/** Exact cubic Bezier construction of two narrow curved ribs. Both outer and
+ * inner edge splines are mirror matched; only the terminal claw cutouts differ.
+ * An independent random-looking polygon is deliberately NOT acceptable.
+ * Coordinates are relative to the same pivot (0,0), Y positive upward.
  */
-export const ANCHOR_LOCAL_OUTLINE:readonly Point[]=[
-  [-.087,.045],[-.080,.075],[-.040,.091],[0,.098],
-  [.040,.091],[.080,.075],[.087,.045],
-  [.725,-.440],[.830,-.450],[1.030,-.630],
-  [.910,-.700],[.970,-.610],[.655,-.495],
-  [.045,-.080],[0,-.090],[-.045,-.080],
-  [-.655,-.495],[-.810,-.620],[-.890,-.700],
-  [-1.030,-.650],[-.830,-.450],[-.725,-.440],
-] as const;
+function cubic(a:Point,b:Point,c:Point,d:Point,samples=14):Point[]{
+  return Array.from({length:samples+1},(_,i):Point=>{
+    const t=i/samples,u=1-t;
+    return [
+      u*u*u*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t*t*t*d[0],
+      u*u*u*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t*t*t*d[1],
+    ];
+  });
+}
+/** With the existing prescribed wheel stepping, the work tip must retreat
+ * smoothly through the tooth envelope. A fixed height-only correction,
+ * not frame-dependent cheating: the same manufactured outline exists at
+ * EVERY frame and is rendered directly from these coordinates.
+ */
+function tipRelief([x,y]:Point):Point{
+  const fade=Math.max(0,Math.min(1,(-y-.47)/.22));
+  return [x,y+.140*fade];
+}
+const makeAnchorBlueprint=()=>{
+  const vertices:Point[]=[];
+  const append=(part:readonly Point[])=>{
+    for(const v of part){
+      const p=tipRelief(v);
+      const last=vertices[vertices.length-1];
+      if(!last||Math.hypot(p[0]-last[0],p[1]-last[1])>1e-10)
+        vertices.push(p);
+    }
+  };
+  append([
+    [-.069,.067],[-.053,.085],[-.028,.096],[0,.102],
+    [.028,.096],[.053,.085],[.069,.067],
+  ]);
+  // Top perimeter: two symmetric slim, bowed, equal-span steel ribs.
+  append(cubic([.069,.067],[.30,-.130],[.70,-.338],[.965,-.427]));
+  const exitStart=vertices.length-1;
+  append([[1.055,-.451]]);
+  append(cubic([1.055,-.451],[.99,-.505],[.84,-.536],
+    [.815,-.626],8));
+  append([[.766,-.746],[.745,-.750],[.759,-.670]]);
+  append(cubic([.759,-.670],[.776,-.596],[.794,-.538],
+    [.793,-.500],8));
+  const exitClaw=vertices.slice(exitStart);
+  // Return along lower rib edge, leaving almost uniform width throughout.
+  append(cubic([.793,-.500],[.60,-.395],[.31,-.230],
+    [.045,-.075]));
+  append([[.025,-.090],[0,-.100],[-.025,-.090],[-.045,-.075]]);
+  append(cubic([-.045,-.075],[-.31,-.230],[-.60,-.395],
+    [-.793,-.500]));
+  const entryStart=vertices.length-1;
+  append(cubic([-.793,-.500],[-.790,-.553],[-.738,-.594],
+    [-.704,-.672],8));
+  append([[-.698,-.751],[-.721,-.748]]);
+  append(cubic([-.721,-.748],[-.79,-.614],[-.985,-.528],
+    [-1.055,-.451],8));
+  append([[-.965,-.427]]);
+  const entryClaw=vertices.slice(entryStart);
+  append(cubic([-.965,-.427],[-.70,-.338],[-.30,-.130],
+    [-.069,.067]));
+  return {vertices,entryClaw,exitClaw};
+};
+const ANCHOR_BLUEPRINT=makeAnchorBlueprint();
+export const ANCHOR_LOCAL_OUTLINE:readonly Point[]=ANCHOR_BLUEPRINT.vertices;
 export const CLAW_LOCAL_POLYGON:Readonly<Record<Side,readonly Point[]>>={
-  entry:[
-    [-.725,-.440],[-.830,-.450],[-1.030,-.650],
-    [-.890,-.700],[-.810,-.620],[-.655,-.495],
-  ],
-  exit:[
-    [.725,-.440],[.830,-.450],[1.030,-.630],
-    [.910,-.700],[.970,-.610],[.655,-.495],
-  ],
+  entry:ANCHOR_BLUEPRINT.entryClaw,exit:ANCHOR_BLUEPRINT.exitClaw,
 };
 export function anchorLocalOutline():Point[]{
   return ANCHOR_LOCAL_OUTLINE.map(p=>[p[0],p[1]]);
@@ -105,14 +151,14 @@ export function palletLocalBase(side:Side):Point{
   return armHeel(side);
 }
 export function palletLocalTip(side:Side):Point{
-  return side==='entry'?[-.890,-.700]:[.910,-.700];
+  return tipRelief(side==='entry'?[-.721,-.748]:[.745,-.750]);
 }
-/** Working-face vectors from each claw tip to its trailing land.
- * Both point upper-right, unlike an erroneously mirrored wedge.
+/** Working-face vectors use the actual curved contour vertices. Both
+ * locking lands lead up/right, NOT reflection-symmetric at the two ends.
  */
 export function clawWorkingDirection(side:Side):Point{
   const tip=palletLocalTip(side);
-  const land:Point=side==='entry'?[-.810,-.620]:[.970,-.610];
+  const land=tipRelief(side==='entry'?[-.704,-.672]:[.759,-.670]);
   const dx=land[0]-tip[0],dy=land[1]-tip[1];
   const length=Math.hypot(dx,dy);
   return [dx/length,dy/length];
