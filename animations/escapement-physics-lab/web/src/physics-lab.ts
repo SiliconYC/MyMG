@@ -11,10 +11,10 @@ export const STEP = 1 / 240;
 export const PARAMETERS = Object.freeze({
   gravity: -9.81,
   // Clockwise torque; BHI construction assumes clockwise rotation.
-  driveTorque: -1.1,
+  driveTorque: -0.8,
   // Real one-off angular impulse, simulating a human starting the pendulum.
   // It is NOT a per-step driver, a scheduler or scripted oscillation.
-  startTorqueImpulse: -3,
+  startTorqueImpulse: -4.5,
   pendulumStart: 0,
   wheelStart: -7 * Math.PI / 180,
   wheelDamping: 0.035,

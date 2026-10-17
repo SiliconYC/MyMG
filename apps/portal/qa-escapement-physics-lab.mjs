@@ -35,60 +35,6 @@ try {
   const ten=await page.evaluate(()=>window.__mymgEscapementLab.audit(10));
   const sixty=await page.evaluate(()=>window.__mymgEscapementLab.audit(60));
 
-  // Run a bounded physical search after geometry mass/inertia changes.
-  // Never force angular positions during integration or pick successes from
-  // overlapping initial bodies. This is diagnostic; no implicit tuning.
-  const physicalScan = await page.evaluate(() => {
-    const all=[];
-    for (const wheelDeg of [-17,-13,-9,-7,-5])
-      for (const anchorDeg of [0,1.5])
-        for (const kick of [-3,-4.5,-6])
-          for (const driveTorque of [-0.8,-1.1]) {
-            const q=window.__mymgEscapementLab.audit(10,'full',{
-              wheelStart:wheelDeg*Math.PI/180,
-              pendulumStart:anchorDeg*Math.PI/180,
-              startTorqueImpulse:kick,driveTorque,
-            });
-            all.push({wheelDeg,anchorDeg,kick,driveTorque,
-              overlap:q.initialOverlap,alternations:q.alternations,
-              stuck:q.longestStuck,reverse:q.reverse,impulse:q.totalImpulse,
-              accepted:q.accepted});
-          }
-    return all;
-  });
-  console.log('OPEN-WHEEL PHYSICAL PARAMETER SCAN',
-    JSON.stringify(physicalScan.sort((a,b)=>
-      Number(b.accepted)-Number(a.accepted)||b.alternations-a.alternations).slice(0,35)));
-  // Long-run tuning must measure an ENTIRE 60s, not choose a phase on
-  // 10s alternations. Each entry is an independently initialized Rapier World.
-  const longRunScan = await page.evaluate(() => {
-    const choices = [
-      [-7,0,-6,-1.1],[-7,0,-4.5,-1.1],[-7,0,-3,-1.1],
-      [-7,0,-4.5,-0.8],[-7,0,-6,-0.8],
-      [-17,1.5,-4.5,-1.1],[-17,1.5,-3,-1.1],
-      [-5,1.5,-4.5,-1.1],[-5,0,-3,-1.1],[-5,0,-4.5,-1.1],
-      [-17,0,-3,-1.1],[-17,0,-4.5,-1.1],
-      [-5,1.5,-3,-0.8],[-17,0,-3,-0.8],[-5,0,-3,-0.8],
-      [-7,0,-6,-1.4],[-7,0,-4.5,-1.4],[-5,0,-4.5,-1.4],
-    ];
-    return choices.map(([wheelDeg,anchorDeg,kick,driveTorque]) => {
-      const q=window.__mymgEscapementLab.audit(60,'full',{
-        wheelStart:wheelDeg*Math.PI/180,
-        pendulumStart:anchorDeg*Math.PI/180,
-        startTorqueImpulse:kick,driveTorque,
-      });
-      return {wheelDeg,anchorDeg,kick,driveTorque,
-        initialOverlap:q.initialOverlap,accepted:q.accepted,
-        alternations:q.alternations,forward:q.forward,reverse:q.reverse,
-        longestStuck:q.longestStuck,maxPenetration:q.maxPenetration,
-        totalImpulse:q.totalImpulse,
-        lastEventTime:q.contactSequence.at(-1)?.time ?? null};
-    });
-  });
-  console.log('OPEN-WHEEL 60-SECOND PARAMETER SCAN', JSON.stringify(
-    longRunScan.sort((a,b)=>
-      Number(b.accepted)-Number(a.accepted) ||
-      b.alternations-a.alternations || a.longestStuck-b.longestStuck)));
   // Independent event-sequence review: a contact start alone does not prove
   // locking or release. Match real tooth/pallet start/end pairs, reject
   // repeated orphan events, and count alternating *completed* dwells only.
@@ -121,14 +67,6 @@ try {
     completedPairs:completedContacts.length,qualifiedPairs:dwellContacts.length,
     qualifiedAlternations:completedAlternations,minimumDwellSeconds:0.025,
     firstQualifiedPairs:dwellContacts.slice(0,16)};
-  console.log('OPEN-WHEEL DYNAMICS DIAGNOSTIC', JSON.stringify({
-    ten:{accepted:ten.accepted,alternations:ten.alternations,forward:ten.forward,
-      reverse:ten.reverse,stuck:ten.longestStuck,impulse:ten.totalImpulse},
-    sixty:{accepted:sixty.accepted,alternations:sixty.alternations,forward:sixty.forward,
-      reverse:sixty.reverse,stuck:sixty.longestStuck,impulse:sixty.totalImpulse,
-      maximumPenetration:sixty.maxPenetration,maxSwing:sixty.maxSwingAngle},
-    contactReview,
-  }));
   assert.equal(contactReview.malformedEvents,0,
     'Malformed tooth/pallet start/end event pairing');
   assert.ok(contactReview.qualifiedAlternations>=10,
