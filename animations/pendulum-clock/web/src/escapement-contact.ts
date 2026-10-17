@@ -181,7 +181,13 @@ export function forkWheelClearance(side:Side,state:ClockState):number{
   const root:Point=[0,PIVOT_Y];
   const base=palletWorldBase(side,state.pendulumAngle);
   let best=Infinity;
-  for(const point of wheel)best=Math.min(best,segmentDistance(point,root,base));
+  for(let i=0;i<wheel.length;i++){
+    const a=wheel[i],b=wheel[(i+1)%wheel.length];
+    if(properCross(root,base,a,b))return 0;
+    best=Math.min(best,
+      segmentDistance(a,root,base),segmentDistance(b,root,base),
+      segmentDistance(root,a,b),segmentDistance(base,a,b));
+  }
   return best;
 }
 export type PalletPose={
