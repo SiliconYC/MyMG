@@ -153,7 +153,13 @@ function advance(s:Machine):void{
     s.contactSide=hit.side;
     const [jw,ja]=contactJacobians(hit);
     const inv=jw*jw/WHEEL_INERTIA+ja*ja/PENDULUM_INERTIA;
-    if(inv<1e-8)break;
+    // A contact normal with no angular leverage on either pivot is an
+    // impossible geometric interference, NOT a license to teleport an angle.
+    if(inv<.001){
+      s.wv=0;
+      s.pv=0;
+      break;
+    }
     const rel=jw*s.wv+ja*s.pv;
     if(rel<0){
       const impulse=-(1+CONTACT_RESTITUTION)*rel/inv;
@@ -163,8 +169,18 @@ function advance(s:Machine):void{
     }
     const correction=Math.max(0,hit.depth-CONTACT_SLOP)*
       CONTACT_CORRECTION/inv;
-    s.w+=correction*jw/WHEEL_INERTIA;
-    s.p+=correction*ja/PENDULUM_INERTIA;
+    const dw=correction*jw/WHEEL_INERTIA;
+    const da=correction*ja/PENDULUM_INERTIA;
+    // A single solver iteration may only correct a microscopic rotation;
+    // if the shape cannot be resolved at this scale it must STALL and FAIL
+    // the penetration audit, not spin through 40 radians in one timestep.
+    if(Math.abs(dw)>.007||Math.abs(da)>.007){
+      s.wv=0;
+      s.pv=0;
+      break;
+    }
+    s.w+=dw;
+    s.p+=da;
   }
   if(s.contactCount&&Math.abs(s.wv)<.01)s.lockedSteps++;
   else s.lockedSteps=0;
