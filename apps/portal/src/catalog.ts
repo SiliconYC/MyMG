@@ -154,7 +154,7 @@ export const projects: readonly MgProject[] = [
     titleEn: 'RAPIER 2D / ESCAPEMENT CONTACT EXPERIMENT',
     category: '机械 / 真实碰撞试验',
     description: '独立于摆钟正片的 2D 刚体可行性实验。展示物理碰撞、卡滞和穿透；不预设正确摆动。',
-    status: '技术实验 · 尚未通过物理验证',
+    status: '技术实验 · 接触候选，尚非机械认证',
     component: EscapementLabScene,
     durationInFrames: 1800,
     fps: 30,
@@ -163,7 +163,7 @@ export const projects: readonly MgProject[] = [
     notes: [
       '两独立转动刚体，固定轴铰链、恒定齿轮力矩、重力钟摆；齿面和擒纵瓦均是 Rapier 实体凸碰撞体。',
       '固定 240 Hz 时间步，进度拖动后重放真实物理计算，不以角度插值或定时放行模拟啮合。',
-      '实验是否成立完全由浏览器的 10/60 秒接触、冲量、倒转、穿透与锁死审计判定；目前不得视为通过。',
+      '10/60 秒物理结果必须由真实浏览器接触、冲量、倒转、穿透与锁死审计判定；当前实验候选不代表可加工的钟表机械认证。',
       '二维中摆杆和叉臂只展示机构拓扑，不承担碰撞；不代表三维装配干涉或工业可制造性已经验证。',
     ],
   },
