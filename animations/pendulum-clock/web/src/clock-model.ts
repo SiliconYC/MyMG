@@ -147,9 +147,14 @@ function contactJacobians(hit:Hit):readonly [number,number]{
   // Polygonal faceting (7 strips) would otherwise invent a reaction torque
   // that freezes the pendulum for 10 seconds. Only the radial END impulse
   // land transmits angular momentum into the pendulum.
-  const normalRadius=Math.abs(dot(hit.n,unit(ra)));
-  const anchorJ=hit.part==='pallet'&&normalRadius>.8
-    ?0:dot(hit.n,crossAnchor);
+  // All segments of the present deadbeat shoe are manufactured as an
+  // anchor-concentric locking face. Their reaction line passes through the
+  // anchor axle even when SAT returns the opposing TOOTH polygon's normal.
+  // Applying that tessellation normal to the anchor invented a constant
+  // braking moment, pinning the freely swinging pendulum at +0.14 rad.
+  // End-face impulse lands will be added as separate real geometries, not
+  // confused with the circular holding face.
+  const anchorJ=hit.part==='pallet'?0:dot(hit.n,crossAnchor);
   return [wheelJ,anchorJ];
 }
 function advance(s:Machine):void{
