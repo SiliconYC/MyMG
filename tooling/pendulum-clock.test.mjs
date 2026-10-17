@@ -15,7 +15,7 @@ import {
 import {
   WHEEL_PLANE_Z,PALLET_PLANE_Z,FORK_ARM_PLANE_Z,
   PALLET_ARM_WELD_Z,WHEEL_THICKNESS,PALLET_THICKNESS,
-  zOverlap,wheelZRange,palletZRange,
+  zOverlap,wheelZRange,palletZRange,forkZRange,
   bearingZRange,spindleZRange,BEARING_DEPTH,
 } from '../animations/pendulum-clock/web/src/escapement-axial.ts';
 import {cameraAtFrame,SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
@@ -61,9 +61,14 @@ test('the actual wheel has real teeth and its solid area leaves clearance for fo
 
 test('fork rods and pallet shoes are one rigid body on the same gear plane',()=>{
   assert.equal(FORK_ARM_PLANE_Z,PALLET_ARM_WELD_Z);
-  assert.equal(FORK_ARM_PLANE_Z,WHEEL_PLANE_Z);
   assert.equal(PALLET_PLANE_Z,WHEEL_PLANE_Z);
-  assert.ok(zOverlap(wheelZRange,palletZRange)>=PALLET_THICKNESS-1e-10);
+  assert.ok(FORK_ARM_PLANE_Z<WHEEL_PLANE_Z);
+  assert.ok(WHEEL_PLANE_Z-FORK_ARM_PLANE_Z<.1);
+  assert.equal(zOverlap(wheelZRange,forkZRange),0,
+    'the solid fork cannot occupy the wheel teeth volume');
+  assert.ok(zOverlap(wheelZRange,palletZRange)>=WHEEL_THICKNESS-1e-10);
+  assert.ok(zOverlap(forkZRange,palletZRange)>.01,
+    'fork rod ends must actually weld into shoe backs');
   const src=sceneSource();
   assert.match(src,/b=\{\[\.\.\.palletLocalBase\(pose.side\),PALLET_ARM_WELD_Z\]\}/);
   assert.match(src,/radius=\{FORK_RADIUS\}/);
@@ -111,7 +116,7 @@ test('full 60 s independent collision audit: physical impacts, nonpenetration an
     'driven wheel must physically advance through multiple real teeth, not remain stalled');
   assert.ok(audit.maxPenetration<.04,
     'solver permitted deep tooth/pallet interpenetration');
-  assert.ok(audit.minArmClearance>-.02,
+  assert.ok(audit.minArmClearance>.005,
     'fork arm intersects the solid outer swept wheel tooth region');
   assert.ok(Number.isFinite(audit.maxSpeed));
 });
