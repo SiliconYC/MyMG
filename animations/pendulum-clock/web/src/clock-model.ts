@@ -15,7 +15,7 @@
  */
 import {
   TEETH,PITCH,WHEEL_Y,PIVOT_Y,START_AMPLITUDE,
-  palletWorld,forkWorld,toothWorld,polar,sub,dot,len,unit,
+  palletCollisionWorld,forkWorld,toothWorld,sub,dot,len,
   type Point,type Side,
 } from './escapement-geometry.ts';
 export {TEETH} from './escapement-geometry.ts';
@@ -30,7 +30,7 @@ export const DT=1/PHYSICS_HZ;
 export const GRAVITY_OVER_LENGTH=Math.PI*Math.PI;
 export const WHEEL_INERTIA=.015;
 export const PENDULUM_INERTIA=1.0;
-export const DRIVE_TORQUE=.25;
+export const DRIVE_TORQUE=.035;
 export const WHEEL_DAMPING=.035;
 export const PENDULUM_DAMPING=.002;
 export const CONTACT_RESTITUTION=.05;
@@ -105,14 +105,13 @@ function contactPair(s:Machine):Hit[] {
   const collisions:Hit[]=[];
   let armClearance=Infinity;
   for(const side of ['entry','exit'] as const){
-    const shoe=palletWorld(side,s.p);
+    const shoes=palletCollisionWorld(side,s.p);
     const fork=forkWorld(side,s.p);
     // Safety diagnostic: a long arm must not penetrate the swept rim.
     const armDistance=Math.min(...fork.map(p=>Math.hypot(p[0],p[1]-WHEEL_Y)));
     armClearance=Math.min(armClearance,armDistance-1.55);
-    const parts:{part:'pallet'|'fork';polygon:Point[]}[]=[
-      {part:'pallet',polygon:shoe},
-    ];
+    const parts:{part:'pallet'|'fork';polygon:Point[]}[]=
+      shoes.map(polygon=>({part:'pallet',polygon}));
     if(armDistance<1.575)parts.push({part:'fork',polygon:fork});
     for(const {part,polygon} of parts){
       const cx=polygon.reduce((sum,p)=>sum+p[0],0)/polygon.length;
