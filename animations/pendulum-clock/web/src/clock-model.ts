@@ -30,7 +30,7 @@ export const DT=1/PHYSICS_HZ;
 export const GRAVITY_OVER_LENGTH=Math.PI*Math.PI;
 export const WHEEL_INERTIA=.015;
 export const PENDULUM_INERTIA=1.0;
-export const DRIVE_TORQUE=.022;
+export const DRIVE_TORQUE=.25;
 export const WHEEL_DAMPING=.035;
 export const PENDULUM_DAMPING=.002;
 export const CONTACT_RESTITUTION=.05;
@@ -110,12 +110,16 @@ function contactPair(s:Machine):Hit[] {
     // Safety diagnostic: a long arm must not penetrate the swept rim.
     const armDistance=Math.min(...fork.map(p=>Math.hypot(p[0],p[1]-WHEEL_Y)));
     armClearance=Math.min(armClearance,armDistance-1.55);
-    for(const [part,polygon] of [['pallet',shoe],['fork',fork]] as const){
+    const parts:{part:'pallet'|'fork';polygon:Point[]}[]=[
+      {part:'pallet',polygon:shoe},
+    ];
+    if(armDistance<1.575)parts.push({part:'fork',polygon:fork});
+    for(const {part,polygon} of parts){
       const cx=polygon.reduce((sum,p)=>sum+p[0],0)/polygon.length;
       const cy=polygon.reduce((sum,p)=>sum+p[1],0)/polygon.length-WHEEL_Y;
       const approx=(Math.atan2(cx,cy)-s.w)/PITCH;
       const near=Math.round(approx-.5);
-      for(let i=near-3;i<=near+3;i++){
+      for(let i=near-2;i<=near+2;i++){
         for(const triangle of wheelTriangles(i,s.w)){
           const hit=polygonOverlap(triangle,polygon);
           if(hit) collisions.push({...hit,side,part});
@@ -141,7 +145,7 @@ function advance(s:Machine):void{
   s.wv+=(DRIVE_TORQUE/WHEEL_INERTIA-WHEEL_DAMPING*s.wv)*DT;
   s.p+=s.pv*DT;
   s.w+=s.wv*DT;
-  for(let iteration=0;iteration<8;iteration++){
+  for(let iteration=0;iteration<6;iteration++){
     const hits=contactPair(s);
     if(!hits.length)break;
     const hit=hits[0];
