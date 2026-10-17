@@ -5,8 +5,7 @@ import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame, TEETH, type ClockState} from './clock-model';
 import {palletPose, palletLocalTip, palletLocalBase, palletOrientation,
-  contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_SCALE, ROOT_RADIUS,
-  OUTER_RADIUS, PALLET_BASE_HEIGHT, WHEEL_PROFILE, PALLET_PROFILE,
+  contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_PROFILE, PALLET_PROFILE,
   palletWheelInterference, type PalletPose} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
