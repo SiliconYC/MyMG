@@ -28,18 +28,20 @@ try {
   // Every case creates an independent Rapier world, with a one-off manual kick.
   const scan = await page.evaluate(()=>{
     const cases=[];
-    for(const driveTorque of [-0.8,-2,-4])
-      for(const startTorqueImpulse of [-6,-3,-1.25,1.25,3,6]) {
-        const trial={driveTorque,startTorqueImpulse};
-        const q=window.__mymgEscapementLab.audit(60,'full',trial);
-        cases.push({...trial,accepted:q.accepted,alternations:q.alternations,
-          contactCount:q.contactCount,forward:q.forward,reverse:q.reverse,
-          maxSwingAngle:q.maxSwingAngle,longestStuck:q.longestStuck,
-          maxPenetration:q.maxPenetration,contacts:q.contactSequence.slice(0,10)});
-      }
-    return cases;
+    for(const wheelDeg of [-17,-15,-13,-11,-9,-7,-5])
+      for(const anchorDeg of [-1.5,0,1.5])
+        for(const kick of [-3,3]) {
+          const trial={driveTorque:-0.8,wheelStart:wheelDeg*Math.PI/180,
+            pendulumStart:anchorDeg*Math.PI/180,startTorqueImpulse:kick};
+          const q=window.__mymgEscapementLab.audit(10,'full',trial);
+          cases.push({wheelDeg,anchorDeg,kick,overlap:q.initialOverlap,
+            alternations:q.alternations,forward:q.forward,reverse:q.reverse,
+            maxSwingAngle:q.maxSwingAngle,longestStuck:q.longestStuck,
+            contacts:q.contactSequence.slice(0,8)});
+        }
+    return cases.sort((a,b)=>b.alternations-a.alternations||a.longestStuck-b.longestStuck);
   });
-  console.log('Graham parameter sweep 60s in Chromium',JSON.stringify(scan));
+  console.log('Graham phase sweep 10s in Chromium',JSON.stringify(scan.slice(0,22)));
   assert.equal(ten.step,2400);
   assert.equal(sixty.step,14400);
   assert.equal(single.step,2400);
