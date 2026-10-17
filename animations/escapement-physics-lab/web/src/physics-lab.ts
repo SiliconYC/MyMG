@@ -4,7 +4,7 @@
  * Coordinates: +Y up, metres (illustrative). Rendering reads THESE colliders.
  */
 import RAPIER from '@dimforge/rapier2d-compat';
-import {GRAHAM, wheelTooth, grahamPallet, constructionAudit} from './graham-geometry';
+import {GRAHAM, WHEEL_STRUCTURE, wheelTooth, wheelRimSector, wheelSpoke, grahamPallet, constructionAudit} from './graham-geometry';
 
 export const LAB_VERSION = 'Rapier 2D 0.21.0';
 export const STEP = 1 / 240;
@@ -22,6 +22,7 @@ export const PARAMETERS = Object.freeze({
   restitution: 0,
   friction: 0.18,
   wheelRadius: GRAHAM.rootRadius,
+  structure: WHEEL_STRUCTURE,
   rootRadius: GRAHAM.rootRadius,
   tipRadius: GRAHAM.tipRadius,
   pivotY: GRAHAM.pivotY,
@@ -147,7 +148,15 @@ export class EscapementSimulation {
     this.world.createImpulseJoint(
       RAPIER.JointData.revolute({x: 0, y: 0}, {x: 0, y: 0}),
       groundAnchor, this.anchor, true);
-    this.addCircle('hub', 'wheel', [0, 0], PARAMETERS.wheelRadius, 0.12);
+    // The six windows are empty in BOTH the visible wheel and Rapier.
+    // Approximate the old solid wheel's angular inertia with rim density.
+    this.addCircle('hub', 'wheel', [0, 0], WHEEL_STRUCTURE.hubRadius, 0.25);
+    for (let i = 0; i < WHEEL_STRUCTURE.spokes; ++i)
+      this.addPoly('spoke-' + i, 'wheel',
+        wheelSpoke(i).map(q => [q[0],q[1]]), 0.15);
+    for (let i = 0; i < PARAMETERS.teeth; ++i)
+      this.addPoly('rim-' + i, 'wheel',
+        wheelRimSector(i).map(q => [q[0],q[1]]), 0.30);
     const teeth = mode === 'single' ? 1 : PARAMETERS.teeth;
     for (let i = 0; i < teeth; ++i) {
       const points = tooth(i);

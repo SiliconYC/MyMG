@@ -39,6 +39,32 @@ export const GRAHAM = Object.freeze({
   startAnchorDeg: 0,   // true BHI drawing datum; do not synthesize an animated beat
 });
 
+/** The escape wheel has real windows, not paint over a circular collider.
+ * Every segment and spoke is a convex Rapier collider and matching SVG. */
+export const WHEEL_STRUCTURE = Object.freeze({
+  rimInnerRadius: 1.60, rimOuterRadius: 1.82,
+  hubRadius: 0.24, spokes: 6, spokeHalfWidth: 0.075,
+});
+export function wheelRimSector(i: number): Point2[] {
+  const a = i * GRAHAM.pitchDeg * RAD;
+  const b = (i + 1) * GRAHAM.pitchDeg * RAD;
+  return [
+    polar(WHEEL_STRUCTURE.rimInnerRadius,a),
+    polar(WHEEL_STRUCTURE.rimOuterRadius,a),
+    polar(WHEEL_STRUCTURE.rimOuterRadius,b),
+    polar(WHEEL_STRUCTURE.rimInnerRadius,b),
+  ];
+}
+export function wheelSpoke(i: number): Point2[] {
+  const a = 2 * Math.PI * i / WHEEL_STRUCTURE.spokes;
+  const u: Point2 = [Math.cos(a),Math.sin(a)];
+  const n: Point2 = [-Math.sin(a),Math.cos(a)];
+  const q = (r: number,s: number): Point2 =>
+    [r*u[0] + s*WHEEL_STRUCTURE.spokeHalfWidth*n[0],
+     r*u[1] + s*WHEEL_STRUCTURE.spokeHalfWidth*n[1]];
+  return [q(0.18,-1),q(1.66,-1),q(1.66,1),q(0.18,1)];
+}
+
 export function wheelTooth(i: number): Point2[] {
   const a = i * GRAHAM.pitchDeg * RAD;
   const halfTip = GRAHAM.tipThicknessDeg * RAD / 2;
