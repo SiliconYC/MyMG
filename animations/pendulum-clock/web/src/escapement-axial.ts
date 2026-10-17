@@ -19,7 +19,6 @@ export const PALLET_ARM_WELD_Z = -0.08;
  */
 export const FORK_ARM_PLANE_Z = PALLET_ARM_WELD_Z;
 export const FORK_ARM_RADIUS = 0.028;
-export const forkZRange = zRange(FORK_ARM_PLANE_Z,FORK_ARM_RADIUS*2);
 export const WHEEL_SPINDLE_RADIUS = 0.13;
 export const WHEEL_SPINDLE_REAR_Z = -0.55;
 export const WHEEL_SPINDLE_FRONT_Z = 0.16;
@@ -31,6 +30,7 @@ export const BEARING_OUTER_RADIUS = 0.23;
 export const zRange = (centre: number, depth: number): readonly [number,number] =>
   [centre-depth/2,centre+depth/2];
 
+export const forkZRange = zRange(FORK_ARM_PLANE_Z,FORK_ARM_RADIUS*2);
 export const wheelZRange = zRange(WHEEL_PLANE_Z,WHEEL_THICKNESS);
 export const palletZRange = zRange(PALLET_PLANE_Z,PALLET_THICKNESS);
 export const bearingZRange = zRange(BEARING_CENTER_Z,BEARING_DEPTH);
