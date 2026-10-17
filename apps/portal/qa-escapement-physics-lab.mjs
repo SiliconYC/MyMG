@@ -29,7 +29,7 @@ try {
   const scan = await page.evaluate(()=>{
     const cases=[];
     for(const driveTorque of [-0.8,-2,-4])
-      for(const startTorqueImpulse of [1.25,3,6]) {
+      for(const startTorqueImpulse of [-6,-3,-1.25,1.25,3,6]) {
         const trial={driveTorque,startTorqueImpulse};
         const q=window.__mymgEscapementLab.audit(60,'full',trial);
         cases.push({...trial,accepted:q.accepted,alternations:q.alternations,
