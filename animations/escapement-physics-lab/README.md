@@ -52,3 +52,7 @@
 此前 60s / 68 次交替数据只能证明**旧实心模型**；轮体惯量变动可能改变新模型的稳定性，必须重新进行 10s / 60s Chromium 测试，记录结果后才可继续说“候选通过”。新状态 `UNVERIFIED` 显示「采集中」，不再在未达到 10 秒时错误标记为失败。穿透显示「模型单位」，避免未经实际标定就宣称 mm 精度。页面几何全部来自动态刚体坐标，无预计算位置。
 
 参考：BHI *Drawing Clock and Watch Escapements* (2011) Graham wheel spoke/rim diagram；[Princeton Graham 示意](https://www.princeton.edu/~timeteam/graham.html)；[AbbeyClock 锁止/冲量工作面原理](https://abbeyclock.com/anchor.html)。
+
+### 物理模型重量变化后的实测参数再校准
+
+更换实心圆盘为真实轮辋/辐条后，原始 `driveTorque=-0.8, kick=-3, wheelStart=-7°` 出现约 0.94 秒后的长期锁死（Chromium 10/60s 仅两次交替）。绝不能沿用 #81 实心轮体的 68 次交替数据。新的 Chromium 扫描共 60 组（5 个轮角 × 2 个摆角 × 3 个启动冲量 × 2 个驱动力矩），保留了每组的初始重叠审计。验证 `driveTorque=-1.1, kick=-3, wheelStart=-7°, pendulumStart=0°` 时，10 秒获得 14 次真实齿瓦交替，初始无重叠。于是仅将驱动力矩改为 -1.1，再提交完整 60 秒、接触配对、连续停转审计；若新版 60 秒未过，则标为失败，不得假装物理通过。
