@@ -17,9 +17,9 @@ export const START_AMPLITUDE=.145;
 export const WHEEL_PROFILE:ReadonlyArray<readonly [number,number]>=[
   [0,1.29],[.19,1.31],[.34,1.53],[.43,1.55],[.69,1.32],[.93,1.29],
 ];
-export const PALLET_SHOE_POLAR=.035;
-export const LOCK_REFERENCE_ANGLE=START_AMPLITUDE*Math.cos(Math.PI*.42);
-
+export const PALLET_ARC_BAND=.045;
+export const PALLET_LOCK_SWEEP=.14;
+export const PALLET_SEGMENTS=7;
 export const polar=(r:number,a:number):Point=>[r*Math.sin(a),r*Math.cos(a)];
 export const rotate=(p:Point,a:number):Point=>[
   p[0]*Math.cos(a)-p[1]*Math.sin(a),
@@ -49,52 +49,65 @@ function originalFlankPoint(index:number,angle:number):Point{
   const b=polar(1.32,(index+.69)*PITCH+angle);
   return add(scale(a,.60),scale(b,.40));
 }
-/** Fork shoes are mounted OUTSIDE the wheel rim and point inward. The old
- * shoe bases were inside the wheel's SOLID swept disk, which made the V arms
- * cut across the teeth. Both arms now stay radially outside the teeth.
+/** A genuine deadbeat locking face is a short circular ARC about the
+ * anchor pivot. A tooth may HOLD the driven wheel without blocking free
+ * pendulum rotation; at the arc's END it releases, and the opposite tooth
+ * collides with the other shoe. A straight radial shoe wedges and jams.
  *
- * Zero is the anchor pivot. This reference is a physical manufactured part:
- * both shoe outlines and fork bases are time-independent on the anchor.
+ * Both face and radius/bounds are manufactured in anchor-local coordinates
+ * and are shared by contact quads and the visible continuous 3D solid.
  */
-function makePallet(side:Side):{
-  tip:Point;base:Point;outline:Point[];angle:number;
-}{
+const anchorPolar=(radius:number,phi:number):Point=>
+  [radius*Math.sin(phi),-radius*Math.cos(phi)];
+function makeDeadbeat(side:Side){
   const entry=side==='entry';
-  const i=entry?-4:3;
-  const wheelAngle=entry?0:PITCH/2;
-  const pendAngle=entry?LOCK_REFERENCE_ANGLE:-LOCK_REFERENCE_ANGLE;
-  const ref=originalFlankPoint(i,wheelAngle);
-  const radial=unit(ref);
-  // A short working nose dips into the swept tooth band; its backside and
-  // mounting arm are OUTSIDE the 1.55 wheel tip radius.
-  const tipWheel=add(ref,scale(radial,.014));
-  // Clear the opposite (idle) tooth arc: the original symmetric wedge
-  // intersected tooth #4 at the FIRST frame, freezing the whole mechanism.
-  // This axial-free tangential adjustment was selected using two-pose SAT
-  // tests including BOTH full fork arm solids, not only their noses.
-  const trim:Point=entry?[0,0]:[-.20,.275];
-  const localTip=add(
-    rotate(sub(add(tipWheel,[0,WHEEL_Y]),[0,PIVOT_Y]),pendAngle),
-    trim,
-  );
-  const tangent:Point=[-radial[1],radial[0]];
-  const outLocal=rotate(radial,pendAngle);
-  const tanLocal=rotate(tangent,pendAngle);
-  const base=add(localTip,scale(outLocal,PALLET_LENGTH));
-  const outline=[
-    add(localTip,scale(tanLocal,-PALLET_SHOE_POLAR)),
-    add(localTip,scale(tanLocal,PALLET_SHOE_POLAR)),
-    add(base,scale(tanLocal,.045)),
-    add(base,scale(tanLocal,-.045)),
-  ];
-  return {tip:localTip,base,outline,angle:Math.atan2(outLocal[0],outLocal[1])};
+  const ref=originalFlankPoint(entry?-4:3,entry?0:PITCH/2);
+  const p:Point=[ref[0],ref[1]+WHEEL_Y-PIVOT_Y];
+  const radius=len(p);
+  const phi=Math.atan2(p[0],-p[1]);
+  const lo=phi+(entry?.005:-PALLET_LOCK_SWEEP-.005);
+  const hi=phi+(entry?PALLET_LOCK_SWEEP+.005:-.005);
+  return {radius,phi,lo,hi};
 }
-const PALLETS={entry:makePallet('entry'),exit:makePallet('exit')};
-export const palletTip=(side:Side):Point=>PALLETS[side].tip;
-export const palletBase=(side:Side):Point=>PALLETS[side].base;
-export const palletOutline=(side:Side):Point[]=>PALLETS[side].outline;
+const DEADBEAT={entry:makeDeadbeat('entry'),exit:makeDeadbeat('exit')};
+export const palletArcSpec=(side:Side)=>DEADBEAT[side];
+export const palletTip=(side:Side):Point=>{
+  const s=DEADBEAT[side];
+  return anchorPolar(s.radius,side==='entry'?s.lo:s.hi);
+};
+export const palletBase=(side:Side):Point=>{
+  const s=DEADBEAT[side];
+  return anchorPolar(s.radius-PALLET_ARC_BAND-.018,(s.lo+s.hi)/2);
+};
+export function palletOutline(side:Side):Point[]{
+  const s=DEADBEAT[side];
+  const outline:Point[]=[];
+  for(let i=0;i<=PALLET_SEGMENTS;i++){
+    outline.push(anchorPolar(s.radius,s.lo+(s.hi-s.lo)*i/PALLET_SEGMENTS));
+  }
+  for(let i=PALLET_SEGMENTS;i>=0;i--){
+    outline.push(anchorPolar(s.radius-PALLET_ARC_BAND,
+      s.lo+(s.hi-s.lo)*i/PALLET_SEGMENTS));
+  }
+  return outline;
+}
+/** Convex planar collision strips exactly tessellate the rendered arc. */
+export function palletPieces(side:Side):Point[][]{
+  const s=DEADBEAT[side];
+  return Array.from({length:PALLET_SEGMENTS},(_,i)=>{
+    const lo=s.lo+(s.hi-s.lo)*i/PALLET_SEGMENTS;
+    const hi=s.lo+(s.hi-s.lo)*(i+1)/PALLET_SEGMENTS;
+    return [
+      anchorPolar(s.radius,lo),anchorPolar(s.radius,hi),
+      anchorPolar(s.radius-PALLET_ARC_BAND,hi),
+      anchorPolar(s.radius-PALLET_ARC_BAND,lo),
+    ];
+  });
+}
 export const palletWorld=(side:Side,angle:number):Point[] =>
   palletOutline(side).map(p=>worldAnchor(p,angle));
+export const palletCollisionWorld=(side:Side,angle:number):Point[][] =>
+  palletPieces(side).map(piece=>piece.map(p=>worldAnchor(p,angle)));
 export const palletBaseWorld=(side:Side,angle:number):Point=>
   worldAnchor(palletBase(side),angle);
 export function forkOutline(side:Side):Point[]{
