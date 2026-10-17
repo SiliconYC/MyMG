@@ -152,7 +152,7 @@ export class EscapementSimulation {
     this.queue = new RAPIER.EventQueue(true);
     // Narrow-phase geometry preflight, BEFORE any integration or solver correction.
     this.initialOverlap = this.toothColliders.some(t =>
-      this.palletColliders.some(p => (t.contactCollider(p, 0)?.dist ?? 0) < -1e-6));
+      this.palletColliders.some(p => (t.contactCollider(p, 0)?.distance ?? 0) < -1e-6));
   }
 
   private addPoly(name: string, owner: 'wheel' | 'anchor',
