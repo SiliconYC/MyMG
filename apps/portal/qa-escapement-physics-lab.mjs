@@ -24,6 +24,22 @@ try {
   const single=await page.evaluate(()=>window.__mymgEscapementLab.audit(10,'single'));
   const ten=await page.evaluate(()=>window.__mymgEscapementLab.audit(10));
   const sixty=await page.evaluate(()=>window.__mymgEscapementLab.audit(60));
+  // One Chromium WASM run explores real (non-scripted) physical start conditions.
+  // Every case creates an independent Rapier world, with a one-off manual kick.
+  const scan = await page.evaluate(()=>{
+    const cases=[];
+    for(const driveTorque of [-0.8,-2,-4])
+      for(const startTorqueImpulse of [1.25,3,6]) {
+        const trial={driveTorque,startTorqueImpulse};
+        const q=window.__mymgEscapementLab.audit(60,'full',trial);
+        cases.push({...trial,accepted:q.accepted,alternations:q.alternations,
+          contactCount:q.contactCount,forward:q.forward,reverse:q.reverse,
+          maxSwingAngle:q.maxSwingAngle,longestStuck:q.longestStuck,
+          maxPenetration:q.maxPenetration,contacts:q.contactSequence.slice(0,10)});
+      }
+    return cases;
+  });
+  console.log('Graham parameter sweep 60s in Chromium',JSON.stringify(scan));
   assert.equal(ten.step,2400);
   assert.equal(sixty.step,14400);
   assert.equal(single.step,2400);
@@ -69,6 +85,7 @@ try {
   report={site,engine:await page.evaluate(()=>window.__mymgEscapementLab.version),
     initial,single,ten,sixty,resetReplays:repeats,oneFrame:afterStep,
     geometry:sixty.parameters.geometry,contactSequence:sixty.contactSequence,
+    trialSweep:scan,
     explanation:!sixty.accepted?
       'NEGATIVE PHYSICAL EXPERIMENT: do not transfer this model to the pendulum clock':
       'CANDIDATE only: requires independent geometry and contact review'};
