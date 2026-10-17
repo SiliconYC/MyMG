@@ -4,7 +4,7 @@ import {EscapementSimulation, initRapier, runAudit, STEP, PARAMETERS,
   LAB_VERSION, type Mode, type Point, type Readout, type Solid} from './physics-lab';
 
 const X = (x: number) => 640 + 93 * x;
-const Y = (y: number) => 445 - 93 * y;
+const Y = (y: number) => 405 - 93 * y;
 const fmt = (x: number, digits = 3) => Number.isFinite(x) ? x.toFixed(digits) : 'NaN';
 const path = (points: readonly Point[]) =>
   points.map((p, i) => (i === 0 ? 'M' : 'L') + X(p[0]).toFixed(2) + ' ' + Y(p[1]).toFixed(2)).join(' ') + ' Z';
