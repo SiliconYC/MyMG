@@ -17,6 +17,9 @@ try {
   await page.waitForFunction(()=>typeof window.__mymgEscapementLab?.audit==='function',null,{timeout:60_000});
   const initial=await page.evaluate(()=>window.__mymgEscapementLab.state());
   assert.equal(initial.step,0);
+  // Geometric assembly MUST NOT start with tooth/pallet interpenetration.
+  assert.equal(initial.initialOverlap,false,'Graham geometry starts interpenetrating');
+  await page.getByText('实验未通过物理验证').waitFor({timeout:20_000});
   await page.screenshot({path:resolve(out,'full-initial.png'),fullPage:true});
   const single=await page.evaluate(()=>window.__mymgEscapementLab.audit(10,'single'));
   const ten=await page.evaluate(()=>window.__mymgEscapementLab.audit(10));
@@ -24,6 +27,17 @@ try {
   assert.equal(ten.step,2400);
   assert.equal(sixty.step,14400);
   assert.equal(single.step,2400);
+  assert.equal(ten.initialOverlap,false);
+  assert.equal(sixty.initialOverlap,false);
+  assert.equal(sixty.contactSequence.every(e =>
+    Number.isInteger(e.toothId) && e.toothId>=0 && e.toothId<30
+    && (e.side==='left'||e.side==='right')),true,
+    'The contact sequence must contain only actual tooth/pallet events');
+  assert.equal(sixty.parameters.geometry.pitchDeg,12);
+  assert.equal(sixty.parameters.geometry.embracedDeg,90);
+  assert.ok(sixty.parameters.geometry.leftTangentDot<1e-8);
+  assert.ok(sixty.parameters.geometry.rightTangentDot<1e-8);
+  assert.equal(sixty.parameters.geometry.diameterRatio,0.75);
   for (const x of [single,ten,sixty]) {
     for (const k of ['wheelAngle','anchorAngle','forward','reverse','totalImpulse','maxPenetration','alternations','longestStuck','physicsMs'])
       assert.ok(Number.isFinite(x[k]),x.mode+' invalid '+k);
@@ -51,6 +65,7 @@ try {
   assert.deepEqual(errors,[]);
   report={site,engine:await page.evaluate(()=>window.__mymgEscapementLab.version),
     initial,single,ten,sixty,resetReplays:repeats,oneFrame:afterStep,
+    geometry:sixty.parameters.geometry,contactSequence:sixty.contactSequence,
     explanation:!sixty.accepted?
       'NEGATIVE PHYSICAL EXPERIMENT: do not transfer this model to the pendulum clock':
       'CANDIDATE only: requires independent geometry and contact review'};
@@ -66,6 +81,7 @@ try {
     '- Maximum penetration m: '+sixty.maxPenetration,
     '- Accumulated reverse rad: '+sixty.reverse,
     '- Longest stuck s: '+sixty.longestStuck,
+    '- Real tooth/pallet start/end events: '+sixty.contactSequence.length,
     '- Result: '+(sixty.accepted?'CANDIDATE, NOT CERTIFIED':'EXPERIMENT NOT PHYSICALLY VERIFIED'),
     '',
     'All measurements are gathered from running Rapier WASM in Chromium, not preset animation curves.',
@@ -75,6 +91,7 @@ try {
     singleImpulse:single.totalImpulse,tenAlternations:ten.alternations,
     sixtyAlternations:sixty.alternations,maxPenetration:sixty.maxPenetration,
     reverse:sixty.reverse,initialOverlap:sixty.initialOverlap,
+    toothEvents:sixty.contactSequence.length,
   }));
 } catch(e) {
   await writeFile(resolve(out,'failure.txt'),(e.stack??String(e))+'\n'+errors.join('\n'));
