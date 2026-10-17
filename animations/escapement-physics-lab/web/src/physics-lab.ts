@@ -92,6 +92,8 @@ export class EscapementSimulation {
   readonly mode: Mode;
   private queue: RAPIER.EventQueue;
   private sides = new Map<number, Side>();
+  private palletColliders: RAPIER.Collider[] = [];
+  private toothColliders: RAPIER.Collider[] = [];
   private contact = {left: false, right: false};
   private counts = {left: 0, right: 0};
   private impulses = {left: 0, right: 0};
@@ -143,11 +145,8 @@ export class EscapementSimulation {
       PARAMETERS.bobRadius, 1.5);
     this.queue = new RAPIER.EventQueue(true);
     // Narrow-phase geometry preflight, BEFORE any integration or solver correction.
-    this.initialOverlap = this.solids
-      .filter(s => s.owner === 'wheel' && s.name.startsWith('tooth'))
-      .some(t => this.solids.filter(s => s.side).some(p =>
-        convexOverlap(worldVertices(t, this.wheel.rotation()),
-          worldVertices(p, this.anchor.rotation()))));
+    this.initialOverlap = this.toothColliders.some(t =>
+      this.palletColliders.some(p => (t.contactCollider(p, 0)?.dist ?? 0) < -1e-6));
   }
 
   private addPoly(name: string, owner: 'wheel' | 'anchor',
@@ -158,7 +157,8 @@ export class EscapementSimulation {
       .setFriction(PARAMETERS.friction).setRestitution(PARAMETERS.restitution)
       .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS |
         RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS), owner === 'wheel' ? this.wheel : this.anchor);
-    if (side) this.sides.set(collider.handle, side);
+    if (side) {this.sides.set(collider.handle, side); this.palletColliders.push(collider);}
+    if (name.startsWith('tooth')) this.toothColliders.push(collider);
     this.solids.push({name, owner, kind: 'poly', vertices, side});
   }
   private addCircle(name: string, owner: 'wheel' | 'anchor',
@@ -200,8 +200,6 @@ export class EscapementSimulation {
     // Signed contact distances are read from Rapier manifold, never a self-made solver.
     let penetrating = false;
     const seen = {left: false, right: false};
-    this.world.contactPairsWith(this.world.getCollider(
-      [...this.sides.keys()][0]), () => undefined);
     for (const [handle, side] of this.sides) {
       const c = this.world.getCollider(handle);
       if (!c) continue;
@@ -254,19 +252,6 @@ export class EscapementSimulation {
 export function worldVertices(s: Solid, angle: number): Point[] {
   if (!s.vertices) return [];
   return s.vertices.map(p => worldPoint(p, s.owner, angle));
-}
-// Separating-axis OVERLAP TEST ONLY for geometric initial preflight.
-// NO dynamics, collision normal, manifold generation or impulse calculation.
-export function convexOverlap(a: Point[], b: Point[]): boolean {
-  for (const poly of [a, b]) for (let i = 0; i < poly.length; i++) {
-    const p = poly[i], q = poly[(i + 1) % poly.length];
-    const nx = q[1] - p[1], ny = p[0] - q[0];
-    const project = (vertices: Point[]) => vertices.map(v => nx * v[0] + ny * v[1]);
-    const aa = project(a), bb = project(b);
-    if (Math.max(...aa) <= Math.min(...bb) || Math.max(...bb) <= Math.min(...aa))
-      return false;
-  }
-  return true;
 }
 export type Audit = Readout & {seconds: number; accepted: boolean; engine: string; parameters: typeof PARAMETERS};
 export function runAudit(seconds: 10 | 60, mode: Mode = 'full'): Audit {
