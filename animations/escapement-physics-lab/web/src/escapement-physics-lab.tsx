@@ -2,7 +2,11 @@ import React, {useEffect, useRef, useState} from 'react';
 import {useCurrentFrame} from 'remotion';
 import {EscapementSimulation, initRapier, runAudit, STEP, PARAMETERS,
   LAB_VERSION, type Mode, type Point, type Readout, type Solid} from './physics-lab';
+import {grahamPallet} from './graham-geometry';
 
+// Anchor arms connect to the BACK of the actual working pallets, not their tips.
+const entryPallet = grahamPallet('left');
+const exitPallet = grahamPallet('right');
 const X = (x: number) => 640 + 93 * x;
 const Y = (y: number) => 405 - 93 * y;
 const fmt = (x: number, digits = 3) => Number.isFinite(x) ? x.toFixed(digits) : 'NaN';
@@ -97,8 +101,8 @@ export const EscapementLabScene: React.FC = () => {
   const angleWheel = state?.wheelAngle ?? 0;
   const angleAnchor = state?.anchorAngle ?? 0;
   const a = ([x,y]: Point): Point => circlePosition([x,y], angleAnchor, true);
-  const baseLeft = a([-1.771, -1.228]);
-  const baseRight = a([1.771,-1.228]);
+  const baseLeft = a(entryPallet[5]);
+  const baseRight = a(exitPallet[3]);
   const pivot: Point = [0, PARAMETERS.pivotY];
   const bob = a([0, -PARAMETERS.pendulumLength]);
   const passed = state?.status === 'CANDIDATE' ? '待复核（连续接触候选）' : '实验未通过物理验证';
@@ -116,7 +120,7 @@ export const EscapementLabScene: React.FC = () => {
         <path d="M 640 35 V 716 M 360 445 H 920" strokeDasharray="4 9"/>
       </g>
       <text x="38" y="57" fill="#dcebf3" fontSize="26" letterSpacing="1.6">ESCAPEMENT / PHYSICS LAB</text>
-      <text x="40" y="88" fill="#88a3b7" fontSize="15">RAPIER 2D · 真实力矩 / 实体碰撞 / 重力钟摆 · #78</text>
+      <text x="40" y="88" fill="#88a3b7" fontSize="15">RAPIER 2D · Graham 静止式擒纵 · 30 齿 / 7.5 齿跨距 · 真实刚体试验</text>
       <g stroke="#607f95" strokeWidth="2" fill="none">
         <path d={`M ${X(pivot[0])} ${Y(pivot[1])} L ${X(bob[0])} ${Y(bob[1])}`}
           stroke="#7a8496" strokeDasharray="10 5" strokeWidth="5"/>

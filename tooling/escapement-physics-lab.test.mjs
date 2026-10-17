@@ -8,7 +8,8 @@ const catalog=readFileSync(resolve(import.meta.dirname,'../apps/portal/src/catal
 test('issue 78 is a separate Rapier WASM experiment, not a new hand-made solver',()=>{
   assert.match(src,/from '@dimforge\/rapier2d-compat'/);
   assert.match(src,/RAPIER\.JointData\.revolute/g);
-  assert.match(src,/\.addTorque\(PARAMETERS\.driveTorque/);
+  assert.match(src,/\.addTorque\(trial\.driveTorque \?\? PARAMETERS\.driveTorque/);
+  assert.match(src,/\.applyTorqueImpulse\(trial\.startTorqueImpulse \?\? PARAMETERS\.startTorqueImpulse/);
   assert.match(src,/world\.step\(this\.queue\)/);
   assert.match(src,/contactForceEvents|drainContactForceEvents/);
   assert.match(src,/contactCollider\(p, 0\)/);

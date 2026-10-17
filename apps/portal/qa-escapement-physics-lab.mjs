@@ -17,13 +17,88 @@ try {
   await page.waitForFunction(()=>typeof window.__mymgEscapementLab?.audit==='function',null,{timeout:60_000});
   const initial=await page.evaluate(()=>window.__mymgEscapementLab.state());
   assert.equal(initial.step,0);
+  // Geometric assembly MUST NOT start with tooth/pallet interpenetration.
+  assert.equal(initial.initialOverlap,false,'Graham geometry starts interpenetrating');
+  await page.getByText('实验未通过物理验证').waitFor({timeout:20_000});
   await page.screenshot({path:resolve(out,'full-initial.png'),fullPage:true});
   const single=await page.evaluate(()=>window.__mymgEscapementLab.audit(10,'single'));
   const ten=await page.evaluate(()=>window.__mymgEscapementLab.audit(10));
   const sixty=await page.evaluate(()=>window.__mymgEscapementLab.audit(60));
+
+  // Independent event-sequence review: a contact start alone does not prove
+  // locking or release. Match real tooth/pallet start/end pairs, reject
+  // repeated orphan events, and count alternating *completed* dwells only.
+  const livePairs=new Map();
+  const completedContacts=[];
+  let malformedEvents=0;
+  for(const event of sixty.contactSequence){
+    const key=event.side+':'+event.toothId;
+    if(event.event==='start'){
+      if(livePairs.has(key)) malformedEvents++;
+      else livePairs.set(key,event.time);
+    } else {
+      const from=livePairs.get(key);
+      if(from===undefined) malformedEvents++;
+      else {
+        completedContacts.push({side:event.side,toothId:event.toothId,
+          start:from,end:event.time,duration:event.time-from});
+        livePairs.delete(key);
+      }
+    }
+  }
+  const dwellContacts=completedContacts.filter(x=>x.duration>=0.025);
+  let completedAlternations=0,priorCompletedSide=null;
+  for(const event of dwellContacts){
+    if(priorCompletedSide!==null && event.side!==priorCompletedSide)
+      completedAlternations++;
+    priorCompletedSide=event.side;
+  }
+  const contactReview={malformedEvents,unclosedPairs:[...livePairs.keys()],
+    completedPairs:completedContacts.length,qualifiedPairs:dwellContacts.length,
+    qualifiedAlternations:completedAlternations,minimumDwellSeconds:0.025,
+    firstQualifiedPairs:dwellContacts.slice(0,16)};
+  assert.equal(contactReview.malformedEvents,0,
+    'Malformed tooth/pallet start/end event pairing');
+  assert.ok(contactReview.qualifiedAlternations>=10,
+    'Real completed lock/release contacts did not alternate at least ten times');
+  assert.ok(new Set(dwellContacts.map(x=>x.toothId)).size>=8,
+    'Insufficient distinct contacted teeth: possible chattering');
+
+  // One Chromium WASM run explores real (non-scripted) physical start conditions.
+  // Every case creates an independent Rapier world, with a one-off manual kick.
+  const scan = await page.evaluate(()=>{
+    const cases=[];
+    for(const wheelDeg of [-17,-15,-13,-11,-9,-7,-5])
+      for(const anchorDeg of [-1.5,0,1.5])
+        for(const kick of [-3,3]) {
+          const trial={driveTorque:-0.8,wheelStart:wheelDeg*Math.PI/180,
+            pendulumStart:anchorDeg*Math.PI/180,startTorqueImpulse:kick};
+          const q=window.__mymgEscapementLab.audit(10,'full',trial);
+          cases.push({wheelDeg,anchorDeg,kick,overlap:q.initialOverlap,
+            alternations:q.alternations,forward:q.forward,reverse:q.reverse,
+            maxSwingAngle:q.maxSwingAngle,longestStuck:q.longestStuck,
+            contacts:q.contactSequence.slice(0,8)});
+        }
+    return cases.sort((a,b)=>b.alternations-a.alternations||a.longestStuck-b.longestStuck);
+  });
+  console.log('Graham phase sweep 10s in Chromium',JSON.stringify(scan.slice(0,22)));
   assert.equal(ten.step,2400);
   assert.equal(sixty.step,14400);
   assert.equal(single.step,2400);
+  assert.equal(ten.initialOverlap,false);
+  const firstContacts=ten.contactSequence.filter(e => e.event==='start' && e.time <= 2/240);
+  assert.ok(firstContacts.length<=1,
+    'Malformed escapement: simultaneous tooth contacts at startup '+JSON.stringify(firstContacts));
+  assert.equal(sixty.initialOverlap,false);
+  assert.equal(sixty.contactSequence.every(e =>
+    Number.isInteger(e.toothId) && e.toothId>=0 && e.toothId<30
+    && (e.side==='left'||e.side==='right')),true,
+    'The contact sequence must contain only actual tooth/pallet events');
+  assert.equal(sixty.parameters.geometry.pitchDeg,12);
+  assert.equal(sixty.parameters.geometry.embracedDeg,90);
+  assert.ok(sixty.parameters.geometry.leftTangentDot<1e-8);
+  assert.ok(sixty.parameters.geometry.rightTangentDot<1e-8);
+  assert.equal(sixty.parameters.geometry.diameterRatio,0.75);
   for (const x of [single,ten,sixty]) {
     for (const k of ['wheelAngle','anchorAngle','forward','reverse','totalImpulse','maxPenetration','alternations','longestStuck','physicsMs'])
       assert.ok(Number.isFinite(x[k]),x.mode+' invalid '+k);
@@ -51,6 +126,8 @@ try {
   assert.deepEqual(errors,[]);
   report={site,engine:await page.evaluate(()=>window.__mymgEscapementLab.version),
     initial,single,ten,sixty,resetReplays:repeats,oneFrame:afterStep,
+    geometry:sixty.parameters.geometry,contactSequence:sixty.contactSequence,
+    trialSweep:scan,contactReview,
     explanation:!sixty.accepted?
       'NEGATIVE PHYSICAL EXPERIMENT: do not transfer this model to the pendulum clock':
       'CANDIDATE only: requires independent geometry and contact review'};
@@ -66,6 +143,9 @@ try {
     '- Maximum penetration m: '+sixty.maxPenetration,
     '- Accumulated reverse rad: '+sixty.reverse,
     '- Longest stuck s: '+sixty.longestStuck,
+    '- Real tooth/pallet start/end events: '+sixty.contactSequence.length,
+    '- Independently paired/dwell-qualified alternations: '+contactReview.qualifiedAlternations,
+    '- Unmatched/malformed contact events: '+contactReview.malformedEvents,
     '- Result: '+(sixty.accepted?'CANDIDATE, NOT CERTIFIED':'EXPERIMENT NOT PHYSICALLY VERIFIED'),
     '',
     'All measurements are gathered from running Rapier WASM in Chromium, not preset animation curves.',
@@ -75,6 +155,14 @@ try {
     singleImpulse:single.totalImpulse,tenAlternations:ten.alternations,
     sixtyAlternations:sixty.alternations,maxPenetration:sixty.maxPenetration,
     reverse:sixty.reverse,initialOverlap:sixty.initialOverlap,
+    toothEvents:sixty.contactSequence.length,contactReview,
+    contactSequence:sixty.contactSequence.slice(0,24),
+    tenState:{wheelAngle:ten.wheelAngle,anchorAngle:ten.anchorAngle,forward:ten.forward,reverse:ten.reverse,
+      wheelOmega:ten.wheelOmega,anchorOmega:ten.anchorOmega,longestStuck:ten.longestStuck,
+      contacts:ten.contactCount,impulse:ten.totalImpulse},
+    sixtyState:{wheelAngle:sixty.wheelAngle,anchorAngle:sixty.anchorAngle,forward:sixty.forward,reverse:sixty.reverse,
+      wheelOmega:sixty.wheelOmega,anchorOmega:sixty.anchorOmega,longestStuck:sixty.longestStuck,
+      contacts:sixty.contactCount,impulse:sixty.totalImpulse},
   }));
 } catch(e) {
   await writeFile(resolve(out,'failure.txt'),(e.stack??String(e))+'\n'+errors.join('\n'));
