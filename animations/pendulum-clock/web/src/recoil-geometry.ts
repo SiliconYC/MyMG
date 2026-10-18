@@ -82,11 +82,11 @@ export function anchorLocalOutline():Point[]{
   path.push(...cubic([.085,.035],[.36,.005],
     [xBack[0]+.06,xBack[1]+.22],xBack).slice(1));
   path.push(x.polygon[2],x.toe,x.heel);
-  path.push(...cubic(x.heel,[x.heel[0]-.13,x.heel[1]+.09],
-    [.30,-.10],[.04,-.07]).slice(1));
+  path.push(...cubic(x.heel,[x.heel[0]-.09,x.heel[1]+.09],
+    [.34,-.09],[.04,-.07]).slice(1));
   path.push([0,-.09],[-.04,-.07]);
-  path.push(...cubic([-.04,-.07],[-.30,-.10],
-    [eBack[0]+.13,eBack[1]+.08],eBack).slice(1));
+  path.push(...cubic([-.04,-.07],[-.34,-.09],
+    [eBack[0]+.09,eBack[1]+.08],eBack).slice(1));
   path.push(e.polygon[2],e.toe,e.heel);
   path.push(...cubic(e.heel,[e.heel[0]-.04,e.heel[1]+.23],
     [-.36,.005],[-.085,.035]).slice(1));
