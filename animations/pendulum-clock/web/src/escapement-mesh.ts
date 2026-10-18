@@ -23,5 +23,5 @@ export function makeEscapeWheel():THREE.ExtrudeGeometry{
   return extrude(shape,WHEEL_THICKNESS,WHEEL_PLANE_Z);
 }
 export function makeAnchorGeometry():THREE.ExtrudeGeometry{
-  return extrude(profile(anchorLocalOutline()),PALLET_THICKNESS,PALLET_PLANE_Z,.008,4);
+  return extrude(profile(anchorLocalOutline()),PALLET_THICKNESS,PALLET_PLANE_Z,.003,4);
 }
