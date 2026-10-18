@@ -40,3 +40,13 @@
 - 截图与 JSON 存放于忽略提交的 `output/qa-clock/`。对公开页面可复用 `MYMG_QA_URL=https://siliconyc.github.io/MyMG/ pnpm --filter @mymg/portal qa:clock`，并核对页脚 BUILD 与发布提交；公开部署的实测结果由本次交付记录给出。
 
 模型使用理想轴承、集中惯量、无摩擦工作面、完全非弹性法向接触与轴系阻尼。未模拟完整发条/重锤轮系、润滑、磨损和机架弹性。详见 [蓝图](BLUEPRINT.md)。
+
+## 公开页面发布验收
+
+2026-10-18 已在规范地址 <https://siliconyc.github.io/MyMG/#/pendulum-clock> 完成浏览器复验。
+
+- 发布实现提交：`47fcf48f3edb58f0e990ec2b52c5caed5fbda7c3`，页脚读取到 `BUILD 47fcf48f3edb`。
+- [GitHub Pages 工作流](https://github.com/SiliconYC/MyMG/actions/runs/39084191227)：测试、生产构建、部署与公开 HTML/资源核查均成功。
+- 公开页面同一套 `qa:clock` 通过，包含真实双侧接触、反冲、60 次承接、共同轴位移、冷拖动、倒放、暂停/播放与手机布局；运行时及资源错误列表为空。
+- 公开页面冷拖动 `0 → 1799` 实测 **400 ms**。桌面特写及390 px手机长截图已经目视检查。
+- 原始线上证据保存于本机 `output/qa-clock-live/clock-qa.json`、`release-build.json` 和同目录截图；生成媒体不提交。后续文档提交不改变上述已发布实现。

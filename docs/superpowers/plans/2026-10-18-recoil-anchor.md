@@ -47,7 +47,7 @@ Consumes Task 1 states; produces the reviewable scene and browser evidence.
 - [x] Update blueprint and README with parameters, measured results and limitations.
 - [x] Run `pnpm check`, `pnpm build:portal` and `pnpm --filter @mymg/portal qa:clock`.
 - [x] Perform whole-branch review, fix actionable findings, rerun affected checks.
-- [ ] Merge to dev, push origin/dev, wait for Pages and verify public route/build.
+- [x] Merge to dev, push origin/dev, wait for Pages and verify public route/build.
 
 ## Execution record
 
@@ -60,3 +60,5 @@ Consumes Task 1 states; produces the reviewable scene and browser evidence.
 - Review fix: cold seeking stalled the main thread; cached normals, SAT early-outs and shared per-substep manifolds reduce fresh Chromium0→1799 to461ms. Browser regression checks cold seek before warmup with a3000ms budget.
 - Independent review: no remaining code blockers; 2500-pose exhaustive tooth comparison and direct fractional replay passed.
 - Pre-release verification: pnpm check56/56 plus all typechecks; production build; desktop/mobile browser QA.
+
+- Task 3 complete: implementation47fcf48 merged to dev and pushed; Pages run39084191227 succeeded. Canonical public page reports BUILD47fcf48f3edb and passes the same desktop/mobile QA with400ms cold seek and no runtime/resource errors. Release evidence documented in animations/pendulum-clock/RESULTS.md.
