@@ -26,42 +26,35 @@ export function makeAnchorGeometry():THREE.ExtrudeGeometry{
   return extrude(profile(anchorLocalOutline()),PALLET_THICKNESS,PALLET_PLANE_Z,.003,4);
 }
 
-/** The visible fork uses two independent swept arms, leaving the space
- * between them open. The contact shoes reuse the audited working-face points;
- * each round arm follows the original certified anchor envelope.
+/** The visible fork is made from one cubic parameterization, fitted between
+ * matching boundary controls for each fixed shoe. Both arms share its smooth
+ * Bernstein progression and continue directly into the contact shoes.
  */
 export function makeAnchorVisualGeometries():THREE.BufferGeometry[]{
   const {entry,exit}=FACES;
-  const rightBack=exit.polygon[3],leftBack=entry.polygon[3];
   const hub=new THREE.Shape();
   hub.absellipse(0,.033,.04,.05,0,Math.PI*2,false,0);
-  const bezier=(a:readonly [number,number],b:readonly [number,number],
-    c:readonly [number,number],d:readonly [number,number],t:number):[number,number]=>{
-    const u=1-t;
-    return [u**3*a[0]+3*u*u*t*b[0]+3*u*t*t*c[0]+t**3*d[0],
-      u**3*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t**3*d[1]];
+  const sweptBetweenBoundaries=(outer:readonly (readonly [number,number])[],
+    inner:readonly (readonly [number,number])[],root:readonly [number,number])=>{
+    // Both sides use the same Bernstein parameter t. Averaging corresponding
+    // boundary controls gives the centerline with no spline joins or endpoint
+    // kinks. The start is tucked into the common pivot hub.
+    const controls=outer.map((p,i)=>[(p[0]+inner[i][0])/2,(p[1]+inner[i][1])/2] as const);
+    controls[0]=root;
+    const [a,b,c,d]=controls.map(([x,y])=>new THREE.Vector3(x,y,PALLET_PLANE_Z));
+    return new THREE.TubeGeometry(new THREE.CubicBezierCurve3(a,b,c,d),128,.0095,12,false);
   };
-  const between=(a:readonly [number,number],b:readonly [number,number],
-    c:readonly [number,number],d:readonly [number,number],
-    e:readonly [number,number],f:readonly [number,number],
-    g:readonly [number,number],h:readonly [number,number])=>
-    Array.from({length:49},(_,i)=>{
-      const t=i/48,p=bezier(a,b,c,d,t),q=bezier(e,f,g,h,t);
-      return [(p[0]+q[0])/2,(p[1]+q[1])/2] as const;
-    });
-  const rod=(points:readonly (readonly [number,number])[])=>{
-    const curve=new THREE.CatmullRomCurve3(points.map(([x,y])=>
-      new THREE.Vector3(x,y,PALLET_PLANE_Z)),false,'centripetal');
-    return new THREE.TubeGeometry(curve,96,.0095,12,false);
-  };
-  const rightSpine=between([.085,.035],[.36,.005],
-    [rightBack[0]+.06,rightBack[1]+.22],rightBack,
-    [.04,-.07],[.34,-.09],[exit.heel[0]-.09,exit.heel[1]+.09],exit.heel);
-  const leftSpine=between([-.085,.035],[-.36,.005],
-    [leftBack[0]+.09,leftBack[1]+.08],leftBack,
-    [-.085,.035],[-.36,.005],[entry.heel[0]-.04,entry.heel[1]+.23],entry.heel);
-  const rightRod=rod([[0,.035],...rightSpine.slice(0,-2)]);
-  const leftRod=rod([[0,.01],...leftSpine.slice(4,-2)]);
+  const rightBack=exit.polygon[3],leftBack=entry.polygon[3];
+  const rightRod=sweptBetweenBoundaries(
+    [[.085,.035],[.36,.005],[rightBack[0]+.06,rightBack[1]+.22],rightBack],
+    [[.04,-.07],[.34,-.09],[exit.heel[0]-.09,exit.heel[1]+.09],exit.heel],
+    [.04,.035],
+  );
+  const leftRod=sweptBetweenBoundaries(
+    [[-.085,.035],[-.36,.005],[leftBack[0]+.09,leftBack[1]+.08],leftBack],
+    [[-.085,.035],[-.36,.005],[entry.heel[0]-.04,entry.heel[1]+.23],entry.heel],
+    [-.04,.035],
+  );
 
   const shoe=(face:typeof entry)=>{
     const geometry=new THREE.ExtrudeGeometry(profile(face.polygon),{

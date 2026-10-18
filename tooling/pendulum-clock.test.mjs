@@ -88,6 +88,13 @@ test('seconds hand has a fixed shaft offset and exactly shares wheel displacemen
   assert.equal(TEETH,30);assert.equal(FPS,30);
 });
 
+test('the public clock film is a focused 30-second cut of the physical simulation',()=>{
+  assert.equal(DURATION,30*FPS);
+  assert.equal(SHOTS[0].start,0);
+  assert.equal(SHOTS.at(-1).end,30);
+  assert.ok(SHOTS.filter(shot=>shot.mode==='observe').length>=4);
+});
+
 test('removing the drive removes replenishment instead of preserving a programmed oscillation',()=>{
   const off=new RecoilSimulation({drive:0});
   const initial=off.state.energy;
@@ -131,10 +138,10 @@ test('axial working overlap and real bored bearing remain mechanically assembled
   assert.ok(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS>.005);
 });
 
-test('camera keeps both pallets readable in one steady close-up and transitions continuously',()=>{
-  assert.deepEqual(cameraAtFrame(24*30).position,cameraAtFrame(37*30).position);
-  assert.equal(cameraAtFrame(24*30).chapter,'contact');
-  for(let f=1;f<1800;f++){
+test('camera keeps the contact view readable and cuts dead time with brisk transitions',()=>{
+  assert.deepEqual(cameraAtFrame(11*30).position,cameraAtFrame(16*30).position);
+  assert.equal(cameraAtFrame(11*30).chapter,'contact');
+  for(let f=1;f<DURATION;f++){
     const a=cameraAtFrame(f-1),b=cameraAtFrame(f);
     assert.ok(Math.hypot(...a.position.map((v,i)=>v-b.position[i]))<1.2);
     assert.ok(Number.isFinite(b.fov));
@@ -200,8 +207,9 @@ test('the visible anchor is two separate swept arms around a compact pivot hub',
   };
   assert.ok(contains(parts[0],[0,.04]),'the pivot remains visually connected');
   parts[1].computeBoundingBox();parts[2].computeBoundingBox();
-  assert.ok(parts[1].boundingBox.max.x>.65,'right arm sweeps into its pallet');
-  assert.ok(parts[2].boundingBox.min.x<-.8,'left arm sweeps into its pallet');
+  assert.ok(parts[1].boundingBox.max.x>.62,'right arm sweeps into its pallet');
+  assert.ok(parts[2].boundingBox.min.x<-.8&&parts[2].boundingBox.min.y<-.58,
+    'the extended left arm reaches its pallet');
   for(const [part,face] of [[parts[3],FACES.entry],[parts[4],FACES.exit]])
     for(const point of face.polygon){
       const p=part.getAttribute('position');
@@ -209,6 +217,10 @@ test('the visible anchor is two separate swept arms around a compact pivot hub',
         .some(distance=>distance<5e-8),'the unchanged pallet stays attached at its exact vertices');
     }
   assert.ok(!parts.some(part=>contains(part,[0,-.2])),'the fork keeps a visible central opening');
+  const leftPositions=parts[2].getAttribute('position');
+  assert.ok(Array.from({length:leftPositions.count},(_,i)=>
+    contains(parts[3],[leftPositions.getX(i),leftPositions.getY(i)])).some(Boolean),
+    'the left arm physically overlaps the unchanged entry shoe');
   const polygon=anchorLocalOutline();
   const tubeEnvelopeTolerance=.0105;
   const inside=(point)=>{

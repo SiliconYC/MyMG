@@ -45,11 +45,11 @@ try{
   }),'real, working WebGL canvas');
   const initial=await read();
   assert.equal(initial.solver,'unilateral-recoil-1920hz');
-  const coldStart=Date.now();await seek(1799);const coldSeekMs=Date.now()-coldStart;
+  const coldStart=Date.now();await seek(899);const coldSeekMs=Date.now()-coldStart;
   assert.ok(coldSeekMs<3000,`cold end-of-minute seek blocked for ${coldSeekMs}ms`);
   await seek(0);assert.deepEqual(await read(),initial);
   const samples={},contacts=new Set();let recoil=false,forward=false;
-  const frames=[0,6,12,19,24,30,42,48,53,60,90,204,360,672,690,720,732,750,762,780,1110,1440,1799];
+  const frames=[0,6,12,19,24,30,42,48,53,60,90,120,141,240,267,330,480,510,534,555,576,765,786,899];
   for(const frame of frames){
     await seek(frame);const s=await read();samples[frame]=s;
     assert.equal(s.interference,'false',`solid interference at ${frame}`);
@@ -61,24 +61,24 @@ try{
       assert.ok((s.contact==='entry'?s.entryGap:s.exitGap)<.00019,`real contact at ${frame}`);
       assert.ok(s.tooth>=0&&s.tooth<30);
     }
-    if([0,204,360,720,732,750,762,780,1110,1440].includes(frame)){
+    if([0,120,240,330,480,510,576,765,786].includes(frame)){
       await page.waitForTimeout(100);
       await scene.screenshot({path:resolve(out,`clock-frame-${frame}.png`)});
     }
   }
   assert.ok(contacts.has('entry')&&contacts.has('exit'),'both physical working faces');
   assert.ok(recoil&&forward,'resolved forward and reverse wheel motion');
-  assert.ok(samples[1799].beats>=58&&samples[1799].beats<=63);
-  assert.ok(Math.abs(samples[1799].residual)<samples[1799].work*.04);
-  assert.ok(samples[0].z>0&&samples[360].z<0);
-  assert.equal(samples[720].x,samples[1110].x);assert.equal(samples[720].z,samples[1110].z);
-  await seek(732);assert.deepEqual(await read(),samples[732],'rewind reproduces physical state');
+  assert.ok(samples[899].beats>=58&&samples[899].beats<=63);
+  assert.ok(Math.abs(samples[899].residual)<samples[899].work*.04);
+  assert.ok(samples[0].z>0&&samples[330].z<0);
+  assert.equal(samples[330].x,samples[480].x);assert.equal(samples[330].z,samples[480].z);
+  await seek(480);assert.deepEqual(await read(),samples[480],'rewind reproduces physical state');
   await seek(0);await page.getByTestId('play-toggle').click();
   await page.waitForFunction(()=>Number(document.querySelector('[data-testid="frame-readout"]')?.textContent)>6);
   await page.getByTestId('play-toggle').click();
   const frozen=await page.getByTestId('frame-readout').textContent();
   await page.waitForTimeout(250);assert.equal(await page.getByTestId('frame-readout').textContent(),frozen);
-  await page.setViewportSize({width:390,height:844});await seek(732);
+  await page.setViewportSize({width:390,height:844});await seek(480);
   await page.screenshot({path:resolve(out,'clock-mobile.png'),fullPage:true});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile has no horizontal overflow');
   assert.deepEqual(errors,[]);

@@ -5,7 +5,9 @@ import {RecoilSimulation,PHYSICS,type PhysicsState} from './recoil-physics.ts';
 import {TEETH,type Side} from './recoil-geometry.ts';
 export {TEETH};
 export const FPS=30;
-export const DURATION=60*FPS;
+/** The public cut compresses one full minute of mechanism motion into 30s. */
+export const SIMULATION_DURATION=60*FPS;
+export const DURATION=30*FPS;
 export const PERIOD_SECONDS=2*Math.PI/Math.sqrt(PHYSICS.gravity); // metadata, not a driver
 export type ClockState={
   seconds:number;pendulumAngle:number;anchorAngle:number;wheelAngle:number;
@@ -18,7 +20,8 @@ const simulation=new RecoilSimulation();
 const snapshots:RecoilSimulation[]=[simulation.fork()];
 const initialWheel=simulation.state.wheel;
 function stateAtFrame(frame:number):PhysicsState{
-  const bounded=Number.isFinite(frame)?Math.max(0,Math.min(DURATION,frame)):0;
+  const bounded=Number.isFinite(frame)
+    ?Math.max(0,Math.min(DURATION,frame))*SIMULATION_DURATION/DURATION:0;
   const whole=Math.floor(bounded),stepsPerFrame=Math.round(1/(FPS*PHYSICS.step));
   while(snapshots.length<=whole){
     for(let i=0;i<stepsPerFrame;i++)simulation.advance();
