@@ -222,12 +222,10 @@ const Dial:React.FC<{angle:number}>=({angle})=>{
     })}
     {/* No second independent model or off-axis display. */}
     <group position={[0,0,2.29]} rotation={[0,0,-angle]}>
-      <Rod a={[0,SECOND_HAND.tailY,0]} b={[0,SECOND_HAND.shaftEndY,0]}
-        radius={SECOND_HAND.shaftRadius} color={SECOND}/>
-      {/* Three.js cones point along +Y by default: tip outward, shaft recessed
-          into the broad base (never extending into the pointed end). */}
-      <mesh position={[0,SECOND_HAND.tipCenterY,0]}>
-        <coneGeometry args={[SECOND_HAND.tipRadius,SECOND_HAND.tipHeight,4]}/>
+      {/* One continuous tapered metal hand, not a cylinder with an attached
+          arrowhead. Native ConeGeometry points toward +Y / the outer dial. */}
+      <mesh position={[0,SECOND_HAND.tipCenterY,0]} castShadow>
+        <coneGeometry args={[SECOND_HAND.baseRadius,SECOND_HAND.height,48]}/>
         <meshStandardMaterial color={SECOND} metalness={.47} roughness={.32}/>
       </mesh>
       <Axle position={[0,-.25,0]} radius={.073} depth={.08} color={SECOND}/>
