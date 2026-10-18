@@ -1,74 +1,42 @@
-/** Pure frame-driven kinematics for a seconds pendulum and 30-tooth escapement.
- * A 2 s period gives one 1 s beat. An anchor alternates its entry/exit pallets.
- * The escape wheel turns half of one tooth pitch per beat: 360 / (2 * 30) = 6°.
- * The seconds hand shares the same calculated shaft angle, never Date.now().
- * The pendulum and anchor are one rigid shaft, and the wheel increment
- * is derived from the pendulum crossing a release-angle interval. This is
- * frame-deterministic teaching kinematics, not a force/contact physics solver.
+/** Deterministic sampling of an actual recoil escapement, never a timed wheel.
+ * Both axes are integrated from gravity, drive torque and unilateral contact.
  */
-export const FPS = 30;
-export const DURATION = 60 * FPS;
-export const TEETH = 30;
-export const BEAT_SECONDS = 1;
-export const PERIOD_SECONDS = 2;
-export const RELEASE_OFFSET = 0.42;
-export const RELEASE_DURATION = 0.18;
-/** Visible fork travel must carry each tooth clear of its opposite pallet. */
-export const PENDULUM_AMPLITUDE = 0.085;
-/** The release window is a segment of the pendulum's swing, not a second motor. */
-export const RELEASE_START_ANGLE = PENDULUM_AMPLITUDE * Math.cos(Math.PI * RELEASE_OFFSET);
-export const RELEASE_END_ANGLE = PENDULUM_AMPLITUDE * Math.cos(Math.PI * (RELEASE_OFFSET + RELEASE_DURATION));
-
-export type ClockState = {
-  seconds: number;
-  pendulumAngle: number;
-  anchorAngle: number;
-  wheelAngle: number;
-  secondHandAngle: number;
-  minuteHandAngle: number;
-  beats: number;
-  lock: 'entry' | 'exit';
-  releasing: boolean;
-  releaseProgress: number;
+import {RecoilSimulation,PHYSICS,type PhysicsState} from './recoil-physics.ts';
+import {TEETH,type Side} from './recoil-geometry.ts';
+export {TEETH};
+export const FPS=30;
+export const DURATION=60*FPS;
+export const PERIOD_SECONDS=2*Math.PI/Math.sqrt(PHYSICS.gravity); // metadata, not a driver
+export type ClockState={
+  seconds:number;pendulumAngle:number;anchorAngle:number;wheelAngle:number;
+  secondHandAngle:number;minuteHandAngle:number;beats:number;lock:Side|null;
+  contact:Side|null;tooth:number;
+  pendulumVelocity:number;wheelVelocity:number;contactImpulse:number;
+  energy:number;driveWork:number;energyResidual:number;penetration:number;
 };
-
-const clamp = (x: number): number => Math.max(0, Math.min(1, x));
-const smoothstep = (x: number): number => {
-  const v = clamp(x);
-  return v * v * (3 - 2 * v);
-};
-
-/** Stateless: seeking directly to any frame returns exactly the same state. */
-export function clockAtFrame(frame: number): ClockState {
-  const seconds = Math.max(0, frame) / FPS;
-  const pendulumAngle = PENDULUM_AMPLITUDE * Math.cos(Math.PI * seconds);
-  const rawBeat = Math.floor(seconds - RELEASE_OFFSET) + 1;
-  const beatsBeforeRelease = Math.max(0, rawBeat - 1);
-  const releaseStart = beatsBeforeRelease + RELEASE_OFFSET;
-  const releasing = rawBeat > 0 &&
-    seconds >= releaseStart && seconds < releaseStart + RELEASE_DURATION;
-  // Every half swing crosses the same two angular thresholds in opposite
-  // directions. The *oscillator's actual angle* determines wheel progress.
-  // No separate motor/impulse oscillator is animated behind the pendulum.
-  const signedSwingAngle = pendulumAngle *
-    (beatsBeforeRelease % 2 === 0 ? 1 : -1);
-  const releaseProgress = rawBeat > 0
-    ? smoothstep((RELEASE_START_ANGLE - signedSwingAngle) /
-      (RELEASE_START_ANGLE - RELEASE_END_ANGLE))
-    : 0;
-  const beats = Math.max(0, rawBeat);
-  const beatTravel = beats === 0 ? 0 : beatsBeforeRelease + releaseProgress;
-  const wheelAngle = beatTravel * Math.PI / TEETH;
+const simulation=new RecoilSimulation();
+const snapshots:RecoilSimulation[]=[simulation.fork()];
+const initialWheel=simulation.state.wheel;
+function stateAtFrame(frame:number):PhysicsState{
+  const bounded=Number.isFinite(frame)?Math.max(0,Math.min(DURATION,frame)):0;
+  const whole=Math.floor(bounded),stepsPerFrame=Math.round(1/(FPS*PHYSICS.step));
+  while(snapshots.length<=whole){
+    for(let i=0;i<stepsPerFrame;i++)simulation.advance();
+    snapshots.push(simulation.fork());
+  }
+  const fraction=Math.round((bounded-whole)*stepsPerFrame);
+  if(fraction===0)return snapshots[whole].state;
+  const replay=snapshots[whole].fork();
+  for(let i=0;i<fraction;i++)replay.advance();
+  return replay.state;
+}
+export function clockAtFrame(frame:number):ClockState{
+  const s=stateAtFrame(frame);
   return {
-    seconds,
-    pendulumAngle,
-    anchorAngle: pendulumAngle, // one coaxial shaft, no reduction or independent phase
-    wheelAngle,
-    secondHandAngle: wheelAngle,
-    minuteHandAngle: wheelAngle / 60,
-    beats,
-    lock: beats % 2 === 0 ? 'entry' : 'exit',
-    releasing,
-    releaseProgress,
+    seconds:s.time,pendulumAngle:s.angle,anchorAngle:s.angle,wheelAngle:s.wheel,
+    secondHandAngle:s.wheel-initialWheel,minuteHandAngle:(s.wheel-initialWheel)/60,
+    beats:s.beats,lock:s.contact,contact:s.contact,tooth:s.tooth,
+    pendulumVelocity:s.velocity,wheelVelocity:s.wheelVelocity,contactImpulse:s.impulse,
+    energy:s.energy,driveWork:s.driveWork,energyResidual:s.residual,penetration:s.penetration,
   };
 }

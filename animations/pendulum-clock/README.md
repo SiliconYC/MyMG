@@ -1,26 +1,44 @@
-# 擺鐘動畫（React / Three.js）
+# 机械摆钟：反冲式锚擒纵
 
-[線上鐘擺系統](https://siliconyc.github.io/MyMG/#/pendulum-clock) · [本輪精確幾何藍圖](BLUEPRINT.md)
+[在线预览](https://siliconyc.github.io/MyMG/#/pendulum-clock) · [几何与动力学蓝图](BLUEPRINT.md) · [验证记录](RESULTS.md)
 
-本目錄是 **60 秒可回放的鐘擺與擒縱動畫**，不是另一個獨立的 Rapier 擒縱物理實驗。前後視角、左右特寫與秒針共用同一 Three.js 實體；不嵌入影片或 GIF。
+60 秒原生 React / Three.js / Remotion 动画。从整钟转到背面与稳定的擒纵特写，再回到同轴秒针；可以暂停、逐帧和任意拖动时间轴。画面没有视频、GIF 或预渲染帧。
 
-## 擒縱輪與錨瓦
+## 机构如何运动
 
-- 30 齒擒縱輪，外半徑 0.93；輪軸 O=(0,0.6)、錨軸 P=(0,1.902)，兩軸距 1.4R。
-- 左右錨臂採用**精確等長、狹窄而平滑的曲線臂架**（上下輪廓均由三次貝茲曲線構造）；末端爪形工作面同向、非鏡像，接近真實錨式擒縱機構照片的鉤爪。
-- **取消圓柱形雙臂、獨立瓦塊及粗大三角 V 板**：小樞軸、兩條狹長曲線臂與獨立設計的鉤爪由同一閉合輪廓一次擠出。擺桿與此件共軸旋轉。
-- 齒輪與完整單件式錨叉的 3D 實體直接由同一份 2D 藍圖輪廓擠出；完整輪廓也用於逐影格相交測試。
-- **刪除齒面額外白色高亮條、接觸時瓦片變黃及發光材質**。接觸示意只靠幾何和運動，不靠變色。
-- 全 1,800 影格驗證**整件錨叉**輪廓無穿模與雙臂等長，瀏覽器拍攝接觸特寫進行視覺核查。
+30 齿黄铜擒纵轮与一体钢制锚叉共用可见和接触几何。入瓦、出瓦是**两条不同倾角的有限斜平面**，轮齿沿实际工作面滑动，越过工作面的末端才脱离，随后被对侧接住。锚叉与摆锤固定在同一根轴上。
 
-**模型邊界**：仍使用預定秒擺時序驅動擒縱輪步進，並非真正齒面碰撞或衝量求解；為避開穿模而保留正間隙，不宣稱已機械鎖止。提供的維基百科範例為帶反沖的錨式擒縱，輪的短暫倒轉尚未模仿。下一階段應將物理接觸約束與工作面衝量一同實作。
+这是参考动图中的**反冲式锚擒纵**：摆向外运动时，会通过接触把轮轴短暂推回；返回时，受恒定驱动力矩的轮齿推动摆锤。承接期间轮角并不固定，秒针也会有对应的细微反冲。
 
-## 播放與驗收
+- 两个固定轴刚体，由重力、恒定轮轴力矩、线性阻尼及非负法向接触冲量求解。
+- 固定子步 `1/1920 s`；一次性初始摆角 `-0.065 rad`，不补踢摆锤、不指定余弦轨迹或放行时间窗。
+- 接触与节拍来自几何及真实承接事件；没有按秒数取整或奇偶侧别制造节拍。
+- 碰撞轮齿、有限瓦面与 Three.js 挤出使用相同轮廓。倒角向实体内侧收，不在接触面之外添加实体。
+- 固定初始条件积分，缓存每帧状态。倒放、随机拖动和重复播放一致；分数帧从前一个缓存状态固定步进，不用可能穿透的线性姿态插值。
 
-0–6 秒看整鐘，6–20 秒繞至背面，20–41 秒定點特寫擒縱，41–60 秒回正面；保留自然推拉與軸向旋轉。
+## 验证
 
-- `pnpm check`
-- `pnpm build:portal`
-- `pnpm --filter @mymg/portal qa:clock`
+```sh
+pnpm install --frozen-lockfile
+pnpm check
+MYMG_BASE_PATH=/MyMG/ pnpm build:portal
+pnpm --filter @mymg/portal exec vite preview --host 127.0.0.1 --port 4174 --strictPort
+```
 
-此處修改不應影響 `animations/escapement-physics-lab`。
+另开终端执行：
+
+```sh
+MYMG_QA_URL=http://127.0.0.1:4174/MyMG/ pnpm --filter @mymg/portal qa:clock
+```
+
+需要先安装 Playwright Chromium：`pnpm --filter @mymg/portal exec playwright install chromium`。也可以通过 `MYMG_QA_BROWSER` 指定本机 Chrome 可执行文件。`MYMG_QA_URL` 可替换为公开预览地址，以同一套检查验收线上版本。默认截图与诊断保存在仓库 `output/qa-clock/`，不提交生成媒体。
+
+单独的机构测试：`node --experimental-strip-types --test tooling/pendulum-clock.test.mjs`。包括一分钟交替承接、反冲、逐子步穿透、整件锚叉间隙、实际三维倒角、无驱动对照、减半步长收敛与确定性拖动。
+
+## 物理边界与来源
+
+模型采用理想固定轴、集中转动惯量、无摩擦工作面和完全非弹性接触，耗散由碰撞损失与轴系线性阻尼表示；恒定轮轴力矩代表上游动力。没有模拟发条、重锤轮系、机架弹性、齿面润滑、磨损或长期走时精度，不是实物加工认证。场景按教学需要放大机构比例，物理长度换算见蓝图。
+
+原理与运动参考：[Anchor escapement](https://en.wikipedia.org/wiki/Anchor_escapement)、[Chetvorno 的反冲动图（CC0）](https://commons.wikimedia.org/wiki/File:Anchor_escapement_animation_217x328px.gif)。外观参考：[Timwether 的实拍（CC BY-SA 3.0）](https://commons.wikimedia.org/wiki/File:Anchor_escapement.jpg)。参考图片不嵌入动画。
+
+`animations/escapement-physics-lab` 是独立实验，本次没有用它的旧试验结果替代新机构验证，也没有修改其实现。

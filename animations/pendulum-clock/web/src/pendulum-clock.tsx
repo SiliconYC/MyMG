@@ -3,11 +3,11 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
-import {clockAtFrame, TEETH, type ClockState} from './clock-model';
-import {palletPose, anchorLocalOutline,
+import {clockAtFrame} from './clock-model';
+import {makeEscapeWheel,makeAnchorGeometry} from './escapement-mesh';
+import {palletPose,
   anchorWheelInterference, anchorWheelClearance,
-  contactDistance, WHEEL_Y, PIVOT_Y, WHEEL_PROFILE,
-  forkWheelClearance, ANCHOR_BEVEL} from './escapement-contact';
+  contactDistance, WHEEL_Y, PIVOT_Y} from './escapement-contact';
 import {cameraAtFrame, type Vec3} from './camera-path';
 import {WHEEL_PLANE_Z, WHEEL_THICKNESS, PALLET_PLANE_Z,
   PALLET_THICKNESS, PALLET_ARM_WELD_Z, FORK_ARM_PLANE_Z,
@@ -41,11 +41,11 @@ const STEEL = '#a9b9b7';
 const PORCELAIN = '#f2eee3';
 const SECOND = '#bc604c';
 
-type AxleProps={position:Vec3;radius:number;depth:number;color:string};
-const Axle:React.FC<AxleProps>=({position,radius,depth,color})=>
+type AxleProps={position:Vec3;radius:number;depth:number;color:string;metalness?:number;roughness?:number};
+const Axle:React.FC<AxleProps>=({position,radius,depth,color,metalness=.69,roughness=.28})=>
   <mesh position={[...position]} rotation={[Math.PI/2,0,0]} castShadow receiveShadow>
     <cylinderGeometry args={[radius,radius,depth,40]}/>
-    <meshStandardMaterial color={color} metalness={.69} roughness={.28}/>
+    <meshStandardMaterial color={color} metalness={metalness} roughness={roughness}/>
   </mesh>;
 
 /** One solid round shaft, with small rounded end edges.
@@ -117,30 +117,6 @@ const Rod:React.FC<{a:Vec3;b:Vec3;radius:number;color:string}>=
   </mesh>;
 };
 
-/** Single, watertight bevelled 30-tooth wheel: depth is real geometry. */
-function makeEscapeWheel():THREE.ExtrudeGeometry {
-  const shape=new THREE.Shape();
-  const step=2*Math.PI/TEETH;
-  for(let k=0;k<TEETH;k++){
-    const base=k*step;
-    for(const [s,r] of WHEEL_PROFILE){
-      const a=base+s*step;
-      const x=Math.sin(a)*r,y=Math.cos(a)*r;
-      if(k===0&&s===0)shape.moveTo(x,y);else shape.lineTo(x,y);
-    }
-  }
-  shape.closePath();
-  const hole=new THREE.Path();
-  hole.absarc(0,0,.47,0,Math.PI*2,true);
-  shape.holes.push(hole);
-  const geo=new THREE.ExtrudeGeometry(shape,{
-    depth:WHEEL_THICKNESS,steps:1,bevelEnabled:true,bevelSize:.008,
-    bevelThickness:.006,bevelSegments:2,curveSegments:48,
-  });
-  geo.translate(0,0,WHEEL_PLANE_Z-WHEEL_THICKNESS/2);
-  return geo;
-}
-
 const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
   const geom=useMemo(makeEscapeWheel,[]);
   useLayoutEffect(()=>()=>geom.dispose(),[geom]);
@@ -167,27 +143,8 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
   </group>;
 };
 
-/** ONE fabricated flat steel component: pivot hub, two equal-length
- * tapered fork arms, and two same-handed asymmetric claws.
- * 3D geometry directly extrudes the independently audited 2D perimeter.
- * No decorative rods, shoe blocks, per-pallet material swaps, or seam.
- */
-function makeOnePieceAnchor():THREE.ExtrudeGeometry {
-  const outline=anchorLocalOutline();
-  const shape=new THREE.Shape();
-  shape.moveTo(...outline[0]);
-  for(const point of outline.slice(1))shape.lineTo(...point);
-  shape.closePath();
-  const geometry=new THREE.ExtrudeGeometry(shape,{
-    depth:PALLET_THICKNESS,steps:1,
-    bevelEnabled:true,bevelSize:ANCHOR_BEVEL,
-    bevelThickness:.004,bevelSegments:2,
-  });
-  geometry.translate(0,0,PALLET_PLANE_Z-PALLET_THICKNESS/2);
-  return geometry;
-}
 const Anchor:React.FC=()=>{
-  const geometry=useMemo(makeOnePieceAnchor,[]);
+  const geometry=useMemo(makeAnchorGeometry,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
   return <mesh geometry={geometry} castShadow receiveShadow>
     <meshStandardMaterial color={STEEL} metalness={.76} roughness={.28}
@@ -209,11 +166,11 @@ const Pendulum:React.FC=()=>
  * It must not be a solid floating plug: the rotating shaft runs through it
  * with a small radial running clearance.
  */
-function makeWheelBearing():THREE.ExtrudeGeometry {
+function makeWheelBearing(inner=BEARING_INNER_RADIUS,outer=BEARING_OUTER_RADIUS):THREE.ExtrudeGeometry {
   const ring=new THREE.Shape();
-  ring.absarc(0,0,BEARING_OUTER_RADIUS,0,Math.PI*2,false);
+  ring.absarc(0,0,outer,0,Math.PI*2,false);
   const bore=new THREE.Path();
-  bore.absarc(0,0,BEARING_INNER_RADIUS,0,Math.PI*2,true);
+  bore.absarc(0,0,inner,0,Math.PI*2,true);
   ring.holes.push(bore);
   const geo=new THREE.ExtrudeGeometry(ring,{
     depth:BEARING_DEPTH,steps:1,bevelEnabled:false,curveSegments:64,
@@ -222,7 +179,7 @@ function makeWheelBearing():THREE.ExtrudeGeometry {
   return geo;
 }
 const WheelBearing:React.FC=()=>{
-  const geometry=useMemo(makeWheelBearing,[]);
+  const geometry=useMemo(()=>makeWheelBearing(),[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
   return <mesh geometry={geometry} position={[0,WHEEL_Y,BEARING_CENTER_Z]}
     castShadow receiveShadow>
@@ -230,9 +187,17 @@ const WheelBearing:React.FC=()=>{
       side={THREE.DoubleSide}/>
   </mesh>;
 };
-/** Other static supports are not part of this edit. */
+const AnchorBearing:React.FC=()=>{
+  const geometry=useMemo(()=>makeWheelBearing(.096,.15),[]);
+  useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
+  return <mesh geometry={geometry} position={[0,PIVOT_Y,BEARING_CENTER_Z]}>
+    <meshStandardMaterial color={METAL} metalness={.69} roughness={.30}/>
+  </mesh>;
+};
+/** Ideal fixed journals; the external clock case is omitted for inspection. */
 const MinimalSupports:React.FC=()=> <group>
   <WheelBearing/>
+  <AnchorBearing/>
 </group>;
 
 /** Porcelain seconds dial is ON THE SAME COAXIAL SHAFT as the escape wheel. */
@@ -241,8 +206,8 @@ const Dial:React.FC<{angle:number}>=({angle})=>{
   return <group position={[0,dialY,0]}>
     {/* The shaft crosses the real 3D gap from the wheel to the clock face. */}
     <Rod a={[0,0,.20]} b={[0,0,2.36]} radius={.073} color={BRASS}/>
-    <Axle position={[0,0,1.75]} radius={1.78} depth={.20} color={BRASS}/>
-    <Axle position={[0,0,1.88]} radius={1.68} depth={.09} color={PORCELAIN}/>
+    <Axle position={[0,0,1.75]} radius={1.78} depth={.20} color={PORCELAIN} metalness={.05} roughness={.52}/>
+    <Axle position={[0,0,1.88]} radius={1.68} depth={.09} color={PORCELAIN} metalness={.05} roughness={.52}/>
     <Ring position={[0,0,2.04]} radius={1.735} tube={.041} color={GOLD}/>
     <Ring position={[0,0,2.07]} radius={1.49} tube={.009} color="#b4a78e"/>
     {Array.from({length:60},(_,k)=>{
@@ -311,10 +276,10 @@ const Movement:React.FC<{frame:number}>=({frame})=>{
 };
 
 const CAPTIONS={
-  front:'秒针一步一走：先看看钟摆的节奏',
-  rear:'两块小擒纵瓦，分别接住轮齿的斜面',
-  contact:'轮齿被锁住 → 放行半齿 → 对侧重新锁住',
-  proof:'每一次放行，秒针恰好前进一步',
+  front:'一枚轮齿，两面擒纵瓦：摆钟如何保持节奏',
+  rear:'两面斜瓦交替承接，把轮轴的动力传给钟摆',
+  contact:'承接 · 反冲 · 推动 · 脱齿，随后由对侧接住',
+  proof:'秒针与轮轴同步：前进之间，也有细微的反冲',
 } as const;
 
 export const PendulumClockScene:React.FC=()=>{
@@ -330,6 +295,12 @@ export const PendulumClockScene:React.FC=()=>{
     data-anchor-angle={state.anchorAngle.toFixed(7)}
     data-wheel-angle={state.wheelAngle.toFixed(7)}
     data-second-hand-angle={state.secondHandAngle.toFixed(7)}
+    data-wheel-velocity={state.wheelVelocity.toFixed(7)}
+    data-contact-impulse={state.contactImpulse.toFixed(9)}
+    data-contact-tooth={state.tooth}
+    data-energy-residual={state.energyResidual.toFixed(8)}
+    data-drive-work={state.driveWork.toFixed(8)}
+    data-solver="unilateral-recoil-1920hz"
     data-camera-x={shot.position[0].toFixed(4)}
     data-camera-z={shot.position[2].toFixed(4)}
     data-camera-distance={Math.hypot(
@@ -342,8 +313,6 @@ export const PendulumClockScene:React.FC=()=>{
     data-entry-contact-distance={contactDistance('entry',state).toFixed(5)}
     data-exit-contact-distance={contactDistance('exit',state).toFixed(5)}
     data-anchor-clearance={anchorWheelClearance(state).toFixed(5)}
-    data-entry-fork-clearance={forkWheelClearance('entry',state).toFixed(5)}
-    data-exit-fork-clearance={forkWheelClearance('exit',state).toFixed(5)}
     data-solid-interference={anchorWheelInterference(state)}
     data-wheel-plane-z={WHEEL_PLANE_Z}
     data-pallet-plane-z={PALLET_PLANE_Z}
@@ -355,8 +324,8 @@ export const PendulumClockScene:React.FC=()=>{
     <Movement frame={frame}/>
     {/* Exactly one restrained chapter caption. No diagrams, cards, HUD or grid. */}
     <div style={{
-      position:'absolute',left:62,bottom:51,pointerEvents:'none',
-      fontSize:24,fontWeight:560,letterSpacing:1.1,color:'#34464c',
+      position:'absolute',left:62,top:48,pointerEvents:'none',
+      fontSize:22,fontWeight:560,letterSpacing:1.1,color:'#34464c',
       textShadow:'0 1px 12px #edece6b8'
     }}>{CAPTIONS[shot.chapter]}</div>
     <div style={{

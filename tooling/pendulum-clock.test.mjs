@@ -1,422 +1,194 @@
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
-import {resolve} from 'node:path';
-import {
-  clockAtFrame, FPS, DURATION, TEETH, PERIOD_SECONDS, RELEASE_OFFSET,
-  PENDULUM_AMPLITUDE, RELEASE_START_ANGLE, RELEASE_END_ANGLE,
-} from '../animations/pendulum-clock/web/src/clock-model.ts';
-import {cameraAtFrame, SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
-import {palletPose, palletLocalTip, palletWorldTip, contactDistance,
-  flankAt, PITCH, PALLET_CLEARANCE, PIVOT_Y,
-  palletLocalBase, palletWorldBase, WHEEL_SCALE, WHEEL_Y,
-  OUTER_RADIUS, ROOT_RADIUS, WHEEL_PROFILE,
-  anchorLocalOutline, anchorWheelInterference, anchorWheelClearance,
-  armHeel, ARM_LENGTH, armCenterlineLength, clawWorkingDirection,
-  palletLocalOutline, palletWheelInterference, forkWheelClearance} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
+import {clockAtFrame,FPS,DURATION,TEETH} from '../animations/pendulum-clock/web/src/clock-model.ts';
+import {RecoilSimulation,PHYSICS,convexContact} from '../animations/pendulum-clock/web/src/recoil-physics.ts';
+import {FACES,PITCH,OUTER_RADIUS,anchorLocalOutline,anchorOutline,wheelOutline,toothLocal,
+  palletOutline,PIVOT_Y} from '../animations/pendulum-clock/web/src/recoil-geometry.ts';
+import {contactDistance,anchorWheelInterference,polygonInterference} from '../animations/pendulum-clock/web/src/escapement-contact.ts';
+import {cameraAtFrame,SHOTS} from '../animations/pendulum-clock/web/src/camera-path.ts';
+import {WHEEL_PLANE_Z,PALLET_PLANE_Z,FORK_ARM_PLANE_Z,wheelZRange,palletZRange,
+  bearingZRange,spindleZRange,zOverlap,BEARING_INNER_RADIUS,WHEEL_SPINDLE_RADIUS} from '../animations/pendulum-clock/web/src/escapement-axial.ts';
 
-import {
-  WHEEL_PLANE_Z,WHEEL_THICKNESS,PALLET_PLANE_Z,PALLET_THICKNESS,
-  PALLET_ARM_WELD_Z,FORK_ARM_PLANE_Z,WHEEL_SPINDLE_RADIUS,WHEEL_SPINDLE_REAR_Z,
-  WHEEL_SPINDLE_FRONT_Z,BEARING_CENTER_Z,BEARING_DEPTH,
-  BEARING_INNER_RADIUS,BEARING_OUTER_RADIUS,
-  wheelZRange,palletZRange,bearingZRange,spindleZRange,zOverlap,
-} from '../animations/pendulum-clock/web/src/escapement-axial.ts';
+const sim=new RecoilSimulation();
+let maxPenetration=0,minWheelSpeed=0,maxAngle=0,contactCount=0,minImpulse=Infinity;
+const states=[];
+for(let i=0;i<60/PHYSICS.step;i++){
+  const s=sim.advance();
+  maxPenetration=Math.max(maxPenetration,s.penetration);
+  minWheelSpeed=Math.min(minWheelSpeed,s.wheelVelocity);
+  maxAngle=Math.max(maxAngle,Math.abs(s.angle));
+  if(s.impulse>0)minImpulse=Math.min(minImpulse,s.impulse);
+  if(i%64===63){states.push(s);if(s.contact)contactCount++;}
+}
 
-const frame=(seconds)=>Math.round(seconds*FPS);
-
-test('a two-second pendulum reverses at its endpoints and returns exactly',()=>{
-  const a=clockAtFrame(0),mid=clockAtFrame(FPS),end=clockAtFrame(2*FPS);
-  assert.equal(PERIOD_SECONDS,2);
-  assert.ok(Math.abs(a.pendulumAngle+mid.pendulumAngle)<1e-10);
-  assert.ok(Math.abs(end.pendulumAngle-a.pendulumAngle)<1e-10);
-});
-
-test('one beat every second, alternating entry and exit pallet',()=>{
-  assert.equal(clockAtFrame(0).beats,0);
-  assert.equal(clockAtFrame(frame(.3)).beats,0);
-  assert.equal(clockAtFrame(frame(.7)).beats,1);
-  assert.equal(clockAtFrame(frame(1.3)).beats,1);
-  assert.equal(clockAtFrame(frame(1.7)).beats,2);
-  assert.equal(clockAtFrame(frame(2.7)).beats,3);
-  assert.equal(clockAtFrame(frame(.3)).lock,'entry');
-  assert.equal(clockAtFrame(frame(.7)).lock,'exit');
-  assert.equal(clockAtFrame(frame(1.7)).lock,'entry');
-  assert.equal(TEETH,30);
-  assert.equal(RELEASE_OFFSET,.42);
-});
-
-test('escape wheel and second hand advance half a tooth per beat',()=>{
-  const radPerBeat=2*Math.PI/(2*TEETH);
-  for(let beat=0;beat<60;beat++){
-    const state=clockAtFrame(frame(beat+.8));
-    assert.equal(state.beats,beat+1);
-    assert.ok(Math.abs(state.wheelAngle-radPerBeat*(beat+1))<1e-9);
-    assert.equal(state.wheelAngle,state.secondHandAngle);
+test('a reported pallet lock is a real touching contact, not a floating label',()=>{
+  for(const frame of [0,6,12,24,30,42,1199,1799]){
+    const s=clockAtFrame(frame);
+    if(s.contact)assert.ok(contactDistance(s.contact,s)<2e-4*OUTER_RADIUS,`contact at ${frame}`);
   }
-  assert.ok(Math.abs(clockAtFrame(frame(59.8)).wheelAngle-2*Math.PI)<1e-9);
+  assert.ok(contactCount>1500,'contact must persist across the swing, not just flicker');
 });
 
-test('locked intervals are stationary; release intervals rotate monotonically',()=>{
-  const before=clockAtFrame(frame(.2));
-  const lock=clockAtFrame(frame(.8));
-  const still=clockAtFrame(frame(1.2));
-  assert.equal(before.wheelAngle,0);
-  assert.equal(lock.wheelAngle,still.wheelAngle);
-  let last=-1;
-  for(let k=0;k<DURATION;k++){
-    const value=clockAtFrame(k).wheelAngle;
-    assert.ok(value>=last-1e-10,'no unsupported reverse motion at '+k);
-    last=value;
+test('60 seconds sustain real alternating tooth contacts and near-second beats',()=>{
+  const events=sim.events;
+  assert.ok(events.length>=58&&events.length<=63,`${events.length} actual beats`);
+  for(let i=1;i<events.length;i++){
+    assert.notEqual(events[i].side,events[i-1].side);
+    assert.ok(events[i].impulse>0);
+    assert.ok(events[i].time-events[i-1].time>.8&&events[i].time-events[i-1].time<1.1);
   }
-  const first=clockAtFrame(frame(.45));
-  const next=clockAtFrame(frame(.55));
-  assert.equal(first.releasing,true);
-  assert.equal(next.releasing,true);
-  assert.ok(first.wheelAngle<next.wheelAngle);
-});
-
-test('random seeking and replay yield identical geometry state',()=>{
-  const samples=[0,12,19,32,90,761,1120,1799];
-  const original=samples.map(clockAtFrame);
-  samples.reverse().map(clockAtFrame);
-  assert.deepEqual(samples.reverse().map(clockAtFrame),original);
-});
-
-test('the new scene uses ThreeCanvas, shares the mechanism model and has no media cheats',()=>{
-  const src=readFileSync(resolve(import.meta.dirname,
-    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  const catalog=readFileSync(resolve(import.meta.dirname,
-    '../apps/portal/src/catalog.ts'),'utf8');
-  assert.match(src,/<ThreeCanvas/);
-  assert.match(src,/clockAtFrame\(frame\)/);
-  assert.match(src,/makeEscapeWheel/);
-  assert.match(src,/data-testid="pendulum-clock-scene"/);
-  assert.doesNotMatch(src,/<video|<img|\.mp4|\.webm|\.gif|Date\.now|setInterval/i);
-  assert.match(catalog,/id: 'pendulum-clock'/);
-  assert.match(catalog,/component: PendulumClockScene/);
-});
-
-
-test('camera concentrates screen time on explicit observation positions',()=>{
-  const hold=SHOTS.filter(s=>s.mode==='observe')
-    .reduce((sum,s)=>sum+s.end-s.start,0);
-  const travel=SHOTS.filter(s=>s.mode==='travel')
-    .reduce((sum,s)=>sum+s.end-s.start,0);
-  assert.ok(hold>travel*2,'close-up observation needs to dominate transitions');
-  assert.ok(SHOTS.every(s=>s.end>s.start),'all shots have positive durations');
-  assert.equal(SHOTS[0].start,0);
-  assert.equal(SHOTS.at(-1).end,60);
-  for(let i=1;i<SHOTS.length;i++){
-    const previous=SHOTS[i-1],current=SHOTS[i];
-    assert.equal(previous.end,current.start,'no timeline gaps');
-    assert.deepEqual(previous.positionTo,current.positionFrom,'no camera teleport');
-    assert.deepEqual(previous.targetTo,current.targetFrom,'no target teleport');
-    assert.equal(previous.fovTo,current.fovFrom,'no fov snap');
+  for(let i=2;i<events.length;i++){
+    assert.equal(events[i].tooth,(events[i-2].tooth+29)%30,'one physical tooth per full swing');
+    assert.ok(Math.abs(events[i].wheelAngle-events[i-2].wheelAngle-PITCH)<.003);
   }
+  const mean=(events.at(-1).time-events[10].time)/(events.length-11);
+  assert.ok(Math.abs(mean-1)<.05,`mean beat ${mean}s`);
 });
 
-test('calm storyboard keeps a single legible two-pallet macro for twenty seconds',()=>{
-  const front=cameraAtFrame(0);
-  const back=cameraAtFrame(12*FPS);
-  const first=cameraAtFrame(24*FPS);
-  const second=cameraAtFrame(36*FPS);
-  const proof=cameraAtFrame(48*FPS);
-  assert.equal(front.chapter,'front');
-  assert.equal(back.chapter,'rear');
-  assert.equal(first.chapter,'contact');
-  assert.equal(second.chapter,'contact');
-  assert.equal(first.mode,'observe');
-  assert.deepEqual(first.position,second.position,'NO moving between the pallets');
-  assert.deepEqual(first.target,second.target,'both contacts fit one fixed composition');
-  assert.ok(first.position[2]<-3,'contact camera is actually behind the wheel');
-  assert.ok(first.position[0]===0,'contact shot centered: no frantic side angle');
-  assert.ok(Math.hypot(...first.position)<Math.hypot(...front.position)*.5);
-  assert.equal(proof.chapter,'proof');
-  assert.ok(proof.position[2]>10);
-  assert.deepEqual(cameraAtFrame(60*FPS).position,front.position);
+test('wheel recoil is a resolved velocity and the shafts transmit energy',()=>{
+  assert.ok(minWheelSpeed<-.1,'recoil must be clearly negative');
+  assert.ok(maxAngle>.06&&maxAngle<.10,'bounded small pendulum swing');
+  assert.ok(sim.state.driveWork>.06);
+  assert.ok(sim.state.energy>.02&&sim.state.dissipation>0&&sim.state.impactLoss>0);
+  assert.ok(Math.abs(sim.state.residual)<.04*sim.state.driveWork,'energy accounting converges');
+  assert.ok(minImpulse>=0,'unilateral contacts never attract');
 });
 
-test('pallets are rigid points on the pendulum shaft, not self-powered sliders',()=>{
-  const rotate=(p,angle)=>[
-    p[0]*Math.cos(angle)-p[1]*Math.sin(angle),
-    p[0]*Math.sin(angle)+p[1]*Math.cos(angle),
-  ];
-  for(let frameNo=0;frameNo<DURATION;frameNo++){
-    const state=clockAtFrame(frameNo);
-    assert.equal(state.anchorAngle,state.pendulumAngle,
-      'anchor and pendulum share exactly one pivot angle');
-    for(const side of ['entry','exit']){
-      const fixed=palletLocalTip(side);
-      const swung=rotate(fixed,-state.pendulumAngle);
-      const rendered=palletWorldTip(side,state.pendulumAngle);
-      assert.ok(Math.abs(swung[0]-rendered[0])<1e-12);
-      assert.ok(Math.abs(swung[1]+PIVOT_Y-rendered[1])<1e-12);
-      assert.ok(Math.abs(Math.hypot(...fixed)-
-        Math.hypot(rendered[0],rendered[1]-PIVOT_Y))<1e-10,
-        'pallet arm may rotate, but its length must NEVER change');
-    }
+test('every physical substep has bounded tooth/pallet penetration',()=>{
+  assert.ok(maxPenetration<2e-4*OUTER_RADIUS,`maximum penetration ${maxPenetration}`);
+});
+
+test('the complete anchor and wheel solids clear at all 1800 display frames',()=>{
+  let count=0;
+  for(let f=0;f<DURATION;f++){
+    const s=clockAtFrame(f);
+    if(anchorWheelInterference(s))count++;
   }
+  assert.equal(count,0,`${count} frames have whole-solid interference`);
 });
 
-test('one-piece anchor clears wheel without misrepresenting swept-contact distance',()=>{
-  for(let i=0;i<DURATION;i++){
-    const state=clockAtFrame(i);
-    assert.equal(anchorWheelInterference(state),false,'anchor intersects wheel at frame '+i);
-    assert.ok(anchorWheelClearance(state)>.027,
-      'whole monolithic plate must clear the wheel and bevel margins at '+i);
+test('fractional and random seeking are independent of playback history',()=>{
+  const frames=[0,12.125,42.75,1799,1100.33,64,876.01];
+  const a=frames.map(clockAtFrame);
+  frames.slice().reverse().map(clockAtFrame);
+  assert.deepEqual(frames.map(clockAtFrame),a);
+  assert.deepEqual(clockAtFrame(-10),clockAtFrame(0));
+  assert.deepEqual(clockAtFrame(NaN),clockAtFrame(0));
+  assert.deepEqual(clockAtFrame(999999),clockAtFrame(DURATION));
+  for(const s of a){assert.equal(s.anchorAngle,s.pendulumAngle);assert.equal(anchorWheelInterference(s),false);}
+});
+
+test('seconds hand has a fixed shaft offset and exactly shares wheel displacement',()=>{
+  const zero=clockAtFrame(0);
+  for(const f of [1,24,31,300,700,1799]){
+    const s=clockAtFrame(f);
+    assert.equal(s.secondHandAngle,s.wheelAngle-zero.wheelAngle);
+    assert.equal(s.minuteHandAngle,s.secondHandAngle/60);
   }
-  assert.equal(TEETH,30);
-  assert.ok(PITCH>0&&PALLET_CLEARANCE>0);
+  assert.equal(TEETH,30);assert.equal(FPS,30);
 });
 
-test('wheel progress is a function of oscillator crossing angles, not independent motion',()=>{
-  const smooth=x=>{const u=Math.max(0,Math.min(1,x));return u*u*(3-2*u)};
-  for(let beat=0;beat<59;beat++){
-    for(const d of [.43,.47,.52,.57]){
-      const state=clockAtFrame(frame(beat+d));
-      const outgoing=state.pendulumAngle*(beat%2===0?1:-1);
-      const derived=smooth((RELEASE_START_ANGLE-outgoing)/
-        (RELEASE_START_ANGLE-RELEASE_END_ANGLE));
-      assert.ok(Math.abs(state.releaseProgress-derived)<1e-12);
-      assert.ok(Math.abs(state.wheelAngle-
-        (beat+derived)*Math.PI/TEETH)<1e-12,
-        'no second oscillator/motor controls the escapement wheel');
-    }
-  }
-  assert.equal(PENDULUM_AMPLITUDE,.085);
+test('removing the drive removes replenishment instead of preserving a programmed oscillation',()=>{
+  const off=new RecoilSimulation({drive:0});
+  const initial=off.state.energy;
+  for(let i=0;i<60/PHYSICS.step;i++)off.advance();
+  assert.equal(off.state.driveWork,0);
+  assert.ok(off.state.energy<initial*.55,`drive-off energy ${off.state.energy}`);
+  assert.ok(off.state.energy<sim.state.energy*.5);
 });
 
-test('mirror-equal arm centers and same-handed claw work faces',()=>{
-  assert.deepEqual(armHeel('entry'),[-.69,-.365]);
-  assert.deepEqual(armHeel('exit'),[.69,-.365]);
-  assert.equal(armCenterlineLength('entry'),armCenterlineLength('exit'));
-  assert.ok(Math.abs(ARM_LENGTH-Math.hypot(.69,.365))<1e-12);
-  for(const side of ['entry','exit']){
-    const base=palletLocalBase(side);
-    assert.deepEqual(base,armHeel(side));
-    assert.ok(palletLocalOutline(side).length>=6);
-    for(const frameNo of [0,7,13,27,42]){
-      const state=clockAtFrame(frameNo);
-      const rotated=palletWorldBase(side,state.pendulumAngle);
-      const pose=palletPose(side,state);
-      assert.ok(Math.hypot(rotated[0]-pose.mounting[0],
-        rotated[1]-pose.mounting[1])<1e-11);
-    }
-  }
-  const a=clawWorkingDirection('entry'),b=clawWorkingDirection('exit');
-  assert.ok(a[0]>.2&&b[0]>.2,'working tips both turn toward +X, not mirrored');
-  assert.ok(a[1]>.2&&b[1]>.2,'both working faces slant toward +Y');
-  assert.ok(a[0]*b[0]+a[1]*b[1]>.93,'both claw working faces point same way');
+test('halving the timestep preserves contacts and converges in energy and trajectory',()=>{
+  const refined=new RecoilSimulation({step:PHYSICS.step/2});
+  for(let i=0;i<60/refined.step;i++)refined.advance();
+  assert.equal(refined.events.length,sim.events.length);
+  assert.deepEqual(refined.events.map(e=>[e.side,e.tooth]),sim.events.map(e=>[e.side,e.tooth]));
+  assert.ok(Math.abs(refined.state.angle-sim.state.angle)<.003);
+  assert.ok(Math.abs(refined.state.wheel-sim.state.wheel)<.005);
+  assert.ok(Math.abs(refined.state.residual)<Math.abs(sim.state.residual)*.6);
 });
 
-test('both claw outlines are part of a continuous plate and never penetrate the wheel',()=>{
-  assert.ok(anchorLocalOutline().length>90,'Bezier ribs and two shaped hooks need a curved stamped perimeter');
-  for(let i=0;i<DURATION;i++){
-    const state=clockAtFrame(i);
-    for(const side of ['entry','exit']){
-      assert.equal(palletWheelInterference(side,state),false);
-      assert.ok(contactDistance(side,state)>.02);
-    }
-  }
+test('convex contacts distinguish separation, touch and overlap with a correct lever point',()=>{
+  const a=[[0,0],[1,0],[1,1],[0,1]];
+  assert.equal(convexContact(a,[[2,0],[3,0],[3,1],[2,1]]).gap,1);
+  assert.equal(convexContact(a,[[1,0],[2,0],[2,1],[1,1]]).gap,0);
+  assert.ok(Math.abs(convexContact(a,[[.9,0],[2,0],[2,1],[.9,1]]).gap+.1)<1e-12);
+  assert.equal(polygonInterference(a,[[.4,-1],[.6,-1],[.6,2],[.4,2]]),true);
 });
 
-test('shared rigid fork still swings between alternating nominal locking phases',()=>{
-  const before=clockAtFrame(frame(.40));
-  const mid=clockAtFrame(frame(.50));
-  const after=clockAtFrame(frame(.70));
-  assert.equal(before.lock,'entry');
-  assert.equal(after.lock,'exit');
-  assert.ok(before.wheelAngle<mid.wheelAngle&&mid.wheelAngle<after.wheelAngle);
-  assert.ok(anchorWheelClearance(before)>.027);
-  assert.ok(anchorWheelClearance(after)>.027);
+test('shared machining profiles are simple and every tooth collider is convex',()=>{
+  const sign=p=>p.map((a,i)=>{const b=p[(i+1)%p.length],c=p[(i+2)%p.length];return (b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);});
+  for(let i=0;i<30;i++)assert.ok(sign(toothLocal(i)).every(v=>v<=1e-12));
+  const shape=anchorLocalOutline();
+  assert.ok(shape.every(p=>p.every(Number.isFinite)));
+  for(const side of ['entry','exit'])for(const p of FACES[side].polygon)
+    assert.ok(shape.some(q=>Math.hypot(p[0]-q[0],p[1]-q[1])<1e-10),'all actual working vertices belong to the rendered anchor');
 });
 
-test('camera moves smoothly within and across shots and is seek-deterministic',()=>{
-  let prev=cameraAtFrame(0);
-  for(let i=1;i<60*FPS;i++){
-    const pose=cameraAtFrame(i);
-    assert.deepEqual(pose,cameraAtFrame(i));
-    for(const n of [...pose.position,...pose.target,pose.fov])
-      assert.ok(Number.isFinite(n),'nonfinite camera value');
-    const displacement=Math.hypot(...pose.position.map((x,k)=>x-prev.position[k]));
-    assert.ok(displacement<1.25,'unexpected camera teleport at frame '+i+': '+displacement);
-    prev=pose;
-  }
-});
-
-test('render exactly ONE extruded anchor plate, not rods plus two shoe meshes',()=>{
-  const src=readFileSync(resolve(import.meta.dirname,
-    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  assert.equal((src.match(/<ThreeCanvas/g)||[]).length,1);
-  assert.match(src,/makeOnePieceAnchor/);
-  assert.match(src,/anchorLocalOutline\(\)/);
-  assert.match(src,/<Anchor\/>/);
-  assert.match(src,/<Pendulum\/>/);
-  assert.match(src,/<EscapeWheel angle={state.wheelAngle}\/>/);
-  assert.match(src,/<Dial angle={state.secondHandAngle}\/>/);
-  const anchor=src.split('const Anchor:')[1].split('/** One pendulum physically hangs')[0];
-  assert.equal((anchor.match(/<mesh geometry=/g)||[]).length,1);
-  assert.doesNotMatch(anchor,/<Rod |<PalletTooth|\.map\(/);
-  assert.doesNotMatch(src,/makeSectorPallet|PalletTooth|ContactHighlights|emissiveIntensity|pose.engaged\?GOLD/);
-  assert.doesNotMatch(src,/<img|<video|\.mp4/i);
-});
-
-test('one filleted cylindrical shaft embeds both connected rod endpoints',()=>{
-  const src=readFileSync(resolve(import.meta.dirname,
-    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  const anchor=src.split('const Anchor:')[1].split('/** One pendulum physically hangs')[0];
-  const pendulum=src.split('const Pendulum:')[1].split('/** A fixed cylindrical JOURNAL SLEEVE')[0];
-  const coupling=src.split('function makeCouplingGeometry()')[1]
-    .split('const Ring:')[0];
-  const movingJoint=src.split('ONE pivot, ONE angle')[1].split('<Dial angle=')[0];
-  const support=src.split('const MinimalSupports:')[1].split('const Dial:')[0];
-
-  const getNumber=name=>{
-    const match=src.match(new RegExp(`const ${name}=(-?[\\d.]+);`));
-    assert.ok(match,`missing coupling dimension ${name}`);
-    return Number(match[1]);
-  };
-  const centre=getNumber('COUPLING_CENTER_Z');
-  const length=getNumber('COUPLING_LENGTH');
-  const radius=getNumber('COUPLING_RADIUS');
-  const fillet=getNumber('COUPLING_FILLET');
-  const back=centre-length/2,front=centre+length/2;
-  const pendulumStemZ=-.91,forkArmZ=FORK_ARM_PLANE_Z;
-  assert.ok(back<pendulumStemZ-.04,
-    'round coupling must extend beyond the pendulum rod by > 0.04');
-  assert.ok(front>forkArmZ+.04,
-    'round coupling must extend beyond the fork arms by > 0.04');
-  assert.ok(radius>.044 && radius>.036,
-    'rod centres must be swallowed by a wider coupling');
-  assert.ok(fillet>.01 && fillet<radius*.4,
-    'ends should be actually rounded without enormous ball-shaped bosses');
-  assert.match(coupling,/new THREE.LatheGeometry\(profile,64\)/);
-  assert.match(coupling,/const steps=8/);
-  assert.match(coupling,/Math.sin\(t\)/);
-  assert.match(coupling,/Math.cos\(t\)/);
-  assert.equal((coupling.match(/<mesh geometry=/g)||[]).length,1,
-    'one continuous mesh, not a stack of fake fillet rings');
-  assert.equal((movingJoint.match(/<PendulumAnchorCoupling\/>/g)||[]).length,1);
-  assert.doesNotMatch(movingJoint,/<Axle |<Ring /,
-    'no old flush-ended axle or decorative collars at the joint');
-  assert.doesNotMatch(anchor,/<Axle /);
-  assert.doesNotMatch(pendulum,/<Axle /);
-  assert.equal((support.match(/<WheelBearing\/>/g)||[]).length,1,
-    'the wheel has exactly one fixed bearing sleeve');
-  assert.doesNotMatch(support,/<Axle /,
-    'the rear support must no longer be an opaque floating cylinder');
-  assert.match(pendulum,/a=\{\[0,0,0\]\} b=\{\[0,-5\.55,0\]\}/);
-  assert.match(anchor,/<mesh geometry=\{geometry\}/,
-    'both fork arms must be extruded with the common hub as ONE plate');
-});
-
-test('one plate has same XY working plane and Z thickness as the wheel',()=>{
-  assert.equal(PALLET_PLANE_Z,WHEEL_PLANE_Z);
-  assert.equal(PALLET_ARM_WELD_Z,PALLET_PLANE_Z);
-  assert.ok(zOverlap(wheelZRange,palletZRange)>=PALLET_THICKNESS-1e-10);
-  assert.equal(WHEEL_THICKNESS,.18);
-  assert.equal(PALLET_THICKNESS,.12);
-  const src=readFileSync(resolve(import.meta.dirname,
-    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  assert.match(src,/depth:PALLET_THICKNESS/);
-  assert.match(src,/geometry.translate\(0,0,PALLET_PLANE_Z-PALLET_THICKNESS\/2\)/);
-  assert.match(src,/makeOnePieceAnchor\(\)/);
-});
-
-test('equal fork arm centerlines remain rigid and coplanar with wheel',()=>{
-  assert.equal(FORK_ARM_PLANE_Z,WHEEL_PLANE_Z);
-  assert.equal(FORK_ARM_PLANE_Z,PALLET_PLANE_Z);
-  assert.equal(FORK_ARM_PLANE_Z,PALLET_ARM_WELD_Z);
-  for(const sec of [0,.2,.45,.8,1.4,24.5,59.6]){
-    const angle=clockAtFrame(Math.round(sec*FPS)).pendulumAngle;
-    assert.ok(Number.isFinite(angle));
-    for(const side of ['entry','exit']){
-      const p=armHeel(side),z=PALLET_PLANE_Z;
-      assert.equal(z,WHEEL_PLANE_Z);
-      assert.ok(Math.abs(Math.hypot(p[0],p[1])-ARM_LENGTH)<1e-12);
-    }
-  }
-});
-
-test('bearing has a real rotating shaft through its entire bored sleeve',()=>{
-  assert.ok(BEARING_OUTER_RADIUS>BEARING_INNER_RADIUS);
-  assert.ok(BEARING_INNER_RADIUS>WHEEL_SPINDLE_RADIUS);
+test('axial working overlap and real bored bearing remain mechanically assembled',()=>{
+  assert.equal(WHEEL_PLANE_Z,PALLET_PLANE_Z);assert.equal(FORK_ARM_PLANE_Z,WHEEL_PLANE_Z);
+  assert.ok(zOverlap(wheelZRange,palletZRange)>.1);
+  assert.ok(zOverlap(bearingZRange,spindleZRange)>=.22-1e-10);
   assert.ok(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS>.005);
-  assert.ok(BEARING_INNER_RADIUS-WHEEL_SPINDLE_RADIUS<.03);
-  assert.ok(zOverlap(bearingZRange,spindleZRange)>=BEARING_DEPTH-1e-10,
-    'rotating shaft must pass all the way through the bearing');
-  assert.ok(spindleZRange[1]>wheelZRange[1],
-    'shaft must embed into the wheel hub');
-  assert.ok(spindleZRange[0]<bearingZRange[0],
-    'shaft must emerge from the back face of the bearing');
-  assert.equal(spindleZRange[0],WHEEL_SPINDLE_REAR_Z);
-  assert.equal(spindleZRange[1],WHEEL_SPINDLE_FRONT_Z);
-  assert.ok(Math.abs((bearingZRange[0]+bearingZRange[1])/2-BEARING_CENTER_Z)<1e-12);
-  const scene=readFileSync(resolve(import.meta.dirname,
-    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  assert.match(scene,/ring.holes.push\(bore\)/,
-    'fixed support must be a drilled sleeve and not an overlapping solid cap');
-  assert.match(scene,/bore.absarc\(0,0,BEARING_INNER_RADIUS/);
-  assert.match(scene,/radius=\{WHEEL_SPINDLE_RADIUS\}/);
-  assert.match(scene,/depth=\{WHEEL_SPINDLE_FRONT_Z-WHEEL_SPINDLE_REAR_Z\}/);
-  assert.match(scene,/data-wheel-bearing-running-clearance=/);
-  assert.doesNotMatch(scene,/<Axle position=\{\[0,\.60,-\.42\]\}/);
 });
 
-test('one-piece claw profile has equal arms but DIFFERENT claw noses',()=>{
-  assert.equal(WHEEL_SCALE,.60);
-  assert.equal(WHEEL_PROFILE.length,6);
-  assert.ok(OUTER_RADIUS<1&&ROOT_RADIUS<OUTER_RADIUS);
-  assert.ok(Math.abs(PIVOT_Y-WHEEL_Y-1.4*OUTER_RADIUS)<1e-12);
-  const left=palletLocalOutline('entry'),right=palletLocalOutline('exit');
-  assert.notDeepEqual(left.map(([x,y])=>[-x,y]),right,
-    'teeth are handed, not reflect-mirror copies');
-  assert.equal(armCenterlineLength('entry'),armCenterlineLength('exit'));
-  const src=readFileSync(resolve(import.meta.dirname,
-    '../animations/pendulum-clock/web/src/pendulum-clock.tsx'),'utf8');
-  assert.match(src,/for\(const \[s,r\] of WHEEL_PROFILE\)/);
-  assert.match(src,/makeOnePieceAnchor\(\)/);
-  assert.match(src,/position=\{\[0,PIVOT_Y,0\]\}/);
+test('camera keeps both pallets readable in one steady close-up and transitions continuously',()=>{
+  assert.deepEqual(cameraAtFrame(24*30).position,cameraAtFrame(37*30).position);
+  assert.equal(cameraAtFrame(24*30).chapter,'contact');
+  for(let f=1;f<1800;f++){
+    const a=cameraAtFrame(f-1),b=cameraAtFrame(f);
+    assert.ok(Math.hypot(...a.position.map((v,i)=>v-b.position[i]))<1.2);
+    assert.ok(Number.isFinite(b.fov));
+  }
+  for(let i=1;i<SHOTS.length;i++)assert.equal(SHOTS[i-1].end,SHOTS[i].start);
 });
 
-test('both equal fork-arm centerlines remain outside the wheel envelope',()=>{
-  for(let i=0;i<DURATION;i++){
-    const state=clockAtFrame(i);
-    for(const side of ['entry','exit']){
-      const gap=forkWheelClearance(side,state);
-      assert.ok(gap>.030,'shaft axis goes through wheel at frame '+i+' '+side);
+test('all nonworking ribs clear the entire tooth envelope throughout the continuous swing',async()=>{
+  const {anchorRibOutline,WHEEL_Y}=await import('../animations/pendulum-clock/web/src/recoil-geometry.ts');
+  let minimum=Infinity;
+  const angularStep=.18/512;
+  for(let k=0;k<=512;k++){
+    const vertices=anchorRibOutline(-.09+k*angularStep);
+    for(let i=0;i<vertices.length;i++){
+      const a=vertices[i],b=vertices[(i+1)%vertices.length],dx=b[0]-a[0],dy=b[1]-a[1];
+      const t=Math.max(0,Math.min(1,(-a[0]*dx+(WHEEL_Y-a[1])*dy)/(dx*dx+dy*dy)));
+      minimum=Math.min(minimum,Math.hypot(a[0]+t*dx,a[1]+t*dy-WHEEL_Y)-OUTER_RADIUS);
     }
   }
+  // Every point lies within 1.2 of P. The Lipschitz bound covers the entire
+  // interval BETWEEN samples, not just the displayed animation frames.
+  assert.ok(minimum-1.2*angularStep/2>.02);
+  assert.ok(maxAngle<.09,'every substep remains inside the certified swing envelope');
 });
 
-test('all 1,800 frames: one stamped anchor plate has true solid clearance',()=>{
-  let closest=Infinity;
-  for(let i=0;i<DURATION;i++){
-    const state=clockAtFrame(i);
-    assert.equal(anchorWheelInterference(state),false,'wheel intersects anchor at '+i);
-    closest=Math.min(closest,anchorWheelClearance(state));
+test('the rendered bevels remain inside the audited XY solids',async()=>{
+  const {makeEscapeWheel,makeAnchorGeometry}=await import('../animations/pendulum-clock/web/src/escapement-mesh.ts');
+  const {WHEEL_Y}=await import('../animations/pendulum-clock/web/src/recoil-geometry.ts');
+  const allowed=(p,poly)=>{
+    let inside=false,min=Infinity;
+    for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+      const a=poly[j],b=poly[i],dx=b[0]-a[0],dy=b[1]-a[1],ll=dx*dx+dy*dy;
+      const t=ll?Math.max(0,Math.min(1,((p[0]-a[0])*dx+(p[1]-a[1])*dy)/ll)):0;
+      min=Math.min(min,Math.hypot(p[0]-a[0]-t*dx,p[1]-a[1]-t*dy));
+      if((a[1]>p[1])!==(b[1]>p[1])&&p[0]<(b[0]-a[0])*(p[1]-a[1])/(b[1]-a[1])+a[0])inside=!inside;
+    }
+    return inside||min<2e-7;
+  };
+  for(const [mesh,poly] of [[makeEscapeWheel(),wheelOutline(0).map(([x,y])=>[x,y-WHEEL_Y])],[makeAnchorGeometry(),anchorLocalOutline()]]){
+    const vertices=mesh.getAttribute('position');
+    for(let i=0;i<vertices.count;i++)assert.ok(allowed([vertices.getX(i),vertices.getY(i)],poly),'actual chamfer extends beyond physical solid');
+    mesh.dispose();
   }
-  assert.ok(closest>.027,'clearance must exceed bevel plus safety margin; found '+closest);
 });
 
-
-test('photographic silhouette: narrow smooth ribs and machined hooked teeth',()=>{
-  const pts=anchorLocalOutline();
-  assert.ok(pts.length>=90,'must retain sampled Bezier curves, not giant triangular arms');
-  // Upper and lower rib boundaries are sampled from independently controlled
-  // splines; midarm must stay visually slim, even after animation updates.
-  for(const sign of [-1,1]){
-    const band=pts.filter(p=>p[0]*sign>.44&&p[0]*sign<.56);
-    assert.ok(band.length>=4,'both ribs span the same centreline region');
-    const ys=band.map(p=>p[1]),thickness=Math.max(...ys)-Math.min(...ys);
-    assert.ok(thickness<.16,'no chunky solid V plate: thickness '+thickness);
-    assert.ok(thickness>.025,'arm must remain visible as real machined steel');
-  }
-  for(const side of ['entry','exit']){
-    const profile=palletLocalOutline(side);
-    assert.ok(profile.length>=15,'each working claw needs a curved heel and distinct tip');
-    const nose=palletLocalTip(side);
-    assert.ok(nose[1]<-.53&&nose[1]>-.68,'hook nose ends near top teeth');
+test('the machined one-piece anchor has no self-crossing perimeter',()=>{
+  const p=anchorLocalOutline();
+  const cross=(a,b)=>a[0]*b[1]-a[1]*b[0];
+  const sub=(a,b)=>[a[0]-b[0],a[1]-b[1]];
+  for(let i=0;i<p.length;i++)for(let j=i+2;j<p.length;j++){
+    if(i===0&&j===p.length-1)continue;
+    const a=p[i],ab=sub(p[(i+1)%p.length],a),c=p[j],cd=sub(p[(j+1)%p.length],c),den=cross(ab,cd);
+    if(Math.abs(den)<1e-14)continue;
+    const t=cross(sub(c,a),cd)/den,u=cross(sub(c,a),ab)/den;
+    assert.ok(!(t>1e-8&&t<1-1e-8&&u>1e-8&&u<1-1e-8),`crossing edges ${i}, ${j}`);
   }
 });
