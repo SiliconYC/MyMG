@@ -27,3 +27,18 @@ test('Pages deploys from dev only and does not run on every commit',()=>{
   assert.ok(existsSync(join(root,'apps/portal/vite.config.ts')));
   assert.match(read('apps/portal/vite.config.ts'),/MyMG/);
 });
+
+// Guard against restoring the retired Rapier lab in shipped routes or dependencies.
+test('retired escapement physics lab stays absent',()=>{
+  const catalog=read('apps/portal/src/catalog.ts');
+  const player=read('apps/portal/src/portal.tsx');
+  const manifest=JSON.parse(read('apps/portal/package.json'));
+  const lock=read('pnpm-lock.yaml');
+  assert.doesNotMatch(catalog,/escapement-physics-lab|EscapementLabScene/);
+  assert.doesNotMatch(player,/escapement-physics-lab|lab-reset|lab-slow/);
+  assert.equal(manifest.dependencies['@mymg/escapement-physics-lab'],undefined);
+  assert.doesNotMatch(lock,/rapier2d-compat|escapement-physics-lab/);
+  assert.ok(!existsSync(join(root,'animations/escapement-physics-lab')));
+  assert.ok(!existsSync(join(root,'apps/portal/qa-escapement-physics-lab.mjs')));
+  assert.match(catalog,/id: 'pendulum-clock'/);
+});

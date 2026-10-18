@@ -5,7 +5,6 @@ import {PendulumClockScene} from '@mymg/pendulum-clock';
 import {SteamEngineScene} from '@mymg/steam-engine';
 import {CpuGpuScene} from '@mymg/cpu-gpu';
 import {AutomaticFireScene} from '@mymg/automatic-fire';
-import {EscapementLabScene} from '@mymg/escapement-physics-lab';
 // @mymg-generator-imports
 
 /** Single catalog powers all portal cards and player routes. */
@@ -146,26 +145,6 @@ export const projects: readonly MgProject[] = [
       '第二版全新立體模型，具有倒角槍托、護木、機匣及抽離的側蓋；24 秒運鏡包含推近、環繞、追拍與復位。',
       '概念示意：連發與半自動的關鍵差別在於持續扣住扳機後，前者能在自動循環中再次擊發；後者需重新扣動扳機。',
       '模型零件、尺寸及時序經刻意抽象，不代表真實槍械的設計、製造或改裝方式。',
-    ],
-  },
-  {
-    id: 'escapement-physics-lab',
-    compositionId: 'EscapementPhysicsLabScene',
-    title: '擒纵机构 · Rapier 物理实验室',
-    titleEn: 'RAPIER 2D / ESCAPEMENT CONTACT EXPERIMENT',
-    category: '机械 / 真实碰撞试验',
-    description: '独立于摆钟正片的 2D 刚体可行性实验。展示物理碰撞、卡滞和穿透；不预设正确摆动。',
-    status: '技术实验 · 接触候选，尚非机械认证',
-    component: EscapementLabScene,
-    durationInFrames: 1800,
-    fps: 30,
-    width: 1280,
-    height: 720,
-    notes: [
-      '两独立转动刚体，固定轴铰链、恒定齿轮力矩、重力钟摆；齿面和擒纵瓦均是 Rapier 实体凸碰撞体。',
-      '固定 240 Hz 时间步，进度拖动后重放真实物理计算，不以角度插值或定时放行模拟啮合。',
-      '10/60 秒物理结果必须由真实浏览器接触、冲量、倒转、穿透与锁死审计判定；当前实验候选不代表可加工的钟表机械认证。',
-      '二维中摆杆和叉臂只展示机构拓扑，不承担碰撞；不代表三维装配干涉或工业可制造性已经验证。',
     ],
   },
   // @mymg-generator-projects
