@@ -180,6 +180,56 @@ test('the rendered bevels remain inside the audited XY solids',async()=>{
   }
 });
 
+test('the visible anchor is two separate swept arms around a compact pivot hub',async()=>{
+  const {makeAnchorVisualGeometries}=await import('../animations/pendulum-clock/web/src/escapement-mesh.ts');
+  const parts=makeAnchorVisualGeometries();
+  assert.equal(parts.length,5,'one pivot hub, two swept arms and two fixed shoes');
+  const contains=(geometry,point)=>{
+    const p=geometry.getAttribute('position'),idx=geometry.index;
+    for(let n=0;n<(idx?idx.count:p.count);n+=3){
+      const ids=idx?[idx.getX(n),idx.getX(n+1),idx.getX(n+2)]:[n,n+1,n+2];
+      const a=[p.getX(ids[0]),p.getY(ids[0])],b=[p.getX(ids[1]),p.getY(ids[1])],c=[p.getX(ids[2]),p.getY(ids[2])];
+      const cross=(u,v)=>u[0]*v[1]-u[1]*v[0];
+      const v0=[b[0]-a[0],b[1]-a[1]],v1=[c[0]-a[0],c[1]-a[1]],v2=[point[0]-a[0],point[1]-a[1]];
+      const den=cross(v0,v1);
+      if(Math.abs(den)<1e-12)continue;
+      const u=cross(v2,v1)/den,v=cross(v0,v2)/den;
+      if(u>=-1e-8&&v>=-1e-8&&u+v<=1+1e-8)return true;
+    }
+    return false;
+  };
+  assert.ok(contains(parts[0],[0,.04]),'the pivot remains visually connected');
+  parts[1].computeBoundingBox();parts[2].computeBoundingBox();
+  assert.ok(parts[1].boundingBox.max.x>.65,'right arm sweeps into its pallet');
+  assert.ok(parts[2].boundingBox.min.x<-.8,'left arm sweeps into its pallet');
+  for(const [part,face] of [[parts[3],FACES.entry],[parts[4],FACES.exit]])
+    for(const point of face.polygon){
+      const p=part.getAttribute('position');
+      assert.ok(Array.from({length:p.count},(_,i)=>Math.hypot(p.getX(i)-point[0],p.getY(i)-point[1]))
+        .some(distance=>distance<5e-8),'the unchanged pallet stays attached at its exact vertices');
+    }
+  assert.ok(!parts.some(part=>contains(part,[0,-.2])),'the fork keeps a visible central opening');
+  const polygon=anchorLocalOutline();
+  const tubeEnvelopeTolerance=.0105;
+  const inside=(point)=>{
+    let result=false,min=Infinity;
+    for(let i=0,j=polygon.length-1;i<polygon.length;j=i++){
+      const a=polygon[i],b=polygon[j];
+      const dx=b[0]-a[0],dy=b[1]-a[1],length=dx*dx+dy*dy;
+      const t=length?Math.max(0,Math.min(1,((point[0]-a[0])*dx+(point[1]-a[1])*dy)/length)):0;
+      min=Math.min(min,Math.hypot(point[0]-a[0]-t*dx,point[1]-a[1]-t*dy));
+      if((a[1]>point[1])!==(b[1]>point[1])&&point[0]<(b[0]-a[0])*(point[1]-a[1])/(b[1]-a[1])+a[0])result=!result;
+    }
+    return result||min<tubeEnvelopeTolerance;
+  };
+  for(const part of parts){
+    const p=part.getAttribute('position');
+    for(let i=0;i<p.count;i++)assert.ok(inside([p.getX(i),p.getY(i)]),
+      'visual metal follows audited anchor profile within its round-arm envelope');
+    part.dispose();
+  }
+});
+
 test('the machined one-piece anchor has no self-crossing perimeter',()=>{
   const p=anchorLocalOutline();
   const cross=(a,b)=>a[0]*b[1]-a[1]*b[0];

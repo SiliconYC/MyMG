@@ -4,7 +4,7 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame} from './clock-model';
-import {makeEscapeWheel,makeAnchorGeometry} from './escapement-mesh';
+import {makeEscapeWheel,makeAnchorVisualGeometries} from './escapement-mesh';
 import {palletPose,
   anchorWheelInterference, anchorWheelClearance,
   contactDistance, WHEEL_Y, PIVOT_Y} from './escapement-contact';
@@ -145,12 +145,14 @@ const EscapeWheel:React.FC<{angle:number}>=({angle})=>{
 };
 
 const Anchor:React.FC=()=>{
-  const geometry=useMemo(makeAnchorGeometry,[]);
-  useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
-  return <mesh geometry={geometry} castShadow receiveShadow>
-    <meshStandardMaterial color={ANCHOR_RED} metalness={.62} roughness={.27}
-      side={THREE.DoubleSide}/>
-  </mesh>;
+  const geometries=useMemo(makeAnchorVisualGeometries,[]);
+  useLayoutEffect(()=>()=>geometries.forEach(geometry=>geometry.dispose()),[geometries]);
+  return <group>
+    {geometries.map((geometry,index)=><mesh key={index} geometry={geometry} castShadow receiveShadow>
+      <meshStandardMaterial color={ANCHOR_RED} metalness={.62} roughness={.27}
+        side={THREE.DoubleSide}/>
+    </mesh>)}
+  </group>;
 };
 
 /** One pendulum physically hangs from the same anchor pivot behind the wheel. */
