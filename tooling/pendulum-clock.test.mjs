@@ -58,7 +58,7 @@ test('every physical substep has bounded tooth/pallet penetration',()=>{
   assert.ok(maxPenetration<2e-4*OUTER_RADIUS,`maximum penetration ${maxPenetration}`);
 });
 
-test('the complete anchor and wheel solids clear at all 1800 display frames',()=>{
+test('the complete anchor and wheel solids clear across the 900-frame film',()=>{
   let count=0;
   for(let f=0;f<DURATION;f++){
     const s=clockAtFrame(f);
@@ -93,6 +93,8 @@ test('the public clock film is a focused 30-second cut of the physical simulatio
   assert.equal(SHOTS[0].start,0);
   assert.equal(SHOTS.at(-1).end,30);
   assert.ok(SHOTS.filter(shot=>shot.mode==='observe').length>=4);
+  assert.ok(clockAtFrame(DURATION-1).seconds<30,
+    'the one-minute clock is not accelerated to fit the shortened film');
 });
 
 test('removing the drive removes replenishment instead of preserving a programmed oscillation',()=>{
@@ -208,8 +210,13 @@ test('the visible anchor is two separate swept arms around a compact pivot hub',
   assert.ok(contains(parts[0],[0,.04]),'the pivot remains visually connected');
   parts[1].computeBoundingBox();parts[2].computeBoundingBox();
   assert.ok(parts[1].boundingBox.max.x>.62,'right arm sweeps into its pallet');
-  assert.ok(parts[2].boundingBox.min.x<-.8&&parts[2].boundingBox.min.y<-.58,
+  assert.ok(parts[2].boundingBox.min.x<-.8&&parts[2].boundingBox.min.y<-.55,
     'the extended left arm reaches its pallet');
+  for(const arm of parts.slice(1,3)){
+    arm.computeBoundingBox();
+    assert.ok(arm.boundingBox.max.y>.035&&arm.boundingBox.max.y<.055,
+      'each shared parabolic arm has its apex at the top pivot');
+  }
   for(const [part,face] of [[parts[3],FACES.entry],[parts[4],FACES.exit]])
     for(const point of face.polygon){
       const p=part.getAttribute('position');

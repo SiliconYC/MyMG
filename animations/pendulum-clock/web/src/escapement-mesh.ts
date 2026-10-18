@@ -26,35 +26,28 @@ export function makeAnchorGeometry():THREE.ExtrudeGeometry{
   return extrude(profile(anchorLocalOutline()),PALLET_THICKNESS,PALLET_PLANE_Z,.003,4);
 }
 
-/** The visible fork is made from one cubic parameterization, fitted between
- * matching boundary controls for each fixed shoe. Both arms share its smooth
- * Bernstein progression and continue directly into the contact shoes.
+/** The visible fork is made from two halves of one vertex-up parabola. Its
+ * apex sits at the top pivot, and each half ends inside its fixed contact shoe.
  */
 export function makeAnchorVisualGeometries():THREE.BufferGeometry[]{
   const {entry,exit}=FACES;
   const hub=new THREE.Shape();
   hub.absellipse(0,.033,.04,.05,0,Math.PI*2,false,0);
-  const sweptBetweenBoundaries=(outer:readonly (readonly [number,number])[],
-    inner:readonly (readonly [number,number])[],root:readonly [number,number])=>{
-    // Both sides use the same Bernstein parameter t. Averaging corresponding
-    // boundary controls gives the centerline with no spline joins or endpoint
-    // kinks. The start is tucked into the common pivot hub.
-    const controls=outer.map((p,i)=>[(p[0]+inner[i][0])/2,(p[1]+inner[i][1])/2] as const);
-    controls[0]=root;
-    const [a,b,c,d]=controls.map(([x,y])=>new THREE.Vector3(x,y,PALLET_PLANE_Z));
-    return new THREE.TubeGeometry(new THREE.CubicBezierCurve3(a,b,c,d),128,.0095,12,false);
+  const apex:[number,number]=[0,.033];
+  const parabolicArm=(end:readonly [number,number])=>{
+    // Quadratic Bézier parameterization of y = apexY - k*x²: the control
+    // point keeps the tangent horizontal at the apex. Both arms use this same
+    // curve and remain tucked into the hub until they emerge at its shoulders.
+    const a=new THREE.Vector3(apex[0],apex[1],PALLET_PLANE_Z);
+    const b=new THREE.Vector3(end[0]/2,apex[1],PALLET_PLANE_Z);
+    const c=new THREE.Vector3(end[0],end[1],PALLET_PLANE_Z);
+    return new THREE.TubeGeometry(new THREE.QuadraticBezierCurve3(a,b,c),128,.0095,12,false);
   };
-  const rightBack=exit.polygon[3],leftBack=entry.polygon[3];
-  const rightRod=sweptBetweenBoundaries(
-    [[.085,.035],[.36,.005],[rightBack[0]+.06,rightBack[1]+.22],rightBack],
-    [[.04,-.07],[.34,-.09],[exit.heel[0]-.09,exit.heel[1]+.09],exit.heel],
-    [.04,.035],
-  );
-  const leftRod=sweptBetweenBoundaries(
-    [[-.085,.035],[-.36,.005],[leftBack[0]+.09,leftBack[1]+.08],leftBack],
-    [[-.085,.035],[-.36,.005],[entry.heel[0]-.04,entry.heel[1]+.23],entry.heel],
-    [-.04,.035],
-  );
+  const rightTip:[number,number]=[(exit.heel[0]+exit.polygon[3][0])/2,
+    (exit.heel[1]+exit.polygon[3][1])/2];
+  const leftTip=entry.polygon[3];
+  const rightRod=parabolicArm(rightTip);
+  const leftRod=parabolicArm(leftTip);
 
   const shoe=(face:typeof entry)=>{
     const geometry=new THREE.ExtrudeGeometry(profile(face.polygon),{

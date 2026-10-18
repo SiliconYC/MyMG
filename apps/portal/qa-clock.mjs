@@ -46,7 +46,7 @@ try{
   const initial=await read();
   assert.equal(initial.solver,'unilateral-recoil-1920hz');
   const coldStart=Date.now();await seek(899);const coldSeekMs=Date.now()-coldStart;
-  assert.ok(coldSeekMs<3000,`cold end-of-minute seek blocked for ${coldSeekMs}ms`);
+  assert.ok(coldSeekMs<3000,`cold end-of-film seek blocked for ${coldSeekMs}ms`);
   await seek(0);assert.deepEqual(await read(),initial);
   const samples={},contacts=new Set();let recoil=false,forward=false;
   const frames=[0,6,12,19,24,30,42,48,53,60,90,120,141,240,267,330,480,510,534,555,576,765,786,899];
@@ -68,7 +68,7 @@ try{
   }
   assert.ok(contacts.has('entry')&&contacts.has('exit'),'both physical working faces');
   assert.ok(recoil&&forward,'resolved forward and reverse wheel motion');
-  assert.ok(samples[899].beats>=58&&samples[899].beats<=63);
+  assert.ok(samples[899].beats>=28&&samples[899].beats<=32);
   assert.ok(Math.abs(samples[899].residual)<samples[899].work*.04);
   assert.ok(samples[0].z>0&&samples[330].z<0);
   assert.equal(samples[330].x,samples[480].x);assert.equal(samples[330].z,samples[480].z);
