@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {clockAtFrame,FPS,DURATION,TEETH} from '../animations/pendulum-clock/web/src/clock-model.ts';
+import {SECOND_HAND} from '../animations/pendulum-clock/web/src/second-hand-geometry.ts';
 import {RecoilSimulation,PHYSICS,convexContact} from '../animations/pendulum-clock/web/src/recoil-physics.ts';
 import {FACES,PITCH,OUTER_RADIUS,anchorLocalOutline,anchorOutline,wheelOutline,toothLocal,
   palletOutline,PIVOT_Y} from '../animations/pendulum-clock/web/src/recoil-geometry.ts';
@@ -86,6 +87,26 @@ test('seconds hand has a fixed shaft offset and exactly shares wheel displacemen
     assert.equal(s.minuteHandAngle,s.secondHandAngle/60);
   }
   assert.equal(TEETH,30);assert.equal(FPS,30);
+});
+
+
+test('seconds hand points outward and its shortened shaft cannot pierce the conical tip',()=>{
+  // Native Three.js ConeGeometry points along +Y. Its base is at
+  // center-height/2, while the tip is at center+height/2.
+  const baseY=SECOND_HAND.tipCenterY-SECOND_HAND.tipHeight/2;
+  const tipY=SECOND_HAND.tipCenterY+SECOND_HAND.tipHeight/2;
+  assert.ok(SECOND_HAND.tailY<0,'short counterweight stays behind the central pivot');
+  assert.ok(baseY>0&&tipY>baseY,'the cone points toward the outer dial');
+  assert.ok(SECOND_HAND.shaftEndY>baseY,
+    'the rod should seat inside the wide base without a visible gap');
+  assert.ok(SECOND_HAND.shaftEndY<baseY+.04,
+    'the rod should stop at the cone base, not extend toward the tip');
+  const coneRadiusAtShaftEnd=SECOND_HAND.tipRadius*
+    (tipY-SECOND_HAND.shaftEndY)/SECOND_HAND.tipHeight;
+  assert.ok(coneRadiusAtShaftEnd>SECOND_HAND.shaftRadius,
+    'the shaft end must be fully hidden inside the tip base');
+  assert.ok(tipY<SECOND_HAND.dialMarkOuterRadius-.02,
+    'the point must clear the perimeter of the dial markings');
 });
 
 test('the public clock film is a focused 30-second cut of the physical simulation',()=>{
