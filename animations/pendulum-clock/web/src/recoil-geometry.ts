@@ -71,25 +71,28 @@ function cubic(a:Point,b:Point,c:Point,d:Point):Point[]{
       u**3*a[1]+3*u*u*t*b[1]+3*u*t*t*c[1]+t**3*d[1]] as Point;
   });
 }
-/** One continuous, slim steel anchor. The terminal working edges are exact
+/** One continuous, tapered anchor. The terminal working edges are exact
  * members of FACES, with no tip-relief or independently positioned shoes.
  */
 export function anchorLocalOutline():Point[]{
   const e=FACES.entry,x=FACES.exit;
   const eBack=e.polygon[3];
   const xBack=x.polygon[3];
+  // Keep the pivot collar compact, then let two separate, swept arms taper
+  // into the unchanged pallet heels. The short inner arc closes the collar;
+  // it leaves a clear window between the arms instead of a broad arch.
   const path:Point[]=[[-.085,.035],[-.065,.072],[-.035,.094],[0,.10],[.035,.094],[.065,.072],[.085,.035]];
-  path.push(...cubic([.085,.035],[.36,.005],
-    [xBack[0]+.06,xBack[1]+.22],xBack).slice(1));
+  path.push(...cubic([.085,.035],[.28,.015],
+    [xBack[0]+.025,xBack[1]+.13],xBack).slice(1));
   path.push(x.polygon[2],x.toe,x.heel);
-  path.push(...cubic(x.heel,[x.heel[0]-.13,x.heel[1]+.09],
-    [.30,-.10],[.04,-.07]).slice(1));
-  path.push([0,-.09],[-.04,-.07]);
-  path.push(...cubic([-.04,-.07],[-.30,-.10],
-    [eBack[0]+.13,eBack[1]+.08],eBack).slice(1));
+  path.push(...cubic(x.heel,[x.heel[0]-.13,x.heel[1]+.12],
+    [.18,.02],[.042,.068]).slice(1));
+  path.push(...cubic([.042,.068],[.022,.087],[-.022,.087],[-.042,.068]).slice(1));
+  path.push(...cubic([-.042,.068],[-.18,.02],
+    [e.heel[0]+.13,e.heel[1]+.12],e.heel).slice(1));
   path.push(e.polygon[2],e.toe,e.heel);
-  path.push(...cubic(e.heel,[e.heel[0]-.04,e.heel[1]+.23],
-    [-.36,.005],[-.085,.035]).slice(1));
+  path.push(...cubic(e.heel,[e.heel[0]-.035,e.heel[1]+.13],
+    [-.28,.015],[-.085,.035]).slice(1));
   return path.slice(0,-1); // Three.js closes the edge; no zero-length duplicate.
 }
 export function anchorOutline(angle:number):Point[]{

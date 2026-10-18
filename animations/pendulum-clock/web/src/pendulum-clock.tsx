@@ -38,6 +38,7 @@ const DARK = '#283c43';
 const BRASS = '#b78d4f';
 const GOLD = '#ddba78';
 const STEEL = '#a9b9b7';
+const ANCHOR_RED = '#873945';
 const PORCELAIN = '#f2eee3';
 const SECOND = '#bc604c';
 
@@ -147,7 +148,7 @@ const Anchor:React.FC=()=>{
   const geometry=useMemo(makeAnchorGeometry,[]);
   useLayoutEffect(()=>()=>geometry.dispose(),[geometry]);
   return <mesh geometry={geometry} castShadow receiveShadow>
-    <meshStandardMaterial color={STEEL} metalness={.76} roughness={.28}
+    <meshStandardMaterial color={ANCHOR_RED} metalness={.62} roughness={.27}
       side={THREE.DoubleSide}/>
   </mesh>;
 };

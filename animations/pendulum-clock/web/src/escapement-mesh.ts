@@ -10,10 +10,10 @@ function profile(points:readonly (readonly [number,number])[]):THREE.Shape{
 /** The chamfer is INSET: at its widest plane the XY solid is exactly the
  * audited profile. Default outward Three.js bevels would penetrate at contact.
  */
-function extrude(shape:THREE.Shape,depth:number,z:number):THREE.ExtrudeGeometry{
+function extrude(shape:THREE.Shape,depth:number,z:number,bevelSize=.003,bevelSegments=2):THREE.ExtrudeGeometry{
   const geometry=new THREE.ExtrudeGeometry(shape,{depth,steps:1,
-    bevelEnabled:true,bevelSize:.003,bevelOffset:-.003,
-    bevelThickness:.003,bevelSegments:2,curveSegments:64});
+    bevelEnabled:true,bevelSize,bevelOffset:-bevelSize,
+    bevelThickness:.003,bevelSegments,curveSegments:64});
   geometry.translate(0,0,z-depth/2);return geometry;
 }
 export function makeEscapeWheel():THREE.ExtrudeGeometry{
@@ -23,5 +23,5 @@ export function makeEscapeWheel():THREE.ExtrudeGeometry{
   return extrude(shape,WHEEL_THICKNESS,WHEEL_PLANE_Z);
 }
 export function makeAnchorGeometry():THREE.ExtrudeGeometry{
-  return extrude(profile(anchorLocalOutline()),PALLET_THICKNESS,PALLET_PLANE_Z);
+  return extrude(profile(anchorLocalOutline()),PALLET_THICKNESS,PALLET_PLANE_Z,.008,4);
 }
