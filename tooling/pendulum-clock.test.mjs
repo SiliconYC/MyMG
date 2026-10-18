@@ -90,23 +90,16 @@ test('seconds hand has a fixed shaft offset and exactly shares wheel displacemen
 });
 
 
-test('seconds hand points outward and its shortened shaft cannot pierce the conical tip',()=>{
-  // Native Three.js ConeGeometry points along +Y. Its base is at
-  // center-height/2, while the tip is at center+height/2.
-  const baseY=SECOND_HAND.tipCenterY-SECOND_HAND.tipHeight/2;
-  const tipY=SECOND_HAND.tipCenterY+SECOND_HAND.tipHeight/2;
-  assert.ok(SECOND_HAND.tailY<0,'short counterweight stays behind the central pivot');
-  assert.ok(baseY>0&&tipY>baseY,'the cone points toward the outer dial');
-  assert.ok(SECOND_HAND.shaftEndY>baseY,
-    'the rod should seat inside the wide base without a visible gap');
-  assert.ok(SECOND_HAND.shaftEndY<baseY+.04,
-    'the rod should stop at the cone base, not extend toward the tip');
-  const coneRadiusAtShaftEnd=SECOND_HAND.tipRadius*
-    (tipY-SECOND_HAND.shaftEndY)/SECOND_HAND.tipHeight;
-  assert.ok(coneRadiusAtShaftEnd>SECOND_HAND.shaftRadius,
-    'the shaft end must be fully hidden inside the tip base');
+test('one-piece conical seconds hand tapers from the pivot toward the dial',()=>{
+  const baseY=SECOND_HAND.tipCenterY-SECOND_HAND.height/2;
+  const tipY=SECOND_HAND.tipCenterY+SECOND_HAND.height/2;
+  assert.ok(Math.abs(baseY)<1e-9,'cone root starts at the central pivot');
+  assert.ok(tipY>1.3,'the needle reaches the outer dial');
   assert.ok(tipY<SECOND_HAND.dialMarkOuterRadius-.02,
-    'the point must clear the perimeter of the dial markings');
+    'the needle tip does not intersect the perimeter marks');
+  assert.ok(SECOND_HAND.baseRadius<.09,'the root remains slender');
+  assert.ok(SECOND_HAND.height>10*SECOND_HAND.baseRadius,
+    'the hand is a long tapered cone, not a short arrowhead');
 });
 
 test('the public clock film is a focused 30-second cut of the physical simulation',()=>{

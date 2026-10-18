@@ -1,13 +1,10 @@
-/** Local coordinates for the front-facing seconds hand (12 o'clock = +Y).
- * The cone is used in Three.js's native +Y orientation, so its point faces
- * the outer minute marks, not the center of the dial.
+/** One-piece tapered seconds hand: broad root at the pivot and a sharp
+ * outward-facing tip, with no protruding cylinder or separate arrowhead.
+ * ConeGeometry's native +Y direction is radial-outward at 12 o'clock.
  */
 export const SECOND_HAND={
-  tailY:-.32,
-  shaftEndY:1.27,
-  shaftRadius:.026,
-  tipCenterY:1.36,
-  tipHeight:.22,
-  tipRadius:.073,
+  baseRadius:.074,
+  height:1.47,
+  tipCenterY:.735,
   dialMarkOuterRadius:1.52,
 } as const;
