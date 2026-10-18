@@ -4,6 +4,7 @@ import {ThreeCanvas} from '@remotion/three';
 import {useThree} from '@react-three/fiber';
 import * as THREE from 'three';
 import {clockAtFrame} from './clock-model';
+import {SECOND_HAND} from './second-hand-geometry';
 import {makeEscapeWheel,makeAnchorVisualGeometries} from './escapement-mesh';
 import {palletPose,
   anchorWheelInterference, anchorWheelClearance,
@@ -221,9 +222,12 @@ const Dial:React.FC<{angle:number}>=({angle})=>{
     })}
     {/* No second independent model or off-axis display. */}
     <group position={[0,0,2.29]} rotation={[0,0,-angle]}>
-      <Rod a={[0,-.32,0]} b={[0,1.31,0]} radius={.026} color={SECOND}/>
-      <mesh position={[0,1.35,0]} rotation={[0,0,Math.PI]}>
-        <coneGeometry args={[.073,.20,4]}/>
+      <Rod a={[0,SECOND_HAND.tailY,0]} b={[0,SECOND_HAND.shaftEndY,0]}
+        radius={SECOND_HAND.shaftRadius} color={SECOND}/>
+      {/* Three.js cones point along +Y by default: tip outward, shaft recessed
+          into the broad base (never extending into the pointed end). */}
+      <mesh position={[0,SECOND_HAND.tipCenterY,0]}>
+        <coneGeometry args={[SECOND_HAND.tipRadius,SECOND_HAND.tipHeight,4]}/>
         <meshStandardMaterial color={SECOND} metalness={.47} roughness={.32}/>
       </mesh>
       <Axle position={[0,-.25,0]} radius={.073} depth={.08} color={SECOND}/>
